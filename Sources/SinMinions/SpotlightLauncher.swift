@@ -21,6 +21,27 @@ enum SpotlightLauncher {
         _ = AXIsProcessTrustedWithOptions(options)
     }
 
+    /// Удаляет запись приложения из списка «Универсальный доступ» и запрашивает разрешение заново.
+    /// Нужно после обновления: подпись без сертификата у каждой сборки своя, и система продолжает
+    /// показывать включённый переключатель, который относится к прежней сборке.
+    @discardableResult
+    static func resetAccess() -> Bool {
+        guard let bundleID = Bundle.main.bundleIdentifier else { return false }
+        let tccutil = Process()
+        tccutil.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+        tccutil.arguments = ["reset", "Accessibility", bundleID]
+        tccutil.standardOutput = FileHandle.nullDevice
+        tccutil.standardError = FileHandle.nullDevice
+        do {
+            try tccutil.run()
+            tccutil.waitUntilExit()
+        } catch {
+            return false
+        }
+        requestAccess()
+        return tccutil.terminationStatus == 0
+    }
+
     static func openAccessSettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)

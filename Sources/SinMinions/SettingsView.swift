@@ -9,6 +9,7 @@ struct SettingsView: View {
     @State private var hasAccess = SpotlightLauncher.hasAccess
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var loginError: String?
+    @State private var resetFailed = false
     private let accessTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -59,6 +60,16 @@ struct SettingsView: View {
                 }
                 if !hasAccess {
                     Text("Без этого разрешения приложение не может нажать сочетание клавиш Spotlight. Остальное работает и без него.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    LabeledContent("Разрешение выдано, но не действует") {
+                        Button("Сбросить и запросить заново") {
+                            resetFailed = !SpotlightLauncher.resetAccess()
+                        }
+                    }
+                    Text(resetFailed
+                        ? "Сбросить не удалось. Удалите SinMinions из списка «Универсальный доступ» кнопкой «−» и добавьте снова."
+                        : "Так бывает после обновления: система помнит разрешение прежней сборки. Сброс удаляет старую запись, после чего разрешение нужно выдать ещё раз.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
