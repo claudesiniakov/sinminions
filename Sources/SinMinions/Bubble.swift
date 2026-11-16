@@ -1,26 +1,16 @@
 import AppKit
 import SinMinionsCore
 
-/// Пузырь с репликой: белый, скругление 12, шрифт 12, ширина до 160 — как в аналоге.
+/// Пузырь с репликой в стиле терминала из claudesiniakov/summary: тёмная плашка без скруглений,
+/// зелёный моноширинный текст 11 pt со свечением, ширина до 170.
 @MainActor
 final class BubbleView: NSView {
-    static let maxWidth: CGFloat = 160
+    static let maxWidth: CGFloat = 170
     static let padH: CGFloat = 12
-    static let padV: CGFloat = 8
+    static let padV: CGFloat = 7
     static let tail: CGFloat = 7
-    static let radius: CGFloat = 12
 
-    private static let fill = NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(white: 0.17, alpha: 1) : .white
-    }
-    private static let stroke = NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            ? NSColor(white: 0.32, alpha: 1) : NSColor(white: 0.88, alpha: 1)
-    }
-    private static let ink = NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            ? NSColor(white: 0.86, alpha: 1) : NSColor(white: 0.33, alpha: 1)
-    }
+    private typealias Palette = CompanionView.Palette
 
     var text = ""
     var below = false
@@ -30,9 +20,16 @@ final class BubbleView: NSView {
         let style = NSMutableParagraphStyle()
         style.alignment = .center
         style.lineBreakMode = .byWordWrapping
+        style.lineHeightMultiple = 1.15
+        let glow = NSShadow()
+        glow.shadowColor = Palette.green.withAlphaComponent(0.55)
+        glow.shadowBlurRadius = 6
+        glow.shadowOffset = .zero
         return NSAttributedString(string: text, attributes: [
-            .font: NSFont.systemFont(ofSize: 12),
-            .foregroundColor: ink,
+            .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .regular),
+            .foregroundColor: Palette.greenDim,
+            .kern: 0.5,
+            .shadow: glow,
             .paragraphStyle: style,
         ])
     }
@@ -58,14 +55,14 @@ final class BubbleView: NSView {
             ? CGRect(x: inset.minX, y: inset.minY, width: inset.width, height: inset.height - Self.tail)
             : CGRect(x: inset.minX, y: inset.minY + Self.tail, width: inset.width, height: inset.height - Self.tail)
 
-        let rounded = NSBezierPath(roundedRect: box, xRadius: Self.radius, yRadius: Self.radius)
-        Self.fill.setFill()
-        rounded.fill()
-        Self.stroke.setStroke()
-        rounded.lineWidth = 1
-        rounded.stroke()
+        let frame = NSBezierPath(rect: box)
+        Palette.panel.setFill()
+        frame.fill()
+        Palette.greenDark.setStroke()
+        frame.lineWidth = 1
+        frame.stroke()
 
-        let x = min(max(tailX, Self.radius + Self.tail), bounds.width - Self.radius - Self.tail)
+        let x = min(max(tailX, Self.tail + 2), bounds.width - Self.tail - 2)
         let baseY = below ? box.maxY : box.minY
         let tipY = below ? box.maxY + Self.tail : box.minY - Self.tail
         let overlap: CGFloat = below ? -1 : 1
@@ -74,14 +71,14 @@ final class BubbleView: NSView {
         triangle.line(to: CGPoint(x: x, y: tipY))
         triangle.line(to: CGPoint(x: x + Self.tail, y: baseY + overlap))
         triangle.close()
-        Self.fill.setFill()
+        Palette.panel.setFill()
         triangle.fill()
         let edges = NSBezierPath()
         edges.move(to: CGPoint(x: x - Self.tail, y: baseY))
         edges.line(to: CGPoint(x: x, y: tipY))
         edges.line(to: CGPoint(x: x + Self.tail, y: baseY))
         edges.lineWidth = 1
-        Self.stroke.setStroke()
+        Palette.greenDark.setStroke()
         edges.stroke()
 
         let t = Self.textSize(text)

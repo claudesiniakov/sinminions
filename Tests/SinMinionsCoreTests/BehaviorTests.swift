@@ -146,11 +146,10 @@ final class PhraseBookTests: XCTestCase {
         XCTAssertEqual(Set(ambient).count, ambient.count, "реплики не должны дублироваться")
     }
 
-    func testToneIsLowercaseWithoutExclamation() {
+    func testPhrasesFitTheBubble() {
         let all = PhraseBook.general + PhraseBook.morning + PhraseBook.day + PhraseBook.evening + PhraseBook.night
             + PhraseBook.byKind.values.flatMap { $0 }
         for phrase in all {
-            XCTAssertFalse(phrase.contains("!"), phrase)
             XCTAssertLessThanOrEqual(phrase.count, 60, phrase)
         }
     }

@@ -93,8 +93,8 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460)
-        .fixedSize(horizontal: false, vertical: true)
+        // Высоту задаёт окно: если всё не помещается на экран, форма прокручивается.
+        .frame(minWidth: 420, maxWidth: .infinity, minHeight: 280, maxHeight: .infinity)
         .onReceive(accessTimer) { _ in hasAccess = SpotlightLauncher.hasAccess }
     }
 }

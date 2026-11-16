@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Рисует иконку SinMinions (1024×1024 PNG): призрак Moth на тёмно-сиреневом скруглённом квадрате.
+"""Рисует иконку SinMinions (1024×1024 PNG): зелёный призрак Moth в стиле терминала на тёмном скруглённом квадрате.
 
 Запуск: python3 scripts/make-icon.py [путь/к/AppIcon.png]
 """
 import sys
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 S = 4  # суперсэмплинг для сглаживания
 N = 1024 * S
@@ -46,7 +46,7 @@ def body():
 def main(out):
     img = Image.new("RGBA", (N, N), (0, 0, 0, 0))
     pad = 100 * S
-    top, bottom = (58, 48, 92), (24, 20, 44)
+    top, bottom = (18, 28, 16), (8, 12, 7)
     gradient = Image.new("RGBA", (N, N))
     gd = ImageDraw.Draw(gradient)
     for y in range(N):
@@ -65,12 +65,18 @@ def main(out):
         return (ox + p[0] * k, oy + p[1] * k)
 
     outline = [at(p) for p in body()]
-    draw.polygon(outline, fill=(216, 208, 240, 255))
-    draw.line(outline + [outline[0]], fill=(184, 174, 224, 255), width=round(1.5 * k), joint="curve")
+    glow = Image.new("RGBA", (N, N), (0, 0, 0, 0))
+    ImageDraw.Draw(glow).polygon(outline, fill=(92, 245, 66, 150))
+    glow = glow.filter(ImageFilter.GaussianBlur(40 * S))
+    glow.putalpha(ImageChops.multiply(glow.getchannel("A"), mask))
+    img.alpha_composite(glow)
+    draw = ImageDraw.Draw(img)
+    draw.polygon(outline, fill=(26, 58, 18, 255))
+    draw.line(outline + [outline[0]], fill=(58, 138, 40, 255), width=round(1.5 * k), joint="curve")
     for cx, cy in ((17, 24), (31, 24)):
-        draw.ellipse([at((cx - 3, cy - 3.5)), at((cx + 3, cy + 3.5))], fill=(51, 51, 51, 255))
+        draw.ellipse([at((cx - 3, cy - 3.5)), at((cx + 3, cy + 3.5))], fill=(92, 245, 66, 255))
     for cx, cy in ((18.2, 22.5), (32.2, 22.5)):
-        draw.ellipse([at((cx - 1, cy - 1)), at((cx + 1, cy + 1))], fill=(255, 255, 255, 255))
+        draw.ellipse([at((cx - 1, cy - 1)), at((cx + 1, cy + 1))], fill=(207, 255, 202, 255))
 
     img.resize((1024, 1024), Image.LANCZOS).save(out)
     print("Сохранено:", out)

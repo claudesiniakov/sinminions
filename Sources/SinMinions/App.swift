@@ -44,6 +44,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(2))
                 controller.announce(.ambient, force: true)
+                // Для снимка в CI: через несколько секунд открываются настройки.
+                try? await Task.sleep(for: .seconds(5))
+                self.showSettings()
             }
         }
     }
@@ -73,15 +76,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showSettings() {
         if settingsWindow == nil {
             let hosting = NSHostingController(rootView: SettingsView(prefs: prefs, updater: updater))
+            // Размер окна не диктуется содержимым: иначе на небольшом экране низ уходит под Dock.
+            hosting.sizingOptions = []
+            let ideal = hosting.sizeThatFits(in: CGSize(width: 460, height: 10_000))
             let window = NSWindow(contentViewController: hosting)
             window.title = "SinMinions"
-            window.styleMask = [.titled, .closable]
+            window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+            // Зелёная кнопка разворачивает окно на весь экран (без отдельного полноэкранного пространства).
+            window.collectionBehavior = [.fullScreenNone]
             window.isReleasedWhenClosed = false
+            window.contentMinSize = NSSize(width: 420, height: 280)
+            let visible = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame
+                ?? CGRect(x: 0, y: 0, width: 1280, height: 720)
+            let titleBar = window.frame.height - window.contentLayoutRect.height
+            let height = min(max(ideal.height, 280), visible.height - titleBar - 16)
+            window.setContentSize(NSSize(width: 460, height: height))
             window.center()
             settingsWindow = window
         }
         NSApp.activate(ignoringOtherApps: true)
-        settingsWindow?.makeKeyAndOrderFront(nil)
+        if let window = settingsWindow {
+            // Окно, оставшееся за краем экрана (сменили монитор), возвращаем в видимую область.
+            if let visible = (window.screen ?? NSScreen.main)?.visibleFrame, !visible.contains(window.frame) {
+                var frame = window.frame
+                frame.size.height = min(frame.height, visible.height)
+                frame.size.width = min(frame.width, visible.width)
+                frame.origin.x = min(max(frame.minX, visible.minX), visible.maxX - frame.width)
+                frame.origin.y = min(max(frame.minY, visible.minY), visible.maxY - frame.height)
+                window.setFrame(frame, display: true)
+            }
+            window.makeKeyAndOrderFront(nil)
+        }
     }
 }
 

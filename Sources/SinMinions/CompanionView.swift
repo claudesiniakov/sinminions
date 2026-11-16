@@ -38,17 +38,35 @@ enum MothShape {
 @MainActor
 final class CompanionView: NSView {
     /// Запас над персонажем под парение и подпрыгивание, в единицах рисунка.
-    static let headroom: CGFloat = 22
-    static let margin: CGFloat = 2
+    static let headroom: CGFloat = 28
+    /// Поля вокруг персонажа под свечение, в единицах рисунка.
+    static let glowMargin: CGFloat = 12
 
     static func windowSize(scale: CGFloat) -> CGSize {
-        CGSize(width: MothShape.size.width * scale + margin * 2,
-               height: (MothShape.size.height + headroom) * scale + margin * 2)
+        CGSize(width: (MothShape.size.width + glowMargin * 2) * scale,
+               height: (MothShape.size.height + headroom + glowMargin * 2) * scale)
+    }
+
+    /// Палитра терминала из claudesiniakov/summary.
+    enum Palette {
+        static func rgb(_ hex: UInt32, _ alpha: CGFloat = 1) -> NSColor {
+            NSColor(srgbRed: CGFloat((hex >> 16) & 0xff) / 255, green: CGFloat((hex >> 8) & 0xff) / 255,
+                    blue: CGFloat(hex & 0xff) / 255, alpha: alpha)
+        }
+        static let green = rgb(0x5cf542)
+        static let greenDim = rgb(0x3a9e28)
+        static let greenDark = rgb(0x1a4a10)
+        static let body = rgb(0x1a3a12)
+        static let bodyStroke = rgb(0x3a8a28)
+        static let pupil = rgb(0xcfffca)
+        static let panel = rgb(0x0e140c)
     }
 
     let scale: CGFloat
     private let moth = CALayer()
+    private let body = CAShapeLayer()
     private let eyes = CALayer()
+    private let zzz = CATextLayer()
     private let bodyPath: CGPath
     private var sleeping = false
     private var eyesHome = CGPoint.zero
@@ -74,13 +92,19 @@ final class CompanionView: NSView {
         layer?.backgroundColor = .clear
 
         let size = CGSize(width: MothShape.size.width * scale, height: MothShape.size.height * scale)
-        moth.frame = CGRect(origin: CGPoint(x: Self.margin, y: Self.margin), size: size)
+        let inset = Self.glowMargin * scale
+        moth.frame = CGRect(origin: CGPoint(x: inset, y: inset), size: size)
 
-        let body = CAShapeLayer()
         body.path = bodyPath
-        body.fillColor = NSColor(srgbRed: 0xd8 / 255, green: 0xd0 / 255, blue: 0xf0 / 255, alpha: 1).cgColor
-        body.strokeColor = NSColor(srgbRed: 0xb8 / 255, green: 0xae / 255, blue: 0xe0 / 255, alpha: 1).cgColor
+        body.fillColor = Palette.body.cgColor
+        body.strokeColor = Palette.bodyStroke.cgColor
         body.lineWidth = 1.5 * scale
+        // Зелёное свечение; контур тени задан явно, чтобы система не считала её по пикселям.
+        body.shadowPath = bodyPath
+        body.shadowColor = Palette.green.cgColor
+        body.shadowOffset = .zero
+        body.shadowRadius = 3 * scale
+        body.shadowOpacity = 0.35
         moth.addSublayer(body)
 
         // Глаза — отдельный слой с опорной точкой на линии глаз: моргание сжимает их к этой линии.
@@ -91,17 +115,29 @@ final class CompanionView: NSView {
         for center in MothShape.eyeCenters {
             let eye = CAShapeLayer()
             eye.path = MothShape.ellipse(center: center, radii: MothShape.eyeRadii, transform)
-            eye.fillColor = NSColor(white: 0.2, alpha: 1).cgColor
+            eye.fillColor = Palette.green.cgColor
             eyes.addSublayer(eye)
         }
         for center in MothShape.shineCenters {
             let shine = CAShapeLayer()
             shine.path = MothShape.ellipse(center: center, radii: CGSize(width: 1, height: 1), transform)
-            shine.fillColor = NSColor.white.cgColor
+            shine.fillColor = Palette.pupil.cgColor
             eyes.addSublayer(shine)
         }
         moth.addSublayer(eyes)
         layer?.addSublayer(moth)
+
+        // «z z z» над спящим.
+        zzz.string = "z z z"
+        zzz.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        zzz.fontSize = max(9, 7.5 * scale)
+        zzz.foregroundColor = Palette.greenDim.cgColor
+        zzz.contentsScale = NSScreen.main?.backingScaleFactor ?? 2
+        zzz.alignmentMode = .left
+        zzz.frame = CGRect(x: moth.frame.maxX - 10 * scale, y: moth.frame.maxY - 4 * scale,
+                           width: 20 * scale, height: 12 * scale)
+        zzz.opacity = 0
+        layer?.addSublayer(zzz)
         startFloating()
     }
 
@@ -113,18 +149,77 @@ final class CompanionView: NSView {
 
     // MARK: - Анимации
 
-    /// Парение: 6 единиц вверх-вниз, цикл 3 с (во сне — вдвое медленнее).
-    func startFloating() {
-        let float = CABasicAnimation(keyPath: "transform.translation.y")
-        float.fromValue = 0
-        float.toValue = 6 * scale
-        float.duration = sleeping ? 3 : 1.5
-        float.autoreverses = true
-        float.repeatCount = .infinity
-        float.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        moth.add(float, forKey: "float")
+    private func keyframes(_ keyPath: String, _ values: [CGFloat], _ times: [NSNumber]) -> CAKeyframeAnimation {
+        let animation = CAKeyframeAnimation(keyPath: keyPath)
+        animation.values = values
+        animation.keyTimes = times
+        animation.timingFunctions = Array(
+            repeating: CAMediaTimingFunction(name: .easeInEaseOut), count: max(values.count - 1, 1)
+        )
+        return animation
     }
 
+    /// Парение призрака: медленный дрейф с лёгким наклоном и мерцанием, цикл 5 с; во сне — тише и тусклее.
+    /// Вместе с ним пульсирует свечение (цикл 3 с).
+    func startFloating() {
+        let degree = CGFloat.pi / 180
+        let group = CAAnimationGroup()
+        let glowRadius = CABasicAnimation(keyPath: "shadowRadius")
+        let glowOpacity = CABasicAnimation(keyPath: "shadowOpacity")
+        if sleeping {
+            let times: [NSNumber] = [0, 0.5, 1]
+            group.animations = [
+                keyframes("transform.translation.y", [0, 4 * scale, 0], times),
+                keyframes("transform.rotation.z", [1.5 * degree, -1.5 * degree, 1.5 * degree], times),
+                keyframes("opacity", [0.55, 0.7, 0.55], times),
+            ]
+            group.duration = 6
+            glowRadius.fromValue = 1.5 * scale
+            glowRadius.toValue = 2.5 * scale
+            glowOpacity.fromValue = 0.12
+            glowOpacity.toValue = 0.2
+        } else {
+            let times: [NSNumber] = [0, 0.2, 0.5, 0.75, 1]
+            group.animations = [
+                keyframes("transform.translation.y", [0, 9 * scale, 6 * scale, 11 * scale, 0], times),
+                keyframes("transform.translation.x", [0, 3 * scale, -2 * scale, 4 * scale, 0], times),
+                // В CSS положительный поворот — по часовой стрелке, в слое с осью y вверх — против.
+                keyframes("transform.rotation.z", [0, -1.5 * degree, 1 * degree, -1 * degree, 0], times),
+                keyframes("opacity", [0.82, 1, 0.9, 1, 0.82], times),
+            ]
+            group.duration = 5
+            glowRadius.fromValue = 3 * scale
+            glowRadius.toValue = 8 * scale
+            glowOpacity.fromValue = 0.35
+            glowOpacity.toValue = 0.8
+        }
+        group.repeatCount = .infinity
+        moth.add(group, forKey: "float")
+
+        for glow in [glowRadius, glowOpacity] {
+            glow.duration = 1.5
+            glow.autoreverses = true
+            glow.repeatCount = .infinity
+            glow.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        }
+        body.add(glowRadius, forKey: "glowRadius")
+        body.add(glowOpacity, forKey: "glowOpacity")
+
+        zzz.removeAnimation(forKey: "drift")
+        if sleeping {
+            let drift = CAAnimationGroup()
+            drift.animations = [
+                keyframes("transform.translation.x", [0, 4 * scale, 8 * scale], [0, 0.5, 1]),
+                keyframes("transform.translation.y", [0, 8 * scale, 16 * scale], [0, 0.5, 1]),
+                keyframes("opacity", [0.3, 0.8, 0], [0, 0.5, 1]),
+            ]
+            drift.duration = 3
+            drift.repeatCount = .infinity
+            zzz.add(drift, forKey: "drift")
+        }
+    }
+
+    /// Щелчок: подпрыгивание и вспышка свечения.
     func hop() {
         let hop = CAKeyframeAnimation(keyPath: "transform.translation.y")
         hop.values = [0, 14 * scale, 0]
@@ -133,6 +228,15 @@ final class CompanionView: NSView {
         hop.isAdditive = true
         hop.timingFunctions = [CAMediaTimingFunction(name: .easeOut), CAMediaTimingFunction(name: .easeIn)]
         moth.add(hop, forKey: "hop")
+
+        let burst = CAKeyframeAnimation(keyPath: "shadowRadius")
+        burst.values = [8 * scale, 11 * scale, 8 * scale]
+        burst.duration = 0.5
+        let flash = CAKeyframeAnimation(keyPath: "shadowOpacity")
+        flash.values = [0.8, 1, 0.8]
+        flash.duration = 0.5
+        body.add(burst, forKey: "burst")
+        body.add(flash, forKey: "flash")
     }
 
     func blink() {

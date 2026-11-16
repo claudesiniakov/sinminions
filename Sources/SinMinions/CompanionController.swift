@@ -117,7 +117,7 @@ final class CompanionController: NSObject {
     func returnToCorner() {
         guard let area = NSScreen.main?.visibleFrame else { return }
         apply(engine.handle(.dragBegan, now: now))
-        panel.setFrameOrigin(Layout.corner(size: panel.frame.size, in: area))
+        panel.setFrameOrigin(Layout.corner(size: panel.frame.size, in: area, margin: 8))
         apply(engine.handle(.dragEnded, now: now))
         savePosition()
     }
@@ -210,7 +210,7 @@ final class CompanionController: NSObject {
         if let x = defaults.object(forKey: Keys.x) as? Double, let y = defaults.object(forKey: Keys.y) as? Double {
             panel.setFrameOrigin(clamped(CGPoint(x: x, y: y), size: size))
         } else if let visible = NSScreen.main?.visibleFrame {
-            panel.setFrameOrigin(Layout.corner(size: size, in: visible))
+            panel.setFrameOrigin(Layout.corner(size: size, in: visible, margin: 8))
         }
     }
 
@@ -303,7 +303,7 @@ final class CompanionController: NSObject {
         let text = book.next(kind, hour: hour)
         let moth = view.mothFrame.offsetBy(dx: panel.frame.minX, dy: panel.frame.minY)
         // Над головой оставляем место под парение.
-        let lifted = CGRect(x: moth.minX, y: moth.minY, width: moth.width, height: moth.height + 6 * view.scale)
+        let lifted = CGRect(x: moth.minX, y: moth.minY, width: moth.width, height: moth.height + 11 * view.scale)
         bubble.show(text, over: lifted, in: area)
     }
 
