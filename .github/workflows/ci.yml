@@ -31,6 +31,31 @@ jobs:
       - name: Test
         run: swift test
 
+      # Постоянный самоподписанный сертификат: подпись всех сборок одинакова для системы,
+      # поэтому разрешение «Универсальный доступ» не сбрасывается при обновлении.
+      - name: Signing certificate
+        env:
+          SIGNING_P12: ${{ secrets.SIGNING_P12 }}
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+        run: |
+          if [ -z "$SIGNING_P12" ]; then
+            echo "Сертификата нет (сборка из форка или запроса на слияние) — подпись ad-hoc"
+            exit 0
+          fi
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "$SIGNING_P12" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/signing.p12" -k "$KEYCHAIN" -P "$SIGNING_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/signing.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          HASH="$(security find-certificate -c "SinMinions Signing" -Z "$KEYCHAIN" | awk '/SHA-1/ {print $NF}')"
+          test -n "$HASH"
+          echo "SIGN_IDENTITY=$HASH" >> "$GITHUB_ENV"
+
       - name: Package SinMinions.app
         run: ./scripts/build-app.sh
 

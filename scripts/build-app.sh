@@ -48,10 +48,18 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# Ad-hoc подпись (без Developer ID). Разрешение «Универсальный доступ» привязано к подписи,
-# поэтому после обновления система может запросить его заново.
-codesign --force --deep --options runtime --sign - "$APP"
+# Подпись. В CI — постоянным самоподписанным сертификатом (SIGN_IDENTITY): требование к подписи
+# у всех сборок одно, и выданный «Универсальный доступ» переживает обновления.
+# Без сертификата — ad-hoc: тогда после каждого обновления разрешение приходится выдавать заново.
+IDENTITY="${SIGN_IDENTITY:--}"
+codesign --force --deep --options runtime --timestamp=none --sign "$IDENTITY" "$APP"
 codesign --verify --verbose "$APP"
+codesign -d -r- "$APP" 2>&1 | tee build/requirement.txt
+if [ "$IDENTITY" != "-" ] && ! grep -q "certificate leaf" build/requirement.txt; then
+  echo "Подпись не привязана к сертификату" >&2
+  exit 1
+fi
+rm build/requirement.txt
 
 ditto -c -k --keepParent "$APP" build/SinMinions.zip
 # Контрольная сумма для проверки обновления внутри приложения.
