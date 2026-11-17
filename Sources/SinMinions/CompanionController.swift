@@ -153,6 +153,7 @@ final class CompanionController: NSObject {
     private func refreshLLM() {
         let list = prefs.connections
         console.model.llmName = list.active?.name
+        console.model.llmModelName = list.active?.model
         console.model.llmCount = list.items.count
         console.model.llmPosition = list.activePosition.map { "\($0)/\(list.items.count)" } ?? ""
     }

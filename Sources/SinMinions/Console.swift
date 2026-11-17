@@ -221,7 +221,7 @@ final class ChatSession {
     func loadDemo() {
         entries = [
             ChatEntry(kind: .user, text: "привет, как дела?"),
-            ChatEntry(kind: .assistant, text: "всё под контролем, смотритель. радиация в норме, периметр чист."),
+            ChatEntry(kind: .assistant, text: "всё под контролем, смотритель. радиация в норме, периметр чист. текст можно выделить мышью и скопировать по ⌘C."),
             ChatEntry(kind: .user, text: "а если без шуток?"),
             ChatEntry(kind: .error, text: "Сервис GigaChat недоступен (503)"),
         ]
@@ -238,6 +238,7 @@ final class ConsoleModel {
     var selected = 0
     /// Выбранное подключение к нейросети («интеллект») — для монитора и заголовка чата.
     var llmName: String?
+    var llmModelName: String?
     var llmPosition = ""
     var llmCount = 0
     @ObservationIgnored var switchConnection: (Int) -> Void = { _ in }
@@ -255,6 +256,10 @@ final class ConsoleModel {
 }
 
 // MARK: - Оформление терминала
+
+private extension String {
+    var nonEmpty: String? { isEmpty ? nil : self }
+}
 
 private enum Term {
     static let body = Color(nsColor: CompanionView.Palette.body)
@@ -355,7 +360,7 @@ private struct ChatScreen: View {
 
     var body: some View {
         @Bindable var chat = model.chat
-        TerminalFrame(title: "MOTH-OS // " + (model.llmName ?? "НЕЙРОСЕТЬ").uppercased()) {
+        TerminalFrame(title: "MOTH-OS // " + ([model.llmName, model.llmModelName].compactMap { $0 }.joined(separator: " · ").nonEmpty ?? "НЕЙРОСЕТЬ").uppercased()) {
             VStack(alignment: .leading, spacing: 8) {
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -364,12 +369,16 @@ private struct ChatScreen: View {
                                 Text("ВВЕДИТЕ СООБЩЕНИЕ. /clear — ОЧИСТИТЬ ИСТОРИЮ.")
                                     .foregroundStyle(Term.dim)
                             }
-                            ForEach(chat.entries) { entry in
-                                line(entry).id(entry.id)
+                            if !chat.entries.isEmpty {
+                                // Весь журнал — один текст: выделять можно мышью через несколько реплик, ⌘C копирует.
+                                Text(log(chat))
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             if chat.isSending {
-                                Text("ОЖИДАНИЕ ОТВЕТА…").foregroundStyle(Term.dim).id("busy")
+                                Text("ОЖИДАНИЕ ОТВЕТА…").foregroundStyle(Term.dim)
                             }
+                            Color.clear.frame(height: 1).id("end")
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -394,27 +403,33 @@ private struct ChatScreen: View {
         .onAppear { focused = true }
     }
 
-    @ViewBuilder
-    private func line(_ entry: ChatEntry) -> some View {
-        switch entry.kind {
-        case .user:
-            Text("> " + entry.text).foregroundStyle(Term.green)
-        case .assistant:
-            Text("GIGACHAT: " + entry.text).foregroundStyle(Term.green)
-                .shadow(color: Term.green.opacity(0.45), radius: 3)
-        case .error:
-            Text("ОШИБКА: " + entry.text).foregroundStyle(Term.amber)
-        case .info:
-            Text(entry.text).foregroundStyle(Term.dim)
+    /// Журнал одной строкой с цветом по видам реплик.
+    private func log(_ chat: ChatSession) -> AttributedString {
+        var result = AttributedString()
+        for (index, entry) in chat.entries.enumerated() {
+            var line: AttributedString
+            switch entry.kind {
+            case .user:
+                line = AttributedString("> " + entry.text)
+                line.foregroundColor = Term.green
+            case .assistant:
+                line = AttributedString("GIGACHAT: " + entry.text)
+                line.foregroundColor = Term.green
+            case .error:
+                line = AttributedString("ОШИБКА: " + entry.text)
+                line.foregroundColor = Term.amber
+            case .info:
+                line = AttributedString(entry.text)
+                line.foregroundColor = Term.dim
+            }
+            result += line
+            if index < chat.entries.count - 1 { result += AttributedString("\n\n") }
         }
+        return result
     }
 
     private func scroll(_ proxy: ScrollViewProxy, _ chat: ChatSession) {
-        if chat.isSending {
-            proxy.scrollTo("busy", anchor: .bottom)
-        } else if let last = chat.entries.last {
-            proxy.scrollTo(last.id, anchor: .bottom)
-        }
+        proxy.scrollTo("end", anchor: .bottom)
     }
 }
 
@@ -469,6 +484,12 @@ struct MonitorView: View {
                     Text((model.llmName ?? "НЕТ ПОДКЛЮЧЕНИЙ").uppercased())
                         .lineLimit(1)
                         .truncationMode(.tail)
+                    if let modelName = model.llmModelName {
+                        Text(modelName.uppercased())
+                            .foregroundStyle(Term.dim)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
                     if !model.llmPosition.isEmpty {
                         Text(model.llmPosition).foregroundStyle(Term.dim)
                     }
@@ -544,6 +565,33 @@ struct MonitorView: View {
 /// Окно терминала: принимает клавиатуру, не активируя приложение.
 final class ConsolePanel: NSPanel {
     var onKey: (UInt16) -> Bool = { _ in false }
+    /// Что скопировать по ⌘C, если ничего не выделено.
+    var copyFallback: () -> String? = { nil }
+
+    /// У приложения без значка в Dock нет меню «Правка», поэтому ⌘C и ⌘A обрабатываем сами.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+              let key = event.charactersIgnoringModifiers?.lowercased() else {
+            return super.performKeyEquivalent(with: event)
+        }
+        switch key {
+        case "c":
+            let board = NSPasteboard.general
+            let before = board.changeCount
+            _ = NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: self)
+            // Выделения нет — копируем последний ответ модели.
+            if board.changeCount == before, let text = copyFallback() {
+                board.clearContents()
+                board.setString(text, forType: .string)
+            }
+            return true
+        case "a":
+            if NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: self) { return true }
+            return super.performKeyEquivalent(with: event)
+        default:
+            return super.performKeyEquivalent(with: event)
+        }
+    }
 
     override var canBecomeKey: Bool { true }
 
@@ -594,6 +642,9 @@ final class ConsoleController: NSObject, NSWindowDelegate {
         monitor.contentView = NSHostingView(rootView: MonitorView(model: model))
         terminal.delegate = self
         terminal.onKey = { [weak self] code in self?.handleKey(code) ?? false }
+        terminal.copyFallback = { [weak self] in
+            self?.model.chat.entries.last(where: { $0.kind == .assistant })?.text
+        }
         model.run = { [weak self] command in self?.onCommand(command) }
     }
 
