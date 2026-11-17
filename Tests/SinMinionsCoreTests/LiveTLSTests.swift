@@ -44,6 +44,22 @@ final class LiveTLSTests: XCTestCase {
         XCTAssertTrue([400, 401, 403].contains(chatCode), "ожидали 400, 401 или 403, получили \(chatCode)")
     }
 
+    /// DeepSeek: обычный HTTPS. Неверный ключ должен дать 401 — значит, сервер достижим и формат запроса принят.
+    func testDeepSeekRejectsFakeKey() async throws {
+        guard ProcessInfo.processInfo.environment["SINMINIONS_LIVE_TLS"] != nil else { throw XCTSkip("только в CI") }
+        let session = URLSession(configuration: .ephemeral)
+        let (data, response) = try await session.data(for: DeepSeekAPI.balanceRequest(key: "sk-0000000000000000000000000000000f"))
+        let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+        print("LIVE api.deepseek.com balance: HTTP \(code) \(String(data: data.prefix(160), encoding: .utf8) ?? "")")
+        XCTAssertEqual(code, 401)
+        let chat = DeepSeekAPI.chatRequest(key: "sk-0000000000000000000000000000000f", model: "deepseek-flash", messages: [ChatMessage(.user, "привет")])
+        let (chatData, chatResponse) = try await session.data(for: chat)
+        let chatCode = (chatResponse as? HTTPURLResponse)?.statusCode ?? -1
+        print("LIVE api.deepseek.com chat: HTTP \(chatCode) \(String(data: chatData.prefix(160), encoding: .utf8) ?? "")")
+        XCTAssertEqual(chatCode, 401)
+        XCTAssertNotNil(LLMResponse.errorDetail(chatData))
+    }
+
     func testChatHost() async throws {
         guard ProcessInfo.processInfo.environment["SINMINIONS_LIVE_TLS"] != nil else { throw XCTSkip("только в CI") }
         let request = GigaChatAPI.chatRequest(token: "x", model: "GigaChat", messages: [ChatMessage(.user, "привет")])
