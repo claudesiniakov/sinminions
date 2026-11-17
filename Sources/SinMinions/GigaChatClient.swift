@@ -65,8 +65,10 @@ actor GigaChatClient {
         case .notConnectedToInternet, .networkConnectionLost: return "Нет подключения к сети"
         case .timedOut: return "Сервер не ответил вовремя"
         case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed: return "Не удалось связаться с сервером GigaChat"
+        case .secureConnectionFailed:
+            return "Защищённое соединение с GigaChat не установилось (код \(error.code.rawValue)): возможно, мешает VPN, прокси или фильтр сети"
         case .serverCertificateUntrusted, .serverCertificateHasBadDate, .serverCertificateHasUnknownRoot,
-             .serverCertificateNotYetValid, .secureConnectionFailed:
+             .serverCertificateNotYetValid:
             var text = "Не удалось проверить сертификат сервера GigaChat (код \(error.code.rawValue))"
             if let reason = GigaChatTrust.lastFailure { text += ": " + reason }
             return text
