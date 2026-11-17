@@ -10,13 +10,14 @@ final class LiveTLSTests: XCTestCase {
             let (data, response) = try await session.data(for: request)
             let code = (response as? HTTPURLResponse)?.statusCode ?? -1
             print("LIVE \(label): HTTP \(code) \(String(data: data.prefix(120), encoding: .utf8) ?? "")")
+            print("LIVE \(label): доверие — \(GigaChatTrust.lastNote ?? "делегат не вызывался")")
             return code
         } catch let error as URLError {
             let ns = error as NSError
             print("LIVE \(label): URLError \(error.code.rawValue) \(ns.localizedDescription)")
             print("LIVE \(label): userInfo \(ns.userInfo)")
-            print("LIVE \(label): наша проверка — \(GigaChatTrust.lastFailure ?? "не вызывалась или прошла")")
-            XCTFail("\(label): \(error.code.rawValue) \(ns.localizedDescription); \(GigaChatTrust.lastFailure ?? "делегат отказа не записал")")
+            print("LIVE \(label): наша проверка — \(GigaChatTrust.lastNote ?? "не вызывалась")")
+            XCTFail("\(label): \(error.code.rawValue) \(ns.localizedDescription); \(GigaChatTrust.lastNote ?? "делегат ничего не записал")")
             return -1
         }
     }

@@ -5,18 +5,18 @@ import Security
 /// Всем остальным хостам — обычная системная проверка.
 public final class GigaChatTrust: NSObject, URLSessionDelegate, @unchecked Sendable {
     private static let lock = NSLock()
-    nonisolated(unsafe) private static var failure: String?
+    nonisolated(unsafe) private static var note: String?
 
-    /// Почему последняя проверка не прошла (для сообщения об ошибке и диагностики).
-    public static var lastFailure: String? {
+    /// Что произошло при последней проверке: пройдена или причина отказа (для сообщения об ошибке и диагностики).
+    public static var lastNote: String? {
         lock.lock()
         defer { lock.unlock() }
-        return failure
+        return note
     }
 
     private static func record(_ text: String?) {
         lock.lock()
-        failure = text
+        note = text
         lock.unlock()
     }
 
@@ -46,11 +46,22 @@ public final class GigaChatTrust: NSObject, URLSessionDelegate, @unchecked Senda
         _ = SecTrustSetAnchorCertificatesOnly(trust, false)
         var error: CFError?
         if SecTrustEvaluateWithError(trust, &error) {
-            Self.record(nil)
+            Self.record("\(space.host): проверка пройдена")
             return (.useCredential, URLCredential(trust: trust))
         }
         let reason = error.map { CFErrorCopyDescription($0) as String } ?? "причина неизвестна"
-        Self.record("\(space.host): \(reason) (цепочка из \(SecTrustGetCertificateCount(trust)) сертификатов)")
+        // Запасной путь: имя хоста, срок действия и цепочка до встроенного корня остаются обязательными,
+        // но отзыв сертификата по сети не проверяется и ничего из сети не подгружается
+        // (сервер сам присылает промежуточный сертификат). Так недоступный сервер отзыва не блокирует чат.
+        SecTrustSetNetworkFetchAllowed(trust, false)
+        SecTrustSetPolicies(trust, SecPolicyCreateSSL(true, space.host as CFString))
+        var fallbackError: CFError?
+        if SecTrustEvaluateWithError(trust, &fallbackError) {
+            Self.record("\(space.host): пройдена без проверки отзыва; первая попытка не прошла: \(reason)")
+            return (.useCredential, URLCredential(trust: trust))
+        }
+        let fallbackReason = fallbackError.map { CFErrorCopyDescription($0) as String } ?? "причина неизвестна"
+        Self.record("\(space.host): отказ — \(reason); без отзыва — \(fallbackReason); цепочка из \(SecTrustGetCertificateCount(trust)) сертификатов")
         // Не прошла и наша проверка: пусть система сама откажет с понятной ошибкой сертификата.
         return (.performDefaultHandling, nil)
     }

@@ -61,18 +61,25 @@ actor GigaChatClient {
     }
 
     private static func describe(_ error: URLError) -> String {
+        // Вложенные коды системы: по ним видно, на каком шаге оборвалось соединение.
+        let ns = error as NSError
+        var codes = ["код \(error.code.rawValue)"]
+        if let stream = ns.userInfo["_kCFStreamErrorCodeKey"] as? Int { codes.append("поток \(stream)") }
+        if let inner = (ns.userInfo[NSUnderlyingErrorKey] as? NSError)?.code { codes.append("вложенная \(inner)") }
+        let suffix = " (" + codes.joined(separator: ", ") + ")"
+        let trust = GigaChatTrust.lastNote.map { ". Проверка доверия: " + $0 } ?? ". Проверка доверия не вызывалась"
         switch error.code {
-        case .notConnectedToInternet, .networkConnectionLost: return "Нет подключения к сети"
-        case .timedOut: return "Сервер не ответил вовремя"
-        case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed: return "Не удалось связаться с сервером GigaChat"
+        case .notConnectedToInternet, .networkConnectionLost: return "Нет подключения к сети" + suffix
+        case .timedOut: return "Сервер не ответил вовремя" + suffix
+        case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed:
+            return "Не удалось связаться с сервером GigaChat" + suffix
         case .secureConnectionFailed:
-            return "Защищённое соединение с GigaChat не установилось (код \(error.code.rawValue)): возможно, мешает VPN, прокси или фильтр сети"
+            return "Защищённое соединение с GigaChat не установилось" + suffix + trust
         case .serverCertificateUntrusted, .serverCertificateHasBadDate, .serverCertificateHasUnknownRoot,
              .serverCertificateNotYetValid:
-            var text = "Не удалось проверить сертификат сервера GigaChat (код \(error.code.rawValue))"
-            if let reason = GigaChatTrust.lastFailure { text += ": " + reason }
-            return text
-        default: return error.localizedDescription + " (код \(error.code.rawValue))"
+            return "Не удалось проверить сертификат сервера GigaChat" + suffix + trust
+        default:
+            return error.localizedDescription + suffix
         }
     }
 }
