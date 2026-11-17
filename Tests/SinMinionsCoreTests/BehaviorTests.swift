@@ -190,26 +190,118 @@ final class ConsoleModeTests: XCTestCase {
         XCTAssertEqual(other.mode, .idle)
     }
 
-    func testConsoleLayout() {
+    func testConsoleLayoutAlignsTheWindowsInOneRow() {
         let area = CGRect(x: 0, y: 80, width: 1440, height: 800)
         let place = Layout.console(
-            moth: CGSize(width: 72, height: 84), terminal: CGSize(width: 400, height: 250),
-            monitor: CGSize(width: 300, height: 350), in: area
+            moth: CGSize(width: 72, height: 84), terminal: CGSize(width: 440, height: 580),
+            monitor: CGSize(width: 280, height: 580), in: area
         )
-        // Призрак по центру, терминал под ним по центру, монитор справа, верх — на уровне призрака.
-        XCTAssertEqual(place.moth, CGPoint(x: 684, y: 571))
-        XCTAssertEqual(place.terminal, CGPoint(x: 520, y: 305))
-        XCTAssertEqual(place.monitor, CGPoint(x: 936, y: 305))
+        XCTAssertEqual(place.moth, CGPoint(x: 684, y: 740))
+        XCTAssertEqual(place.terminal, CGRect(x: 348, y: 136, width: 440, height: 580))
+        XCTAssertEqual(place.monitor, CGRect(x: 812, y: 136, width: 280, height: 580))
+        // Одна высота, общие верхний и нижний края, зазор между окнами, пара по центру под персонажем.
+        XCTAssertEqual(place.terminal.minY, place.monitor.minY)
+        XCTAssertEqual(place.terminal.maxY, place.monitor.maxY)
+        XCTAssertEqual(place.monitor.minX - place.terminal.maxX, 24)
+        XCTAssertEqual((place.terminal.minX + place.monitor.maxX) / 2, area.midX)
+        XCTAssertEqual(place.moth.x + 36, area.midX)
     }
 
-    func testMonitorGoesLeftWhenNoRoomOnTheRight() {
-        let area = CGRect(x: 0, y: 0, width: 900, height: 700)
+    func testConsoleLayoutOnASmallScreen() {
+        let area = CGRect(x: 0, y: 24, width: 1024, height: 680)
         let place = Layout.console(
-            moth: CGSize(width: 72, height: 84), terminal: CGSize(width: 400, height: 250),
-            monitor: CGSize(width: 300, height: 350), in: area
+            moth: CGSize(width: 72, height: 84), terminal: CGSize(width: 440, height: 580),
+            monitor: CGSize(width: 280, height: 580), in: area
         )
-        XCTAssertLessThan(place.monitor.x, place.terminal.x)
-        XCTAssertGreaterThanOrEqual(place.monitor.x, 0)
+        XCTAssertTrue(area.contains(place.terminal))
+        XCTAssertTrue(area.contains(place.monitor))
+        XCTAssertEqual(place.terminal.height, place.monitor.height)
+        XCTAssertLessThan(place.terminal.height, 580, "на невысоком экране окна ниже желаемого")
+        XCTAssertFalse(Layout.overlaps(place.terminal, place.monitor))
+        XCTAssertLessThanOrEqual(place.moth.y + 84, area.maxY)
+        // Персонаж над рядом, не на нём.
+        XCTAssertGreaterThanOrEqual(place.moth.y, place.terminal.maxY)
+    }
+}
+
+final class WindowPlacementTests: XCTestCase {
+    private let area = CGRect(x: 0, y: 0, width: 1000, height: 800)
+
+    func testOverlapsHonoursTheGap() {
+        let a = CGRect(x: 0, y: 0, width: 100, height: 100)
+        XCTAssertTrue(Layout.overlaps(a, CGRect(x: 50, y: 50, width: 100, height: 100)))
+        XCTAssertFalse(Layout.overlaps(a, CGRect(x: 108, y: 0, width: 100, height: 100), gap: 8), "расстояние ровно в зазор допустимо")
+        XCTAssertTrue(Layout.overlaps(a, CGRect(x: 107, y: 0, width: 100, height: 100), gap: 8))
+        XCTAssertFalse(Layout.overlaps(a, CGRect(x: 300, y: 300, width: 10, height: 10), gap: 8))
+    }
+
+    func testMoveInFreeSpaceIsJustClamped() {
+        let rect = CGRect(x: 900, y: 700, width: 150, height: 150)
+        XCTAssertEqual(Layout.placeWindow(rect, avoiding: [], in: area), CGRect(x: 850, y: 650, width: 150, height: 150))
+    }
+
+    func testMoveOntoANeighbourSlidesToTheNearestFreeSpot() throws {
+        let neighbour = CGRect(x: 400, y: 100, width: 200, height: 300)
+        let moved = try XCTUnwrap(Layout.placeWindow(CGRect(x: 450, y: 150, width: 150, height: 150), avoiding: [neighbour], in: area))
+        XCTAssertEqual(moved.origin, CGPoint(x: 608, y: 150), "ближайшее свободное место — справа от соседа с зазором 8")
+        XCTAssertFalse(Layout.overlaps(moved, neighbour, gap: 8))
+    }
+
+    func testMoveAvoidsSeveralObstacles() throws {
+        let obstacles = [CGRect(x: 400, y: 100, width: 200, height: 300), CGRect(x: 620, y: 100, width: 100, height: 300)]
+        let moved = try XCTUnwrap(Layout.placeWindow(CGRect(x: 450, y: 150, width: 150, height: 150), avoiding: obstacles, in: area))
+        for obstacle in obstacles { XCTAssertFalse(Layout.overlaps(moved, obstacle, gap: 8)) }
+        XCTAssertTrue(area.contains(moved))
+    }
+
+    func testMoveHasNoSpot() {
+        let tiny = CGRect(x: 0, y: 0, width: 300, height: 300)
+        XCTAssertNil(Layout.placeWindow(CGRect(x: 10, y: 10, width: 200, height: 200), avoiding: [tiny], in: tiny))
+    }
+
+    func testResizeStopsAtTheRightNeighbour() throws {
+        let start = CGRect(x: 100, y: 100, width: 200, height: 200)
+        let neighbour = CGRect(x: 400, y: 0, width: 200, height: 600)
+        let resized = try XCTUnwrap(Layout.resizedWindow(from: start, to: CGSize(width: 500, height: 200), avoiding: [neighbour], in: area, minSize: CGSize(width: 100, height: 100)))
+        XCTAssertEqual(resized.width, 292)
+        XCTAssertEqual(resized.height, 200)
+        XCTAssertEqual(resized.minX, 100)
+        XCTAssertEqual(resized.maxY, 300, "верхний край неподвижен")
+    }
+
+    func testResizeStopsAtTheNeighbourBelow() throws {
+        let start = CGRect(x: 100, y: 300, width: 200, height: 200)
+        let below = CGRect(x: 0, y: 0, width: 600, height: 200)
+        let resized = try XCTUnwrap(Layout.resizedWindow(from: start, to: CGSize(width: 200, height: 400), avoiding: [below], in: area, minSize: CGSize(width: 100, height: 100)))
+        XCTAssertEqual(resized.height, 292)
+        XCTAssertEqual(resized.minY, 208)
+        XCTAssertEqual(resized.maxY, 500)
+    }
+
+    func testResizeRespectsMinimumAndArea() throws {
+        let start = CGRect(x: 100, y: 100, width: 200, height: 200)
+        // Меньше минимума не станет.
+        let small = try XCTUnwrap(Layout.resizedWindow(from: start, to: CGSize(width: 10, height: 10), avoiding: [], in: area, minSize: CGSize(width: 150, height: 120)))
+        XCTAssertEqual(small.size, CGSize(width: 150, height: 120))
+        // За край области не выйдет.
+        let huge = try XCTUnwrap(Layout.resizedWindow(from: start, to: CGSize(width: 5000, height: 5000), avoiding: [], in: area, minSize: CGSize(width: 150, height: 120)))
+        XCTAssertEqual(huge.maxX, area.maxX)
+        XCTAssertEqual(huge.minY, area.minY)
+        // Соседа так близко, что минимальный размер не помещается, — nil.
+        let close = CGRect(x: 250, y: 0, width: 200, height: 600)
+        XCTAssertNil(Layout.resizedWindow(from: start, to: CGSize(width: 300, height: 200), avoiding: [close], in: area, minSize: CGSize(width: 160, height: 100)))
+    }
+
+    func testSavedLayoutValidation() {
+        let terminal = CGRect(x: 100, y: 100, width: 400, height: 500)
+        let monitor = CGRect(x: 600, y: 100, width: 250, height: 500)
+        let ghost = CGRect(x: 450, y: 650, width: 80, height: 100)
+        XCTAssertTrue(Layout.isValidConsoleLayout(terminal: terminal, monitor: monitor, ghost: ghost, in: area))
+        // Наезжают друг на друга, на персонажа, выходят за область.
+        XCTAssertFalse(Layout.isValidConsoleLayout(terminal: terminal, monitor: CGRect(x: 450, y: 100, width: 250, height: 500), ghost: ghost, in: area))
+        XCTAssertFalse(Layout.isValidConsoleLayout(terminal: terminal, monitor: monitor, ghost: CGRect(x: 300, y: 300, width: 50, height: 50), in: area))
+        XCTAssertFalse(Layout.isValidConsoleLayout(terminal: terminal, monitor: CGRect(x: 900, y: 100, width: 250, height: 500), ghost: ghost, in: area))
+        XCTAssertFalse(Layout.isValidConsoleLayout(terminal: CGRect(x: 100, y: 100, width: 400, height: 500), monitor: CGRect(x: 505, y: 100, width: 250, height: 500), ghost: ghost, in: area), "ближе зазора")
     }
 }
 

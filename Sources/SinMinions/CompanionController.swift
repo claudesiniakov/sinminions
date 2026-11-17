@@ -332,19 +332,27 @@ final class CompanionController: NSObject {
         refreshLLM()
         refreshLimits()
         let mothSize = view.mothFrame.size
-        let terminalSize = ConsoleController.terminalSize
-        let monitorSize = CGSize(
-            width: ConsoleController.monitorWidth,
-            height: max(mothSize.height + 16 + terminalSize.height, ConsoleController.monitorMinHeight)
+        let area = area
+        let place = Layout.console(
+            moth: mothSize, terminal: ConsoleController.terminalSize, monitor: ConsoleController.monitorSize, in: area
         )
-        let place = Layout.console(moth: mothSize, terminal: terminalSize, monitor: monitorSize, in: area)
+        // Место призрака с запасом на парение и свечение: окна на него не наезжают.
+        let ghost = CGRect(origin: place.moth, size: mothSize).insetBy(dx: -10, dy: -12)
+        // Раскладка, заданная пользователем, действует, пока подходит к экрану; иначе — выровненная по умолчанию.
+        var terminalRect = place.terminal
+        var monitorRect = place.monitor
+        if let saved = ConsoleLayoutStore.load(),
+           Layout.isValidConsoleLayout(terminal: saved.terminal, monitor: saved.monitor, ghost: ghost, in: area) {
+            terminalRect = saved.terminal
+            monitorRect = saved.monitor
+        }
+        console.areaProvider = { [weak self] in self?.area ?? .zero }
+        console.ghostRect = ghost
+        console.defaultRects = (place.terminal, place.monitor)
         consoleHome = panel.frame.origin
         bubble.hide(animated: false)
         glide(to: CGPoint(x: place.moth.x - view.mothFrame.minX, y: place.moth.y - view.mothFrame.minY))
-        console.open(
-            terminalFrame: CGRect(origin: place.terminal, size: terminalSize),
-            monitorFrame: CGRect(origin: place.monitor, size: monitorSize)
-        )
+        console.open(terminalRect: terminalRect, monitorRect: monitorRect)
         onStateChange()
     }
 
@@ -380,10 +388,19 @@ final class CompanionController: NSObject {
                 consoleHome = Layout.corner(size: panel.frame.size, in: visible, margin: 8)
             }
             apply(engine.handle(.closeConsole, now: now))
+        case .unlock:
+            console.setUnlocked(!console.model.unlocked)
+        case .resetLayout:
+            console.resetLayout()
         case .settings:
             apply(engine.handle(.closeConsole, now: now))
             onOpenSettings(nil)
         }
+    }
+
+    /// Для снимка в CI: окна разблокированы.
+    func unlockConsoleForDemo() {
+        console.setUnlocked(true)
     }
 
     // MARK: - Окно

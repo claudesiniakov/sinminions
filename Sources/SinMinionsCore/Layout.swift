@@ -67,26 +67,112 @@ public enum Layout {
     public struct ConsolePlacement: Equatable, Sendable {
         /// Левый нижний угол самого персонажа (не его окна).
         public let moth: CGPoint
-        public let terminal: CGPoint
-        public let monitor: CGPoint
+        /// Видимые прямоугольники окон терминала и монитора.
+        public let terminal: CGRect
+        public let monitor: CGRect
     }
 
-    /// Средний режим: персонаж по центру области, терминал под ним, монитор справа от терминала
-    /// (слева, если справа нет места); верх монитора — на уровне верха персонажа.
+    /// Средний режим: персонаж по центру области, под ним в один ряд терминал и монитор одной высоты,
+    /// с общими верхним и нижним краями; пара стоит по центру под персонажем.
     public static func console(
-        moth: CGSize, terminal: CGSize, monitor: CGSize, in area: CGRect, gap: CGFloat = 16
+        moth: CGSize, terminal: CGSize, monitor: CGSize, in area: CGRect,
+        gap: CGFloat = 24, margin: CGFloat = 12
     ) -> ConsolePlacement {
-        let blockHeight = moth.height + gap + terminal.height
-        let top = min(area.maxY, area.midY + blockHeight / 2)
+        let availableWidth = max(area.width - 2 * margin, 0)
+        let terminalWidth = min(terminal.width, max(availableWidth - gap - monitor.width, 240))
+        let rowWidth = terminalWidth + gap + monitor.width
+        let availableHeight = max(area.height - 2 * margin - moth.height - gap, 160)
+        let rowHeight = min(max(terminal.height, monitor.height), availableHeight)
+        let block = moth.height + gap + rowHeight
+        let top = min(area.maxY - margin, area.midY + block / 2)
         let mothOrigin = CGPoint(x: area.midX - moth.width / 2, y: top - moth.height)
-        let terminalOrigin = clamp(
-            origin: CGPoint(x: area.midX - terminal.width / 2, y: mothOrigin.y - gap - terminal.height),
-            size: terminal, in: area
+        let rowY = max(area.minY + margin, mothOrigin.y - gap - rowHeight)
+        let left = max(area.minX + margin, area.midX - rowWidth / 2)
+        return ConsolePlacement(
+            moth: mothOrigin,
+            terminal: CGRect(x: left, y: rowY, width: terminalWidth, height: rowHeight),
+            monitor: CGRect(x: left + terminalWidth + gap, y: rowY, width: monitor.width, height: rowHeight)
         )
-        var monitorX = terminalOrigin.x + terminal.width + gap
-        if monitorX + monitor.width > area.maxX { monitorX = terminalOrigin.x - gap - monitor.width }
-        let monitorOrigin = clamp(origin: CGPoint(x: monitorX, y: top - monitor.height), size: monitor, in: area)
-        return ConsolePlacement(moth: mothOrigin, terminal: terminalOrigin, monitor: monitorOrigin)
+    }
+
+    /// Ближе ли два прямоугольника друг к другу, чем на `gap`. Расстояние ровно `gap` допустимо.
+    public static func overlaps(_ a: CGRect, _ b: CGRect, gap: CGFloat = 0) -> Bool {
+        a.minX < b.maxX + gap && a.maxX > b.minX - gap && a.minY < b.maxY + gap && a.maxY > b.minY - gap
+    }
+
+    /// Перемещение окна: остаётся в области и не наезжает на препятствия (соседнее окно, персонаж).
+    /// Если нужное место занято, окно встаёт в ближайшее свободное (слева, справа, выше или ниже препятствия);
+    /// nil — свободного места нет, и окно должно остаться там, где было.
+    public static func placeWindow(
+        _ proposed: CGRect, avoiding obstacles: [CGRect], in area: CGRect, gap: CGFloat = 8
+    ) -> CGRect? {
+        let size = proposed.size
+        func clamped(_ origin: CGPoint) -> CGRect {
+            CGRect(origin: clamp(origin: origin, size: size, in: area), size: size)
+        }
+        func free(_ rect: CGRect) -> Bool { !obstacles.contains { overlaps(rect, $0, gap: gap) } }
+        let wanted = clamped(proposed.origin)
+        if free(wanted) { return wanted }
+        var best: CGRect?
+        var bestDistance = CGFloat.infinity
+        for o in obstacles {
+            let candidates = [
+                CGPoint(x: o.minX - gap - size.width, y: wanted.minY),
+                CGPoint(x: o.maxX + gap, y: wanted.minY),
+                CGPoint(x: wanted.minX, y: o.maxY + gap),
+                CGPoint(x: wanted.minX, y: o.minY - gap - size.height),
+            ]
+            for origin in candidates {
+                let rect = clamped(origin)
+                guard free(rect) else { continue }
+                let distance = hypot(rect.minX - wanted.minX, rect.minY - wanted.minY)
+                if distance < bestDistance {
+                    best = rect
+                    bestDistance = distance
+                }
+            }
+        }
+        return best
+    }
+
+    /// Изменение размера за правый нижний угол (левый верхний неподвижен). Размер не меньше `minSize`,
+    /// не выходит за область и не наезжает на препятствия: упирается в них. nil — подходящего размера нет.
+    public static func resizedWindow(
+        from start: CGRect, to size: CGSize, avoiding obstacles: [CGRect], in area: CGRect,
+        minSize: CGSize, gap: CGFloat = 8
+    ) -> CGRect? {
+        let maxWidth = area.maxX - start.minX
+        let maxHeight = start.maxY - area.minY
+        guard maxWidth >= minSize.width, maxHeight >= minSize.height else { return nil }
+        let width = min(max(size.width, minSize.width), maxWidth)
+        let height = min(max(size.height, minSize.height), maxHeight)
+        func rect(_ w: CGFloat, _ h: CGFloat) -> CGRect {
+            CGRect(x: start.minX, y: start.maxY - h, width: w, height: h)
+        }
+        func free(_ r: CGRect) -> Bool { !obstacles.contains { overlaps(r, $0, gap: gap) } }
+        let wanted = rect(width, height)
+        if free(wanted) { return wanted }
+        var widthLimit = width
+        var heightLimit = height
+        for o in obstacles where overlaps(wanted, o, gap: gap) {
+            // Препятствие справа ограничивает ширину, снизу — высоту.
+            if o.minX >= start.minX { widthLimit = min(widthLimit, o.minX - gap - start.minX) }
+            if o.maxY <= start.maxY { heightLimit = min(heightLimit, start.maxY - (o.maxY + gap)) }
+        }
+        let candidates = [rect(widthLimit, height), rect(width, heightLimit), rect(widthLimit, heightLimit)]
+        return candidates
+            .filter { $0.width >= minSize.width && $0.height >= minSize.height && free($0) }
+            .max { $0.width * $0.height < $1.width * $1.height }
+    }
+
+    /// Сохранённая раскладка годится, только если окна в области и не наезжают друг на друга и на персонажа.
+    public static func isValidConsoleLayout(
+        terminal: CGRect, monitor: CGRect, ghost: CGRect, in area: CGRect, gap: CGFloat = 8
+    ) -> Bool {
+        area.contains(terminal) && area.contains(monitor)
+            && !overlaps(terminal, monitor, gap: gap)
+            && !overlaps(terminal, ghost, gap: gap)
+            && !overlaps(monitor, ghost, gap: gap)
     }
 
     /// Плавный разгон и торможение: доля пути по доле времени.

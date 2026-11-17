@@ -6,16 +6,18 @@ import SinMinionsCore
 
 /// Команды терминала среднего режима.
 enum ConsoleCommand: Int, CaseIterable, Identifiable {
-    case spotlight, chat, nap, hide, corner, settings
+    case spotlight, chat, nap, hide, corner, unlock, resetLayout, settings
     var id: Int { rawValue }
 
-    var title: String {
+    func title(unlocked: Bool) -> String {
         switch self {
         case .spotlight: return "ПОИСК SPOTLIGHT"
         case .chat: return "ЧАТ С GIGACHAT"
         case .nap: return "УСЫПИТЬ НА 1 ЧАС"
         case .hide: return "СКРЫТЬ"
         case .corner: return "ВЕРНУТЬ В УГОЛ"
+        case .unlock: return unlocked ? "ЗАБЛОКИРОВАТЬ ОКНА" : "РАЗБЛОКИРОВАТЬ ОКНА"
+        case .resetLayout: return "СБРОСИТЬ РАСКЛАДКУ"
         case .settings: return "НАСТРОЙКИ"
         }
     }
@@ -134,6 +136,18 @@ struct LLMConnectionRow: Identifiable, Equatable {
     let connection: LLMConnection
     let isActive: Bool
     var id: UUID { connection.id }
+}
+
+/// Окна среднего режима.
+enum ConsoleWindow { case terminal, monitor }
+
+enum GesturePhase { case began, changed, ended }
+
+/// Что пользователь делает с окном: замок, перемещение за заголовок, изменение размера за уголок.
+enum LayoutEvent {
+    case toggleLock
+    case move(GesturePhase)
+    case resize(GesturePhase)
 }
 
 enum ChatEntryKind { case user, assistant, error, info }
@@ -256,6 +270,9 @@ final class ConsoleModel {
     var llmCount = 0
     var llmConnections: [LLMConnectionRow] = []
     let limits = LimitsStore()
+    /// Окна разблокированы: их можно двигать и менять их размер.
+    var unlocked = false
+    @ObservationIgnored var layoutEvent: (ConsoleWindow, LayoutEvent) -> Void = { _, _ in }
     @ObservationIgnored var switchConnection: (Int) -> Void = { _ in }
     var snapshot = SystemSnapshot()
     @ObservationIgnored var run: (ConsoleCommand) -> Void = { _ in }
@@ -292,16 +309,34 @@ private enum Term {
 /// Рамка окна терминала: тёмный фон, зелёная рамка, строки развёртки, заголовок.
 private struct TerminalFrame<Content: View>: View {
     let title: String
+    let window: ConsoleWindow
+    var model: ConsoleModel
     @ViewBuilder var content: Content
+
+    @State private var moving = false
+    @State private var resizing = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .font(Term.small)
-                .tracking(1)
-                .foregroundStyle(Term.dim)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
+            HStack(spacing: 8) {
+                Text(title)
+                    .font(Term.small)
+                    .tracking(1)
+                    .foregroundStyle(Term.dim)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Text(model.unlocked ? "[ЗАМОК ВЫКЛ]" : "[ЗАМОК ВКЛ]")
+                    .font(Term.small)
+                    .foregroundStyle(model.unlocked ? Term.green : Term.dim)
+                    .contentShape(Rectangle())
+                    .onTapGesture { model.layoutEvent(window, .toggleLock) }
+                    .help(model.unlocked ? "Заблокировать окна" : "Разблокировать: окна можно двигать и менять их размер")
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .contentShape(Rectangle())
+            // Двигать окно можно только разблокированным и только за заголовок.
+            .gesture(moveGesture, including: model.unlocked ? .all : .subviews)
             Rectangle().fill(Term.dark).frame(height: 1)
             content
                 .padding(12)
@@ -318,9 +353,51 @@ private struct TerminalFrame<Content: View>: View {
             }
             .allowsHitTesting(false)
         }
-        .overlay(Rectangle().strokeBorder(Term.dim, lineWidth: 1))
+        .overlay(
+            // Разблокированное окно обведено пунктиром.
+            Rectangle().strokeBorder(
+                model.unlocked ? Term.green : Term.dim,
+                style: StrokeStyle(lineWidth: 1, dash: model.unlocked ? [5, 3] : [])
+            )
+            .allowsHitTesting(false)
+        )
+        .overlay(alignment: .bottomTrailing) {
+            if model.unlocked {
+                Text("◢")
+                    .font(.system(size: 14, design: .monospaced))
+                    .foregroundStyle(Term.green)
+                    .padding(4)
+                    .contentShape(Rectangle())
+                    .gesture(resizeGesture)
+                    .help("Потяните, чтобы изменить размер")
+            }
+        }
         .shadow(color: Term.green.opacity(0.35), radius: 8)
         .padding(10)
+    }
+
+    private var moveGesture: some Gesture {
+        DragGesture(minimumDistance: 2)
+            .onChanged { _ in
+                model.layoutEvent(window, .move(moving ? .changed : .began))
+                moving = true
+            }
+            .onEnded { _ in
+                model.layoutEvent(window, .move(.ended))
+                moving = false
+            }
+    }
+
+    private var resizeGesture: some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { _ in
+                model.layoutEvent(window, .resize(resizing ? .changed : .began))
+                resizing = true
+            }
+            .onEnded { _ in
+                model.layoutEvent(window, .resize(.ended))
+                resizing = false
+            }
     }
 }
 
@@ -335,13 +412,13 @@ struct TerminalView: View {
     }
 
     private var menu: some View {
-        TerminalFrame(title: "MOTH-OS // ТЕРМИНАЛ") {
+        TerminalFrame(title: "MOTH-OS // ТЕРМИНАЛ", window: .terminal, model: model) {
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(ConsoleCommand.allCases) { command in
                     let active = model.selected == command.rawValue
                     HStack(spacing: 8) {
                         Text(active ? ">" : " ")
-                        Text(command.title)
+                        Text(command.title(unlocked: model.unlocked))
                         Spacer(minLength: 0)
                     }
                     .font(Term.font)
@@ -375,7 +452,7 @@ private struct ChatScreen: View {
 
     var body: some View {
         @Bindable var chat = model.chat
-        TerminalFrame(title: "MOTH-OS // " + ([model.llmName, model.llmModelName].compactMap { $0 }.joined(separator: " · ").nonEmpty ?? "НЕЙРОСЕТЬ").uppercased()) {
+        TerminalFrame(title: "MOTH-OS // " + ([model.llmName, model.llmModelName].compactMap { $0 }.joined(separator: " · ").nonEmpty ?? "НЕЙРОСЕТЬ").uppercased(), window: .terminal, model: model) {
             VStack(alignment: .leading, spacing: 8) {
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -601,7 +678,9 @@ struct MonitorView: View {
 
     var body: some View {
         let s = model.snapshot
-        TerminalFrame(title: "СИСТЕМА // МОНИТОР") {
+        TerminalFrame(title: "СИСТЕМА // МОНИТОР", window: .monitor, model: model) {
+            // Если окно сделали ниже содержимого, оно прокручивается.
+            ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 9) {
                 intelligence
                 Rectangle().fill(Term.dark).frame(height: 1)
@@ -624,6 +703,7 @@ struct MonitorView: View {
             .font(Term.small)
             .foregroundStyle(Term.green)
             .shadow(color: Term.green.opacity(0.45), radius: 3)
+            }
         }
     }
 }
@@ -692,10 +772,13 @@ final class ConsolePanel: NSPanel {
 /// Терминал и монитор среднего режима.
 @MainActor
 final class ConsoleController: NSObject, NSWindowDelegate {
-    /// Размеры окон вместе с полями под свечение (10 pt с каждой стороны).
-    static let terminalSize = CGSize(width: 460, height: 380)
-    static let monitorWidth: CGFloat = 300
-    static let monitorMinHeight: CGFloat = 610
+    /// Поля вокруг видимой части окна под свечение (10 pt с каждой стороны). Размеры и положения
+    /// ниже и в раскладке — видимой части; окну ОС добавляются поля.
+    static let padding: CGFloat = 10
+    static let terminalSize = CGSize(width: 440, height: 580)
+    static let monitorSize = CGSize(width: 280, height: 580)
+    static let terminalMinSize = CGSize(width: 340, height: 240)
+    static let monitorMinSize = CGSize(width: 240, height: 300)
 
     let model = ConsoleModel()
     private let terminal: ConsolePanel
@@ -705,6 +788,20 @@ final class ConsoleController: NSObject, NSWindowDelegate {
     private(set) var isOpen = false
 
     var onCommand: (ConsoleCommand) -> Void = { _ in }
+    /// Область экрана, в которой можно двигать окна.
+    var areaProvider: () -> CGRect = { .zero }
+    /// Занятое призраком место (с запасом на парение и свечение): окна на него не наезжают.
+    var ghostRect: CGRect = .zero
+    /// Раскладка по умолчанию — к ней возвращает «Сбросить раскладку».
+    var defaultRects: (terminal: CGRect, monitor: CGRect) = (.zero, .zero)
+
+    private struct DragSession {
+        let window: ConsoleWindow
+        let resize: Bool
+        let startMouse: CGPoint
+        let startRect: CGRect
+    }
+    private var session: DragSession?
     /// Esc или щелчок мимо терминала.
     var onDismiss: () -> Void = {}
 
@@ -737,6 +834,7 @@ final class ConsoleController: NSObject, NSWindowDelegate {
             self.model.chat.focusTick += 1
         }
         model.run = { [weak self] command in self?.onCommand(command) }
+        model.layoutEvent = { [weak self] window, event in self?.handleLayout(window, event) }
     }
 
     func setCollectionBehavior(_ behavior: NSWindow.CollectionBehavior) {
@@ -744,14 +842,88 @@ final class ConsoleController: NSObject, NSWindowDelegate {
         monitor.collectionBehavior = behavior
     }
 
-    func open(terminalFrame: CGRect, monitorFrame: CGRect) {
+    /// Видимая часть окна (без полей под свечение).
+    private func visual(_ panel: NSPanel) -> CGRect {
+        panel.frame.insetBy(dx: Self.padding, dy: Self.padding)
+    }
+
+    private func panel(for window: ConsoleWindow) -> NSPanel {
+        window == .terminal ? terminal : monitor
+    }
+
+    private func setVisual(_ rect: CGRect, of panel: NSPanel, animated: Bool = false) {
+        let frame = rect.insetBy(dx: -Self.padding, dy: -Self.padding)
+        panel.setFrame(frame, display: true, animate: animated)
+    }
+
+    func setUnlocked(_ value: Bool) {
+        guard model.unlocked != value else { return }
+        model.unlocked = value
+        session = nil
+    }
+
+    func resetLayout() {
+        ConsoleLayoutStore.clear()
+        setVisual(defaultRects.terminal, of: terminal, animated: true)
+        setVisual(defaultRects.monitor, of: monitor, animated: true)
+    }
+
+    private func saveLayout() {
+        ConsoleLayoutStore.save(terminal: visual(terminal), monitor: visual(monitor))
+    }
+
+    private func handleLayout(_ window: ConsoleWindow, _ event: LayoutEvent) {
+        switch event {
+        case .toggleLock: setUnlocked(!model.unlocked)
+        case let .move(phase): drag(window, resize: false, phase)
+        case let .resize(phase): drag(window, resize: true, phase)
+        }
+    }
+
+    /// Перемещение и изменение размера: положение мыши берётся с экрана, а не из жеста, потому что
+    /// окно двигается вместе с курсором. Окна не наезжают друг на друга и на призрака.
+    private func drag(_ window: ConsoleWindow, resize: Bool, _ phase: GesturePhase) {
+        guard model.unlocked else { return }
+        let target = panel(for: window)
+        switch phase {
+        case .began:
+            session = DragSession(window: window, resize: resize, startMouse: NSEvent.mouseLocation, startRect: visual(target))
+        case .changed:
+            guard let current = session, current.window == window else { return }
+            let mouse = NSEvent.mouseLocation
+            let dx = mouse.x - current.startMouse.x
+            let dy = mouse.y - current.startMouse.y
+            let other = visual(panel(for: window == .terminal ? .monitor : .terminal))
+            let obstacles = [other, ghostRect]
+            let result: CGRect?
+            if current.resize {
+                result = Layout.resizedWindow(
+                    from: current.startRect,
+                    to: CGSize(width: current.startRect.width + dx, height: current.startRect.height - dy),
+                    avoiding: obstacles, in: areaProvider(),
+                    minSize: window == .terminal ? Self.terminalMinSize : Self.monitorMinSize
+                )
+            } else {
+                result = Layout.placeWindow(current.startRect.offsetBy(dx: dx, dy: dy), avoiding: obstacles, in: areaProvider())
+            }
+            // Нет подходящего места — окно остаётся там, где было.
+            if let result, result != visual(target) { setVisual(result, of: target) }
+        case .ended:
+            session = nil
+            saveLayout()
+        }
+    }
+
+    func open(terminalRect: CGRect, monitorRect: CGRect) {
         isOpen = true
         model.screen = .menu
         model.selected = 0
+        model.unlocked = false
+        session = nil
         sampler.reset()
         model.snapshot = sampler.sample()
-        terminal.setFrame(terminalFrame, display: true)
-        monitor.setFrame(monitorFrame, display: true)
+        setVisual(terminalRect, of: terminal)
+        setVisual(monitorRect, of: monitor)
         monitor.orderFrontRegardless()
         terminal.makeKeyAndOrderFront(nil)
         NSAnimationContext.runAnimationGroup { context in
@@ -804,5 +976,29 @@ final class ConsoleController: NSObject, NSWindowDelegate {
 
     func windowDidResignKey(_ notification: Notification) {
         if isOpen { onDismiss() }
+    }
+}
+
+/// Раскладка окон терминала и монитора, которую пользователь задал сам (видимые части, координаты экрана).
+enum ConsoleLayoutStore {
+    struct Saved: Codable {
+        var terminal: CGRect
+        var monitor: CGRect
+    }
+
+    private static let key = "consoleLayout"
+
+    static func load() -> Saved? {
+        guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(Saved.self, from: data)
+    }
+
+    static func save(terminal: CGRect, monitor: CGRect) {
+        guard let data = try? JSONEncoder().encode(Saved(terminal: terminal, monitor: monitor)) else { return }
+        UserDefaults.standard.set(data, forKey: key)
+    }
+
+    static func clear() {
+        UserDefaults.standard.removeObject(forKey: key)
     }
 }
