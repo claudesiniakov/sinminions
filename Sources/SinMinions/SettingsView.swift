@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import SinMinionsCore
 
 /// Окно настроек.
 struct SettingsView: View {
