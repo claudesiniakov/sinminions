@@ -178,8 +178,8 @@ private struct LLMSettings: View {
                     Text("Подключений пока нет. Добавьте первое — например, GigaChat.")
                         .foregroundStyle(.secondary)
                 }
-                ForEach(prefs.connections.items) { connection in
-                    row(connection)
+                ForEach(Array(prefs.connections.items.enumerated()), id: \.element.id) { index, connection in
+                    row(connection, index: index)
                 }
                 Button("Добавить подключение…") { editing = .new }
                     .disabled(prefs.connections.isFull)
@@ -192,7 +192,7 @@ private struct LLMSettings: View {
             }
 
             Section {
-                Text("Отмеченное подключение отвечает в чате терминала. В терминале и на мониторе призрака его можно переключать кнопками «+» и «−» (в терминале — клавишами + и −). В нейросеть уходит только текст, который вы вводите в чате; данные о Mac не передаются. Ключи хранятся в Связке ключей.")
+                Text("Отмеченное подключение отвечает в чате терминала. В терминале и на мониторе призрака его можно переключать кнопками «+» и «−» (в терминале — клавишами + и −) — по порядку этого списка. Порядок меняется стрелками справа; тот же порядок у строк блока «Лимиты». В нейросеть уходит только текст, который вы вводите в чате; данные о Mac не передаются. Ключи хранятся в Связке ключей.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -213,7 +213,7 @@ private struct LLMSettings: View {
         }
     }
 
-    private func row(_ connection: LLMConnection) -> some View {
+    private func row(_ connection: LLMConnection, index: Int) -> some View {
         let isActive = prefs.connections.active?.id == connection.id
         let hasKey = Keychain.exists(connection.keyAccount)
         return HStack(spacing: 10) {
@@ -231,6 +231,14 @@ private struct LLMSettings: View {
                     .foregroundStyle(hasKey ? Color.secondary : Color.red)
             }
             Spacer()
+            Button { prefs.connections.move(id: connection.id, by: -1) } label: { Image(systemName: "chevron.up") }
+                .buttonStyle(.borderless)
+                .disabled(index == 0)
+                .help("Выше в списке")
+            Button { prefs.connections.move(id: connection.id, by: 1) } label: { Image(systemName: "chevron.down") }
+                .buttonStyle(.borderless)
+                .disabled(index == prefs.connections.items.count - 1)
+                .help("Ниже в списке")
             Button { editing = .edit(connection) } label: { Image(systemName: "pencil") }
                 .buttonStyle(.borderless)
                 .help("Изменить")

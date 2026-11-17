@@ -100,7 +100,6 @@ final class CompanionController: NSObject {
         }
         console.onCommand = { [weak self] command in self?.run(command) }
         console.model.switchConnection = { [weak self] delta in self?.switchConnection(delta) }
-        console.model.switchModel = { [weak self] delta in self?.switchModel(delta) }
         power = Self.readPower()
 
         let workspace = NSWorkspace.shared.notificationCenter
@@ -160,8 +159,6 @@ final class CompanionController: NSObject {
         console.model.llmName = list.active?.name
         console.model.llmModelName = list.active?.model
         console.model.llmConnections = list.items.map { LLMConnectionRow(connection: $0, isActive: $0.id == list.active?.id) }
-        console.model.llmCanStepUp = list.active.map { $0.provider.step(model: $0.model, by: 1) != nil } ?? false
-        console.model.llmCanStepDown = list.active.map { $0.provider.step(model: $0.model, by: -1) != nil } ?? false
         console.model.llmCount = list.items.count
         console.model.llmPosition = list.activePosition.map { "\($0)/\(list.items.count)" } ?? ""
     }
@@ -173,18 +170,6 @@ final class CompanionController: NSObject {
     /// Как узнавать лимит подключения (остаток токенов или средств) — для блока на мониторе.
     func attachLimits(fetch: @escaping @MainActor (LLMConnection, String) async throws -> String?) {
         console.model.limits.fetch = fetch
-    }
-
-    /// «▲» и «▼» на мониторе: модель выше или ниже в списке провайдера. Меняется модель самого подключения.
-    private func switchModel(_ delta: Int) {
-        guard var connection = prefs.connections.active,
-              let next = connection.provider.step(model: connection.model, by: delta) else { return }
-        connection.model = next
-        prefs.connections.update(connection)
-        refreshLLM()
-        if !console.model.chat.entries.isEmpty {
-            console.model.chat.addInfo("МОДЕЛЬ: " + next.uppercased())
-        }
     }
 
     /// «+» и «−» на мониторе: следующее или предыдущее подключение по кругу.

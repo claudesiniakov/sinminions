@@ -256,9 +256,6 @@ final class ConsoleModel {
     var llmCount = 0
     var llmConnections: [LLMConnectionRow] = []
     let limits = LimitsStore()
-    var llmCanStepUp = false
-    var llmCanStepDown = false
-    @ObservationIgnored var switchModel: (Int) -> Void = { _ in }
     @ObservationIgnored var switchConnection: (Int) -> Void = { _ in }
     var snapshot = SystemSnapshot()
     @ObservationIgnored var run: (ConsoleCommand) -> Void = { _ in }
@@ -363,7 +360,7 @@ struct TerminalView: View {
                     }
                 }
                 Spacer(minLength: 6)
-                Text("↑↓ ВЫБОР · ENTER · +/− LLM · ⌥↑↓ МОДЕЛЬ · ESC")
+                Text("↑↓ ВЫБОР · ENTER · +/− LLM · ESC ВЫХОД")
                     .font(Term.small)
                     .foregroundStyle(Term.dim)
             }
@@ -412,7 +409,7 @@ private struct ChatScreen: View {
                         .onSubmit { chat.submit() }
                 }
                 .foregroundStyle(Term.green)
-                Text("ENTER ОТПРАВИТЬ · ⌥↑↓ МОДЕЛЬ · ESC НАЗАД")
+                Text("ENTER ОТПРАВИТЬ · ESC НАЗАД")
                     .foregroundStyle(Term.dim)
             }
             .font(Term.small)
@@ -490,8 +487,8 @@ struct MonitorView: View {
         }
     }
 
-    /// Призрак вместо человечка Pip-Boy и переключатель «интеллекта»: «−» и «+» меняют подключение,
-    /// «▼» и «▲» — модель внутри него (по списку от простых к мощным).
+    /// Призрак вместо человечка Pip-Boy и переключатель «интеллекта»: «−» и «+» меняют подключение.
+    /// Порядок подключений и модель задаются в настройках.
     private var intelligence: some View {
         VStack(spacing: 6) {
             GhostFigure()
@@ -504,23 +501,18 @@ struct MonitorView: View {
                     Text((model.llmName ?? "НЕТ ПОДКЛЮЧЕНИЙ").uppercased())
                         .lineLimit(1)
                         .truncationMode(.tail)
+                    if let modelName = model.llmModelName {
+                        Text(modelName.uppercased())
+                            .foregroundStyle(Term.dim)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
                     if !model.llmPosition.isEmpty {
                         Text(model.llmPosition).foregroundStyle(Term.dim)
                     }
                 }
                 .frame(maxWidth: .infinity)
                 stepButton("+", enabled: model.llmCount > 1) { model.switchConnection(1) }
-            }
-            if let modelName = model.llmModelName {
-                HStack(spacing: 10) {
-                    stepButton("▼", enabled: model.llmCanStepDown) { model.switchModel(-1) }
-                    Text(modelName.uppercased())
-                        .foregroundStyle(Term.dim)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .frame(maxWidth: .infinity)
-                    stepButton("▲", enabled: model.llmCanStepUp) { model.switchModel(1) }
-                }
             }
         }
         .frame(maxWidth: .infinity)
@@ -535,7 +527,8 @@ struct MonitorView: View {
             .onTapGesture { if enabled { action() } }
     }
 
-    /// Остаток токенов или средств по каждому подключению; выбранное подсвечено. Длинный список прокручивается.
+    /// Остаток токенов или средств по каждому подключению: название и остаток, под ними модель.
+    /// Выбранное подключение подсвечено; длинный список прокручивается.
     private var limitsBlock: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("ЛИМИТЫ").foregroundStyle(Term.dim)
@@ -543,11 +536,11 @@ struct MonitorView: View {
                 Text("ПОДКЛЮЧЕНИЙ НЕТ").foregroundStyle(Term.dim)
             } else {
                 ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: 5) {
                         ForEach(model.llmConnections) { item in limitRow(item) }
                     }
                 }
-                .frame(height: min(CGFloat(model.llmConnections.count) * 16, 80))
+                .frame(height: min(CGFloat(model.llmConnections.count) * 31, 96))
             }
         }
     }
@@ -562,15 +555,24 @@ struct MonitorView: View {
         case let .failed(reason): text = reason; warning = true
         case .noKey: text = "нет ключа"; warning = true
         }
-        return HStack(spacing: 6) {
-            Text((item.isActive ? "▸ " : "  ") + item.connection.name.uppercased())
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                // Название имеет приоритет: сжимается значение справа, а не оно.
+                Text((item.isActive ? "▸ " : "  ") + item.connection.name.uppercased())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .layoutPriority(1)
+                Spacer(minLength: 4)
+                Text(text.uppercased())
+                    .foregroundStyle(warning ? Term.amber : (item.isActive ? Term.green : Term.dim))
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+            Text("  " + item.connection.model.uppercased())
+                .font(.system(size: 9.5, design: .monospaced))
+                .foregroundStyle(Term.dim)
                 .lineLimit(1)
                 .truncationMode(.tail)
-            Spacer(minLength: 4)
-            Text(text.uppercased())
-                .foregroundStyle(warning ? Term.amber : (item.isActive ? Term.green : Term.dim))
-                .lineLimit(1)
-                .layoutPriority(1)
         }
         .foregroundStyle(item.isActive ? Term.green : Term.dim)
     }
@@ -636,20 +638,11 @@ final class ConsolePanel: NSPanel {
 
     /// Куда вставить текст, если строка ввода не в фокусе.
     var pasteFallback: (String) -> Void = { _ in }
-    /// ⌥↑ и ⌥↓: модель выше и ниже.
-    var onModelStep: (Int) -> Void = { _ in }
 
     /// У приложения без значка в Dock нет меню «Правка», поэтому сочетания ⌘C, ⌘X, ⌘V, ⌘A, ⌘Z
     /// обрабатываем сами, отправляя действие тому, кто сейчас в фокусе.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        if flags == .option {
-            switch event.keyCode {
-            case 126: onModelStep(1); return true
-            case 125: onModelStep(-1); return true
-            default: break
-            }
-        }
         guard flags == .command || flags == [.command, .shift],
               let key = event.charactersIgnoringModifiers?.lowercased() else {
             return super.performKeyEquivalent(with: event)
@@ -737,7 +730,6 @@ final class ConsoleController: NSObject, NSWindowDelegate {
         terminal.copyFallback = { [weak self] in
             self?.model.chat.entries.last(where: { $0.kind == .assistant })?.text
         }
-        terminal.onModelStep = { [weak self] delta in self?.model.switchModel(delta) }
         terminal.pasteFallback = { [weak self] text in
             guard let self, self.model.screen == .chat else { return }
             // Строка ввода однострочная: переводы строк заменяем пробелами.

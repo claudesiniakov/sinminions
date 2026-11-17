@@ -45,9 +45,9 @@ public enum LLMError: LocalizedError, Equatable, Sendable {
             switch status {
             case 401: return "ключ не принят"
             case 402: return "нет средств"
-            case 403: return "лимит недоступен"
+            case 403: return "недоступно"
             case 429: return "много запросов"
-            case 500...599: return "сервис недоступен"
+            case 500...599: return "сбой сервиса"
             default: return "ошибка \(status)"
             }
         case .network: return "нет связи"
@@ -139,8 +139,14 @@ public enum GigaChatAPI {
         return request
     }
 
-    /// Остаток для модели подключения: «100,5 ТЫС». Если среди записей нет такой модели, а записей несколько,
-    /// показываются первые две с названиями; nil — ответ не разобрать или в нём нет записей.
+    /// Название модели в том виде, как его пишут в остатках: номер поколения опускается
+    /// («GigaChat-2-Pro» → «gigachat-pro», «GigaChat-3-Ultra» → «gigachat-ultra», «GigaChat-2» → «gigachat»).
+    static func canonicalModel(_ name: String) -> String {
+        name.lowercased().replacingOccurrences(of: "-\\d+(?=-|$)", with: "", options: .regularExpression)
+    }
+
+    /// Остаток для модели подключения: «100,5 ТЫС». Записей может быть несколько (по модели на запись):
+    /// берётся запись этой модели; если запись одна — она; иначе nil — чужие числа не показываем.
     public static func parseBalance(_ data: Data, model: String) -> String? {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let items = json["balance"] as? [[String: Any]] else { return nil }
@@ -149,11 +155,11 @@ public enum GigaChatAPI {
             return (usage, value)
         }
         guard !entries.isEmpty else { return nil }
-        if let match = entries.first(where: { $0.usage.lowercased() == model.lowercased() }) {
+        let wanted = canonicalModel(model)
+        if let match = entries.first(where: { canonicalModel($0.usage) == wanted }) {
             return TokenFormat.short(match.value)
         }
-        if entries.count == 1 { return TokenFormat.short(entries[0].value) }
-        return entries.prefix(2).map { "\($0.usage) \(TokenFormat.short($0.value))" }.joined(separator: " · ")
+        return entries.count == 1 ? TokenFormat.short(entries[0].value) : nil
     }
 
     public static func tokenRequest(

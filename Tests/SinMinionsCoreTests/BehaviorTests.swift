@@ -531,6 +531,25 @@ final class LLMConnectionsTests: XCTestCase {
         XCTAssertEqual(list.items.count, 2)
     }
 
+    func testMoveChangesOrderNotSelection() {
+        var list = make(3)
+        let first = list.items[0], third = list.items[2]
+        list.move(id: first.id, by: 1)
+        XCTAssertEqual(list.items.map(\.name), ["Подключение 2", "Подключение 1", "Подключение 3"])
+        XCTAssertEqual(list.active?.id, first.id, "выбранное подключение остаётся прежним")
+        list.move(id: third.id, by: -1)
+        XCTAssertEqual(list.items.map(\.name), ["Подключение 2", "Подключение 3", "Подключение 1"])
+        // На краях и для чужого id — без изменений.
+        list.move(id: list.items[0].id, by: -1)
+        list.move(id: list.items[2].id, by: 1)
+        list.move(id: UUID(), by: 1)
+        XCTAssertEqual(list.items.map(\.name), ["Подключение 2", "Подключение 3", "Подключение 1"])
+        // «+» переключает по новому порядку.
+        var cycling = list
+        cycling.setActive(cycling.items[0].id)
+        XCTAssertEqual(cycling.cycle(by: 1)?.name, "Подключение 3")
+    }
+
     func testSetActiveIgnoresUnknown() {
         var list = make(2)
         list.setActive(UUID())
@@ -663,15 +682,31 @@ final class LimitsTests: XCTestCase {
     }
 
     func testGigaChatBalanceParsing() {
-        let two = Data(#"{"balance":[{"usage":"GigaChat","value":100500},{"usage":"embeddings","value":3000000}]}"#.utf8)
-        // Есть запись для модели подключения — показывается только она, без совпадения — первые две.
-        XCTAssertEqual(GigaChatAPI.parseBalance(two, model: "gigachat"), "100,5 ТЫС")
-        XCTAssertEqual(GigaChatAPI.parseBalance(two, model: "GigaChat-2-Pro"), "GigaChat 100,5 ТЫС · embeddings 3 МЛН")
+        // Как в настоящем аккаунте: остатки названы без номера поколения.
+        let real = Data(#"{"balance":[{"usage":"GigaChat-Ultra","value":50000000},{"usage":"GigaChat-Pro","value":100500},{"usage":"GigaChat-Max","value":3000000},{"usage":"embeddings","value":7}]}"#.utf8)
+        XCTAssertEqual(GigaChatAPI.parseBalance(real, model: "GigaChat-3-Ultra"), "50 МЛН")
+        XCTAssertEqual(GigaChatAPI.parseBalance(real, model: "GigaChat-2-Pro"), "100,5 ТЫС")
+        XCTAssertEqual(GigaChatAPI.parseBalance(real, model: "GigaChat-2-Max"), "3 МЛН")
+        XCTAssertEqual(GigaChatAPI.parseBalance(real, model: "gigachat-max"), "3 МЛН")
+        // Записи для модели нет, а записей несколько — чужие числа не показываем.
+        XCTAssertNil(GigaChatAPI.parseBalance(real, model: "GigaChat"))
+        let lite = Data(#"{"balance":[{"usage":"GigaChat","value":250000000},{"usage":"embeddings","value":3000000}]}"#.utf8)
+        XCTAssertEqual(GigaChatAPI.parseBalance(lite, model: "GigaChat-2"), "250 МЛН")
+        XCTAssertEqual(GigaChatAPI.parseBalance(lite, model: "GigaChat"), "250 МЛН")
         let one = Data(#"{"balance":[{"usage":"GigaChat-Pro","value":2500000}]}"#.utf8)
         XCTAssertEqual(GigaChatAPI.parseBalance(one, model: "GigaChat-2-Max"), "2,5 МЛН")
         XCTAssertNil(GigaChatAPI.parseBalance(Data(#"{"balance":[]}"#.utf8), model: "GigaChat"))
         XCTAssertNil(GigaChatAPI.parseBalance(Data("не json".utf8), model: "GigaChat"))
         XCTAssertNil(GigaChatAPI.parseBalance(Data(#"{"balance":[{"usage":"x"}]}"#.utf8), model: "GigaChat"))
+    }
+
+    func testCanonicalModelNames() {
+        XCTAssertEqual(GigaChatAPI.canonicalModel("GigaChat-2-Pro"), "gigachat-pro")
+        XCTAssertEqual(GigaChatAPI.canonicalModel("GigaChat-2-Max"), "gigachat-max")
+        XCTAssertEqual(GigaChatAPI.canonicalModel("GigaChat-3-Ultra"), "gigachat-ultra")
+        XCTAssertEqual(GigaChatAPI.canonicalModel("GigaChat-2"), "gigachat")
+        XCTAssertEqual(GigaChatAPI.canonicalModel("GigaChat"), "gigachat")
+        XCTAssertEqual(GigaChatAPI.canonicalModel("deepseek-v4-pro"), "deepseek-v4-pro")
     }
 
     func testDeepSeekSummary() {
@@ -681,40 +716,18 @@ final class LimitsTests: XCTestCase {
     }
 
     func testShortErrorDescriptions() {
-        XCTAssertEqual(LLMError.http(403, nil, .chat).shortDescription, "лимит недоступен")
+        XCTAssertEqual(LLMError.http(403, nil, .chat).shortDescription, "недоступно")
         XCTAssertEqual(LLMError.http(401, nil, .direct).shortDescription, "ключ не принят")
         XCTAssertEqual(LLMError.http(402, nil, .direct).shortDescription, "нет средств")
-        XCTAssertEqual(LLMError.http(503, nil, .direct).shortDescription, "сервис недоступен")
+        XCTAssertEqual(LLMError.http(503, nil, .direct).shortDescription, "сбой сервиса")
         XCTAssertEqual(LLMError.network("x").shortDescription, "нет связи")
         XCTAssertEqual(LLMError.noCredentials.shortDescription, "нет ключа")
-        for text in [LLMError.http(418, nil, .chat), .network("n"), .invalidResponse].map(\.shortDescription) {
-            XCTAssertLessThanOrEqual(text.count, 20, text)
+        // Строка лимита на мониторе узкая: пояснение не длиннее 14 знаков.
+        let all: [LLMError] = [.noCredentials, .http(401, nil, .chat), .http(402, nil, .chat), .http(403, nil, .chat), .http(429, nil, .chat),
+                               .http(503, nil, .chat), .http(418, nil, .chat), .network("n"), .invalidResponse, .emptyAnswer]
+        for error in all {
+            XCTAssertLessThanOrEqual(error.shortDescription.count, 14, error.shortDescription)
         }
-    }
-}
-
-final class ModelStepTests: XCTestCase {
-    func testStepsAlongTheListAndStopsAtEnds() {
-        let provider = LLMProvider.gigachat
-        XCTAssertEqual(provider.step(model: "GigaChat", by: 1), "GigaChat-2")
-        XCTAssertEqual(provider.step(model: "GigaChat-2-Pro", by: 1), "GigaChat-2-Max")
-        XCTAssertEqual(provider.step(model: "GigaChat-2-Max", by: -1), "GigaChat-2-Pro")
-        XCTAssertNil(provider.step(model: "GigaChat", by: -1))
-        XCTAssertNil(provider.step(model: "GigaChat-3-Ultra", by: 1))
-        XCTAssertNil(provider.step(model: "GigaChat", by: 0))
-    }
-
-    func testCustomModelJumpsToAnEnd() {
-        XCTAssertEqual(LLMProvider.gigachat.step(model: "GigaChat-Pro", by: 1), "GigaChat")
-        XCTAssertEqual(LLMProvider.gigachat.step(model: "GigaChat-Pro", by: -1), "GigaChat-3-Ultra")
-        XCTAssertEqual(LLMProvider.deepseek.step(model: "deepseek-flash", by: 1), "deepseek-v4-pro")
-        XCTAssertNil(LLMProvider.deepseek.step(model: "deepseek-v4-pro", by: 1))
-    }
-
-    func testListsGoFromSimpleToPowerful() {
-        XCTAssertEqual(GigaChatAPI.models.first, "GigaChat")
-        XCTAssertEqual(GigaChatAPI.models.last, "GigaChat-3-Ultra")
-        XCTAssertEqual(DeepSeekAPI.models, ["deepseek-flash", "deepseek-v4-pro"])
     }
 }
 
