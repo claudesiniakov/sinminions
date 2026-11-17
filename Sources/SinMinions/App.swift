@@ -7,6 +7,7 @@ import SinMinionsCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let prefs = Prefs()
     private let updater = Updater()
+    private let gigaChat = GigaChatClient()
     private var controller: CompanionController?
     private var statusMenu: StatusMenu?
     private var settingsWindow: NSWindow?
@@ -27,6 +28,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         self.statusMenu = statusMenu
         controller.onStateChange = { [weak statusMenu] in statusMenu?.refresh() }
+        controller.attachChat(
+            send: { [weak self] messages in
+                guard let self, let key = Keychain.read(GigaChatAccount.key) else { throw LLMError.noCredentials }
+                return try await self.gigaChat.send(
+                    messages, key: key, scope: self.prefs.llmScope, model: self.prefs.llmModel
+                )
+            },
+            hasCredentials: { Keychain.exists(GigaChatAccount.key) }
+        )
 
         observeUpdater()
         Task { await updater.checkIfDue() }
@@ -41,23 +51,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         RunLoop.main.add(timer, forMode: .common)
         checkTimer = timer
 
-        if ProcessInfo.processInfo.environment["SINMINIONS_DEMO"] != nil {
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(2))
-                controller.announce(.ambient, force: true)
-                // Для снимка в CI: через несколько секунд открываются настройки.
-                try? await Task.sleep(for: .seconds(5))
-                self.showSettings()
-                // …а затем — терминал и монитор среднего режима.
-                try? await Task.sleep(for: .seconds(6))
-                self.settingsWindow?.close()
-                controller.openConsoleForDemo()
-                // …и порталы: терминал закрывается, призрак телепортируется.
-                try? await Task.sleep(for: .seconds(8))
-                controller.closeConsoleForDemo()
-                try? await Task.sleep(for: .seconds(1))
-                controller.teleportForDemo()
-            }
+        if ProcessInfo.processInfo.environment["SINMINIONS_DEMO"] != nil { runDemo(controller) }
+    }
+
+    /// Для CI: сцены демонстрации. Перед каждой приложение ставит файл-метку `<имя>.ready`,
+    /// по которой оболочка делает снимок экрана (снимать экран само приложение не может).
+    private func demoMark(_ name: String) {
+        guard let dir = ProcessInfo.processInfo.environment["SINMINIONS_SHOT_DIR"] else { return }
+        FileManager.default.createFile(atPath: dir + "/" + name + ".ready", contents: Data())
+    }
+
+    private func runDemo(_ controller: CompanionController) {
+        Task { @MainActor in
+            func wait(_ seconds: Double) async { try? await Task.sleep(for: .seconds(seconds)) }
+            await wait(2)
+            controller.announce(.ambient, force: true)
+            await wait(1)
+            demoMark("screen")
+            await wait(3)
+            showSettings()
+            await wait(1.5)
+            demoMark("settings")
+            await wait(4)
+            settingsWindow?.close()
+            controller.openConsoleForDemo()
+            await wait(1.5)
+            demoMark("console")
+            await wait(4)
+            controller.showChatDemo()
+            await wait(1.5)
+            demoMark("chat")
+            await wait(4)
+            controller.closeConsoleForDemo()
+            await wait(1)
+            controller.teleportForDemo()
         }
     }
 
@@ -85,7 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showSettings() {
         if settingsWindow == nil {
-            let hosting = NSHostingController(rootView: SettingsView(prefs: prefs, updater: updater))
+            let hosting = NSHostingController(rootView: SettingsView(prefs: prefs, updater: updater, gigaChat: gigaChat))
             // Размер окна не диктуется содержимым: иначе на небольшом экране низ уходит под Dock.
             hosting.sizingOptions = []
             let ideal = hosting.sizeThatFits(in: CGSize(width: 460, height: 10_000))

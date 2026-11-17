@@ -1,4 +1,5 @@
 import XCTest
+import CryptoKit
 @testable import SinMinionsCore
 
 final class BehaviorEngineTests: XCTestCase {
@@ -324,6 +325,111 @@ final class TeleportTests: XCTestCase {
 
     func testTeleportHasPhrases() {
         XCTAssertFalse(PhraseBook.pool(.teleport, hour: 10).isEmpty)
+    }
+}
+
+final class GigaChatAPITests: XCTestCase {
+    func testTokenRequestShape() throws {
+        let request = GigaChatAPI.tokenRequest(authorizationKey: "abc123==", scope: "GIGACHAT_API_PERS")
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.absoluteString, "https://ngw.devices.sberbank.ru:9443/api/v2/oauth")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Basic abc123==")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/x-www-form-urlencoded")
+        XCTAssertEqual(String(data: try XCTUnwrap(request.httpBody), encoding: .utf8), "scope=GIGACHAT_API_PERS")
+        // RqUID — UUID четвёртой версии.
+        let rqUID = try XCTUnwrap(request.value(forHTTPHeaderField: "RqUID"))
+        XCTAssertNotNil(UUID(uuidString: rqUID))
+        XCTAssertEqual(Array(rqUID)[14], "4")
+    }
+
+    func testChatRequestShape() throws {
+        let messages = [ChatMessage(.system, "будь краток"), ChatMessage(.user, "привет")]
+        let request = GigaChatAPI.chatRequest(token: "tok", model: "GigaChat", messages: messages)
+        XCTAssertEqual(request.url?.absoluteString, "https://api.giga.chat/v1/chat/completions")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer tok")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), "SinMinions")
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
+        XCTAssertEqual(body["model"] as? String, "GigaChat")
+        XCTAssertEqual(body["stream"] as? Bool, false)
+        let sent = try XCTUnwrap(body["messages"] as? [[String: String]])
+        XCTAssertEqual(sent, [["role": "system", "content": "будь краток"], ["role": "user", "content": "привет"]])
+    }
+
+    func testNormalizedKey() {
+        XCTAssertEqual(GigaChatAPI.normalizedKey("  Basic abc def\n"), "abcdef")
+        XCTAssertEqual(GigaChatAPI.normalizedKey("abc=="), "abc==")
+        XCTAssertNil(GigaChatAPI.normalizedKey("  \n "))
+        XCTAssertNil(GigaChatAPI.normalizedKey("Basic "))
+    }
+
+    func testParseTokenSecondsAndMilliseconds() throws {
+        let seconds = try GigaChatAPI.parseToken(Data(#"{"access_token":"t","expires_at":1679471442}"#.utf8))
+        XCTAssertEqual(seconds.expiresAt, Date(timeIntervalSince1970: 1679471442))
+        let millis = try GigaChatAPI.parseToken(Data(#"{"access_token":"t","expires_at":1679471442000}"#.utf8))
+        XCTAssertEqual(millis.expiresAt, Date(timeIntervalSince1970: 1679471442))
+        XCTAssertThrowsError(try GigaChatAPI.parseToken(Data(#"{"expires_at":1}"#.utf8)))
+        XCTAssertThrowsError(try GigaChatAPI.parseToken(Data("не json".utf8)))
+    }
+
+    func testTokenUsability() {
+        let now = Date(timeIntervalSince1970: 1000)
+        XCTAssertTrue(AccessToken(value: "t", expiresAt: now.addingTimeInterval(120)).isUsable(at: now))
+        XCTAssertFalse(AccessToken(value: "t", expiresAt: now.addingTimeInterval(30)).isUsable(at: now))
+    }
+
+    func testParseChat() throws {
+        let ok = #"{"choices":[{"message":{"role":"assistant","content":"  всё под контролем \n"},"index":0,"finish_reason":"stop"}],"usage":{}}"#
+        XCTAssertEqual(try GigaChatAPI.parseChat(Data(ok.utf8)), "всё под контролем")
+        XCTAssertThrowsError(try GigaChatAPI.parseChat(Data(#"{"choices":[{"message":{"content":" "}}]}"#.utf8))) {
+            XCTAssertEqual($0 as? LLMError, .emptyAnswer)
+        }
+        XCTAssertThrowsError(try GigaChatAPI.parseChat(Data(#"{"choices":[]}"#.utf8))) {
+            XCTAssertEqual($0 as? LLMError, .invalidResponse)
+        }
+    }
+
+    func testErrorTexts() {
+        XCTAssertEqual(LLMError.http(401, nil, .token).errorDescription, "Ключ авторизации не подходит: проверьте ключ и область доступа")
+        XCTAssertEqual(LLMError.http(401, "Unauthorized", .chat).errorDescription, "Токен не принят — Unauthorized")
+        XCTAssertTrue(LLMError.http(429, nil, .chat).errorDescription?.contains("один запрос за раз") == true)
+        XCTAssertEqual(LLMError.http(503, nil, .chat).errorDescription, "Сервис GigaChat недоступен (503)")
+        XCTAssertEqual(LLMError.http(418, nil, .chat).errorDescription, "Ошибка 418")
+    }
+
+    func testErrorDetail() {
+        XCTAssertEqual(GigaChatAPI.errorDetail(Data(#"{"status":401,"message":"Unauthorized"}"#.utf8)), "Unauthorized")
+        XCTAssertNil(GigaChatAPI.errorDetail(Data("<html>".utf8)))
+        let long = String(repeating: "я", count: 300)
+        let detail = GigaChatAPI.errorDetail(Data(#"{"message":"\#(long)"}"#.utf8))
+        XCTAssertEqual(detail?.count, 121)
+    }
+
+    func testHistoryTrimming() {
+        let system = ChatMessage(.system, "s")
+        let messages = [system, ChatMessage(.user, String(repeating: "а", count: 100)), ChatMessage(.assistant, String(repeating: "б", count: 100)),
+                        ChatMessage(.user, String(repeating: "в", count: 100))]
+        XCTAssertEqual(ChatHistory.trimmed(messages, maxCharacters: 10_000), messages)
+        // Старое отбрасывается, система и последнее остаются, диалог начинается с пользователя.
+        let trimmed = ChatHistory.trimmed(messages, maxCharacters: 250)
+        XCTAssertEqual(trimmed.first, system)
+        XCTAssertEqual(trimmed.last, messages.last)
+        XCTAssertEqual(trimmed.count, 2)
+        // Единственное сообщение не отбрасывается, даже если оно длиннее лимита.
+        XCTAssertEqual(ChatHistory.trimmed([system, messages[3]], maxCharacters: 5).count, 2)
+    }
+
+    func testTrustedHostsAndCatalog() {
+        XCTAssertTrue(GigaChatAPI.trustedHosts.contains(GigaChatAPI.tokenURL.host ?? ""))
+        XCTAssertTrue(GigaChatAPI.trustedHosts.contains(GigaChatAPI.chatURL.host ?? ""))
+        XCTAssertEqual(GigaChatAPI.scopes.first, "GIGACHAT_API_PERS")
+        XCTAssertEqual(GigaChatAPI.models.first, "GigaChat")
+    }
+
+    /// Встроенный корневой сертификат не должен меняться незаметно: сверяем отпечаток с опубликованным.
+    func testRussianRootFingerprint() throws {
+        let der = try XCTUnwrap(RussianTrustedRoot.der)
+        let digest = SHA256.hash(data: der).map { String(format: "%02x", $0) }.joined()
+        XCTAssertEqual(digest, "d26d2d0231b7c39f92cc738512ba54103519e4405d68b5bd703e9788ca8ecf31")
     }
 }
 

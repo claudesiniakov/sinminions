@@ -168,6 +168,26 @@ final class CompanionController: NSObject {
         apply(engine.handle(.doubleClick, now: now))
     }
 
+    /// Подключает чат терминала к клиенту нейросети.
+    func attachChat(
+        send: @escaping @MainActor ([ChatMessage]) async throws -> String,
+        hasCredentials: @escaping () -> Bool
+    ) {
+        let chat = console.model.chat
+        chat.send = send
+        chat.hasCredentials = hasCredentials
+        chat.needCredentials = { [weak self] in
+            guard let self else { return }
+            self.apply(self.engine.handle(.closeConsole, now: self.now))
+            self.onOpenSettings()
+        }
+    }
+
+    func showChatDemo() {
+        console.model.chat.loadDemo()
+        console.model.screen = .chat
+    }
+
     func closeConsoleForDemo() {
         apply(engine.handle(.closeConsole, now: now))
     }
@@ -307,6 +327,8 @@ final class CompanionController: NSObject {
                 try? await Task.sleep(for: .milliseconds(200))
                 self?.openSpotlight()
             }
+        case .chat:
+            console.model.screen = .chat
         case .nap:
             nap(seconds: 3600)
         case .hide:

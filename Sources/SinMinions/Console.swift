@@ -6,12 +6,13 @@ import SinMinionsCore
 
 /// Команды терминала среднего режима.
 enum ConsoleCommand: Int, CaseIterable, Identifiable {
-    case spotlight, nap, hide, corner, settings
+    case spotlight, chat, nap, hide, corner, settings
     var id: Int { rawValue }
 
     var title: String {
         switch self {
         case .spotlight: return "ПОИСК SPOTLIGHT"
+        case .chat: return "ЧАТ С GIGACHAT"
         case .nap: return "УСЫПИТЬ НА 1 ЧАС"
         case .hide: return "СКРЫТЬ"
         case .corner: return "ВЕРНУТЬ В УГОЛ"
@@ -128,9 +129,108 @@ final class SystemMonitor {
     }
 }
 
+enum ChatEntryKind { case user, assistant, error, info }
+
+struct ChatEntry: Identifiable, Equatable {
+    let id = UUID()
+    let kind: ChatEntryKind
+    let text: String
+}
+
+/// Переписка в терминале: журнал на экране и история для модели.
+@MainActor
+@Observable
+final class ChatSession {
+    static let systemPrompt = "Ты — Moth, призрак-компаньон на рабочем столе Mac. Отвечай по-русски, кратко (1–4 предложения), в духе терминала Fallout, без эмодзи."
+
+    var entries: [ChatEntry] = []
+    var input = ""
+    private(set) var isSending = false
+
+    @ObservationIgnored var send: @MainActor ([ChatMessage]) async throws -> String = { _ in throw LLMError.noCredentials }
+    @ObservationIgnored var hasCredentials: () -> Bool = { false }
+    @ObservationIgnored var needCredentials: () -> Void = {}
+    @ObservationIgnored private var history = [ChatMessage(.system, ChatSession.systemPrompt)]
+    @ObservationIgnored private var task: Task<Void, Never>?
+    /// Меняется при сбросе и отмене: ответ на устаревший запрос не попадает в журнал.
+    @ObservationIgnored private var generation = 0
+
+    func submit() {
+        let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !isSending else { return }
+        input = ""
+        if text == "/clear" || text == "/очистить" {
+            reset()
+            entries = [ChatEntry(kind: .info, text: "ИСТОРИЯ ОЧИЩЕНА")]
+            return
+        }
+        guard hasCredentials() else {
+            entries.append(ChatEntry(kind: .info, text: "КЛЮЧ GIGACHAT НЕ ЗАДАН — ОТКРЫВАЮ НАСТРОЙКИ"))
+            needCredentials()
+            return
+        }
+        entries.append(ChatEntry(kind: .user, text: text))
+        history.append(ChatMessage(.user, text))
+        isSending = true
+        let snapshot = history
+        let mine = generation
+        task = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let answer = try await self.send(snapshot)
+                guard mine == self.generation else { return }
+                self.history.append(ChatMessage(.assistant, answer))
+                self.entries.append(ChatEntry(kind: .assistant, text: answer))
+            } catch {
+                guard mine == self.generation else { return }
+                // Неудавшийся вопрос из истории убираем, чтобы его можно было задать заново.
+                self.history.removeLast()
+                if !(error is CancellationError) {
+                    self.entries.append(ChatEntry(kind: .error, text: error.localizedDescription))
+                }
+            }
+            self.isSending = false
+        }
+    }
+
+    /// Терминал закрыт во время запроса: ответ уже не нужен.
+    func cancel() {
+        guard isSending else { return }
+        generation += 1
+        task?.cancel()
+        task = nil
+        history.removeLast()
+        isSending = false
+        entries.append(ChatEntry(kind: .info, text: "ЗАПРОС ПРЕРВАН"))
+    }
+
+    func reset() {
+        generation += 1
+        task?.cancel()
+        task = nil
+        isSending = false
+        history = [ChatMessage(.system, Self.systemPrompt)]
+        entries = []
+    }
+
+    /// Для снимка в CI: готовая переписка без обращения к сети.
+    func loadDemo() {
+        entries = [
+            ChatEntry(kind: .user, text: "привет, как дела?"),
+            ChatEntry(kind: .assistant, text: "всё под контролем, смотритель. радиация в норме, периметр чист."),
+            ChatEntry(kind: .user, text: "а если без шуток?"),
+            ChatEntry(kind: .error, text: "Сервис GigaChat недоступен (503)"),
+        ]
+    }
+}
+
 @MainActor
 @Observable
 final class ConsoleModel {
+    enum Screen { case menu, chat }
+
+    var screen = Screen.menu
+    let chat = ChatSession()
     var selected = 0
     var snapshot = SystemSnapshot()
     @ObservationIgnored var run: (ConsoleCommand) -> Void = { _ in }
@@ -148,6 +248,7 @@ final class ConsoleModel {
 // MARK: - Оформление терминала
 
 private enum Term {
+    static let amber = Color(red: 1, green: 0.69, blue: 0.2)
     static let green = Color(nsColor: CompanionView.Palette.green)
     static let dim = Color(nsColor: CompanionView.Palette.greenDim)
     static let dark = Color(nsColor: CompanionView.Palette.greenDark)
@@ -195,6 +296,13 @@ struct TerminalView: View {
     var model: ConsoleModel
 
     var body: some View {
+        switch model.screen {
+        case .menu: menu
+        case .chat: ChatScreen(model: model)
+        }
+    }
+
+    private var menu: some View {
         TerminalFrame(title: "MOTH-OS // ТЕРМИНАЛ") {
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(ConsoleCommand.allCases) { command in
@@ -224,6 +332,76 @@ struct TerminalView: View {
                     .font(Term.small)
                     .foregroundStyle(Term.dim)
             }
+        }
+    }
+}
+
+/// Экран чата: журнал, строка ввода, подсказка.
+private struct ChatScreen: View {
+    var model: ConsoleModel
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        @Bindable var chat = model.chat
+        TerminalFrame(title: "MOTH-OS // GIGACHAT") {
+            VStack(alignment: .leading, spacing: 8) {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            if chat.entries.isEmpty {
+                                Text("ВВЕДИТЕ СООБЩЕНИЕ. /clear — ОЧИСТИТЬ ИСТОРИЮ.")
+                                    .foregroundStyle(Term.dim)
+                            }
+                            ForEach(chat.entries) { entry in
+                                line(entry).id(entry.id)
+                            }
+                            if chat.isSending {
+                                Text("ОЖИДАНИЕ ОТВЕТА…").foregroundStyle(Term.dim).id("busy")
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .onChange(of: chat.entries.count) { scroll(proxy, chat) }
+                    .onChange(of: chat.isSending) { scroll(proxy, chat) }
+                }
+                Rectangle().fill(Term.dark).frame(height: 1)
+                HStack(spacing: 6) {
+                    Text(">")
+                    TextField("", text: $chat.input)
+                        .textFieldStyle(.plain)
+                        .focused($focused)
+                        .onSubmit { chat.submit() }
+                }
+                .foregroundStyle(Term.green)
+                Text("ENTER ОТПРАВИТЬ · ESC НАЗАД")
+                    .foregroundStyle(Term.dim)
+            }
+            .font(Term.small)
+            .tint(Term.green)
+        }
+        .onAppear { focused = true }
+    }
+
+    @ViewBuilder
+    private func line(_ entry: ChatEntry) -> some View {
+        switch entry.kind {
+        case .user:
+            Text("> " + entry.text).foregroundStyle(Term.green)
+        case .assistant:
+            Text("GIGACHAT: " + entry.text).foregroundStyle(Term.green)
+                .shadow(color: Term.green.opacity(0.45), radius: 3)
+        case .error:
+            Text("ОШИБКА: " + entry.text).foregroundStyle(Term.amber)
+        case .info:
+            Text(entry.text).foregroundStyle(Term.dim)
+        }
+    }
+
+    private func scroll(_ proxy: ScrollViewProxy, _ chat: ChatSession) {
+        if chat.isSending {
+            proxy.scrollTo("busy", anchor: .bottom)
+        } else if let last = chat.entries.last {
+            proxy.scrollTo(last.id, anchor: .bottom)
         }
     }
 }
@@ -313,7 +491,7 @@ final class ConsolePanel: NSPanel {
 @MainActor
 final class ConsoleController: NSObject, NSWindowDelegate {
     /// Размеры окон вместе с полями под свечение (10 pt с каждой стороны).
-    static let terminalSize = CGSize(width: 400, height: 250)
+    static let terminalSize = CGSize(width: 460, height: 380)
     static let monitorWidth: CGFloat = 300
     static let monitorMinHeight: CGFloat = 330
 
@@ -356,6 +534,7 @@ final class ConsoleController: NSObject, NSWindowDelegate {
 
     func open(terminalFrame: CGRect, monitorFrame: CGRect) {
         isOpen = true
+        model.screen = .menu
         model.selected = 0
         sampler.reset()
         model.snapshot = sampler.sample()
@@ -382,6 +561,7 @@ final class ConsoleController: NSObject, NSWindowDelegate {
     func close() {
         guard isOpen else { return }
         isOpen = false
+        model.chat.cancel()
         timer?.invalidate()
         timer = nil
         terminal.alphaValue = 0
@@ -392,6 +572,12 @@ final class ConsoleController: NSObject, NSWindowDelegate {
 
     private func handleKey(_ code: UInt16) -> Bool {
         guard isOpen else { return false }
+        // В чате клавиатуру получает строка ввода; Esc возвращает в меню.
+        if model.screen == .chat {
+            guard code == 53 else { return false }
+            model.screen = .menu
+            return true
+        }
         switch code {
         case 126: model.move(-1)
         case 125: model.move(1)

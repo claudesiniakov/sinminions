@@ -56,6 +56,8 @@ final class Prefs {
     static let sleepOptions: [Int] = [1, 5, 15, 0]
 
     var mode: CompanionMode { didSet { store(mode.rawValue, "mode") } }
+    var llmScope: String { didSet { store(llmScope, "llmScope") } }
+    var llmModel: String { didSet { store(llmModel, "llmModel") } }
     var scale: Double { didSet { store(scale, "scale") } }
     var wanderEnabled: Bool { didSet { store(wanderEnabled, "wanderEnabled") } }
     var teleportEnabled: Bool { didSet { store(teleportEnabled, "teleportEnabled") } }
@@ -73,6 +75,10 @@ final class Prefs {
     init() {
         let d = UserDefaults.standard
         mode = CompanionMode(rawValue: d.string(forKey: "mode") ?? "") ?? .minimal
+        let savedScope = d.string(forKey: "llmScope") ?? ""
+        llmScope = GigaChatAPI.scopes.contains(savedScope) ? savedScope : GigaChatAPI.scopes[0]
+        let savedModel = d.string(forKey: "llmModel") ?? ""
+        llmModel = GigaChatAPI.models.contains(savedModel) ? savedModel : GigaChatAPI.models[0]
         let savedScale = d.object(forKey: "scale") as? Double ?? 1.5
         scale = Self.scales.contains(savedScale) ? savedScale : 1.5
         wanderEnabled = d.object(forKey: "wanderEnabled") as? Bool ?? true

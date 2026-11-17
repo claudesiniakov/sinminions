@@ -5,12 +5,58 @@ import Combine
 struct SettingsView: View {
     @Bindable var prefs: Prefs
     @Bindable var updater: Updater
+    let gigaChat: GigaChatClient
 
     @State private var hasAccess = SpotlightLauncher.hasAccess
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var loginError: String?
     @State private var resetFailed = false
+    @State private var keyDraft = ""
+    @State private var hasKey = Keychain.exists(GigaChatAccount.key)
+    @State private var keyError: String?
+    @State private var check: CheckState = .idle
+
+    enum CheckState: Equatable {
+        case idle, running, ok
+        case failed(String)
+    }
     private let accessTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
+
+    private func saveKey() {
+        guard let key = GigaChatAPI.normalizedKey(keyDraft) else { return }
+        do {
+            try Keychain.write(key, account: GigaChatAccount.key)
+            keyDraft = ""
+            keyError = nil
+            hasKey = true
+            check = .idle
+        } catch {
+            keyError = "Не удалось сохранить ключ: " + error.localizedDescription
+        }
+    }
+
+    private func removeKey() {
+        Keychain.delete(GigaChatAccount.key)
+        hasKey = false
+        check = .idle
+    }
+
+    private func checkConnection() {
+        guard let key = Keychain.read(GigaChatAccount.key) else {
+            check = .failed("Ключ не читается из Связки ключей")
+            return
+        }
+        check = .running
+        let scope = prefs.llmScope
+        Task {
+            do {
+                try await gigaChat.checkConnection(key: key, scope: scope)
+                check = .ok
+            } catch {
+                check = .failed(error.localizedDescription)
+            }
+        }
+    }
 
     var body: some View {
         Form {
@@ -74,6 +120,49 @@ struct SettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+            }
+
+            Section("Нейросеть — GigaChat") {
+                SecureField("Ключ авторизации", text: $keyDraft)
+                HStack {
+                    Button("Сохранить ключ") { saveKey() }
+                        .disabled(GigaChatAPI.normalizedKey(keyDraft) == nil)
+                    if hasKey {
+                        Button("Удалить ключ", role: .destructive) { removeKey() }
+                    }
+                }
+                LabeledContent("Ключ") {
+                    Text(hasKey ? "сохранён в Связке ключей" : "не задан").foregroundStyle(.secondary)
+                }
+                if let keyError {
+                    Text(keyError).font(.footnote).foregroundStyle(.red)
+                }
+                Picker("Область доступа", selection: $prefs.llmScope) {
+                    Text("Физлица (GIGACHAT_API_PERS)").tag("GIGACHAT_API_PERS")
+                    Text("ИП и юрлица, пакеты (GIGACHAT_API_B2B)").tag("GIGACHAT_API_B2B")
+                    Text("ИП и юрлица, по факту (GIGACHAT_API_CORP)").tag("GIGACHAT_API_CORP")
+                }
+                Picker("Модель", selection: $prefs.llmModel) {
+                    ForEach(GigaChatAPI.models, id: \.self) { Text($0).tag($0) }
+                }
+                LabeledContent("Подключение") {
+                    HStack {
+                        switch check {
+                        case .idle: EmptyView()
+                        case .running: Text("проверка…").foregroundStyle(.secondary)
+                        case .ok: Text("работает").foregroundStyle(.secondary)
+                        case .failed: Text("не удалось").foregroundStyle(.red)
+                        }
+                        Button("Проверить") { checkConnection() }
+                            .disabled(!hasKey || check == .running)
+                    }
+                }
+                if case let .failed(message) = check {
+                    Text(message).font(.footnote).foregroundStyle(.secondary)
+                }
+                Text("Ключ — это «Authorization data» из личного кабинета GigaChat API на developers.sber.ru. В GigaChat уходит только текст, который вы вводите в чате терминала (средний режим → «Чат с GigaChat»); данные о Mac не передаются.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Система") {
