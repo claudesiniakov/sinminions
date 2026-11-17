@@ -239,6 +239,25 @@ final class CompanionView: NSView {
         body.add(flash, forKey: "flash")
     }
 
+    /// Испуг: быстрая дрожь с наклоном и вспышкой свечения.
+    func shake() {
+        let degree = CGFloat.pi / 180
+        let x = CAKeyframeAnimation(keyPath: "transform.translation.x")
+        x.values = [0, -6, 6, -4, 4, 0].map { $0 * scale }
+        let rotation = CAKeyframeAnimation(keyPath: "transform.rotation.z")
+        rotation.values = [0, -4, 4, -2, 2, 0].map { $0 * degree }
+        for animation in [x, rotation] {
+            animation.duration = 0.45
+            animation.isAdditive = true
+        }
+        moth.add(x, forKey: "shakeX")
+        moth.add(rotation, forKey: "shakeRotation")
+        let flash = CAKeyframeAnimation(keyPath: "shadowOpacity")
+        flash.values = [0.8, 1, 0.8]
+        flash.duration = 0.45
+        body.add(flash, forKey: "shakeFlash")
+    }
+
     /// Втягивание в портал: призрак сжимается до точки, поворачиваясь, и остаётся невидимым.
     func vanish(duration: Double) {
         var gone = CATransform3DMakeScale(0.05, 0.05, 1)

@@ -564,6 +564,150 @@ final class LLMConnectionsTests: XCTestCase {
     }
 }
 
+final class NewBehaviorsTests: XCTestCase {
+    private func makeEngine(scare: Bool = true, chase: Bool = false) -> BehaviorEngine {
+        var config = BehaviorConfig()
+        config.scareEnabled = scare
+        config.chaseEnabled = chase
+        config.sleepAfter = nil
+        config.talkEnabled = false
+        return BehaviorEngine(config: config, now: 0, random: { $0.lowerBound })
+    }
+
+    func testScareShakesAndSpeaks() {
+        var engine = makeEngine()
+        XCTAssertEqual(engine.handle(.scare, now: 1), [.shake, .say(.scared)])
+        XCTAssertEqual(engine.mode, .reacting)
+        XCTAssertEqual(engine.tick(now: 5, idleSeconds: 0), [.hideBubble])
+    }
+
+    func testScareInterruptsWanderAndHasCooldown() {
+        var engine = makeEngine()
+        _ = engine.tick(now: 60, idleSeconds: 1)
+        XCTAssertEqual(engine.mode, .wandering)
+        XCTAssertEqual(engine.handle(.scare, now: 61), [.stopWander, .shake, .say(.scared)])
+        _ = engine.tick(now: 66, idleSeconds: 0)
+        // Повторно пугается не раньше чем через 20 с.
+        XCTAssertEqual(engine.handle(.scare, now: 70), [])
+        XCTAssertEqual(engine.handle(.scare, now: 82), [.shake, .say(.scared)])
+    }
+
+    func testScareIgnoredWhenDisabledOrBusy() {
+        var disabled = makeEngine(scare: false)
+        XCTAssertEqual(disabled.handle(.scare, now: 1), [])
+
+        var sleeping = makeEngine()
+        _ = sleeping.handle(.nap(3600), now: 1)
+        XCTAssertEqual(sleeping.handle(.scare, now: 2), [])
+
+        var dragged = makeEngine()
+        _ = dragged.handle(.dragBegan, now: 1)
+        XCTAssertEqual(dragged.handle(.scare, now: 2), [])
+
+        var console = makeEngine()
+        console = {
+            var config = BehaviorConfig()
+            config.scareEnabled = true
+            config.consoleEnabled = true
+            return BehaviorEngine(config: config, now: 0, random: { $0.lowerBound })
+        }()
+        _ = console.handle(.doubleClick, now: 1)
+        XCTAssertEqual(console.handle(.scare, now: 2), [])
+    }
+
+    func testChaseReplacesSomeWanders() {
+        // Случайность подменена нижней границей (0): доля 0,3 выбирает подлёт к курсору.
+        var chase = makeEngine(scare: false, chase: true)
+        XCTAssertEqual(chase.tick(now: 60, idleSeconds: 1), [.startChase])
+        XCTAssertEqual(chase.mode, .wandering)
+        XCTAssertEqual(chase.handle(.arrived, now: 65), [])
+        XCTAssertEqual(chase.mode, .idle)
+
+        var plain = makeEngine(scare: false, chase: false)
+        XCTAssertEqual(plain.tick(now: 60, idleSeconds: 1), [.startWander])
+
+        // Случайность выше доли — обычный перелёт.
+        var config = BehaviorConfig()
+        config.chaseEnabled = true
+        config.sleepAfter = nil
+        config.talkEnabled = false
+        var high = BehaviorEngine(config: config, now: 0, random: { $0.upperBound })
+        XCTAssertEqual(high.tick(now: 180, idleSeconds: 1), [.startWander])
+    }
+
+    func testNewPhrases() {
+        XCTAssertFalse(PhraseBook.pool(.scared, hour: 10).isEmpty)
+        XCTAssertFalse(PhraseBook.pool(.curious, hour: 10).isEmpty)
+        XCTAssertFalse(BehaviorConfig().scareEnabled)
+        XCTAssertFalse(BehaviorConfig().chaseEnabled)
+    }
+}
+
+final class DeepSeekAPITests: XCTestCase {
+    func testChatRequestShape() throws {
+        let request = DeepSeekAPI.chatRequest(key: "sk-abc", model: "deepseek-flash", messages: [ChatMessage(.system, "кратко"), ChatMessage(.user, "привет")])
+        XCTAssertEqual(request.url?.absoluteString, "https://api.deepseek.com/chat/completions")
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer sk-abc")
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
+        XCTAssertEqual(body["model"] as? String, "deepseek-flash")
+        XCTAssertEqual(body["stream"] as? Bool, false)
+        XCTAssertEqual((body["thinking"] as? [String: String])?["type"], "disabled")
+        XCTAssertEqual((body["messages"] as? [[String: String]])?.count, 2)
+    }
+
+    func testBalanceRequestAndParsing() throws {
+        let request = DeepSeekAPI.balanceRequest(key: "sk-abc")
+        XCTAssertEqual(request.url?.absoluteString, "https://api.deepseek.com/user/balance")
+        XCTAssertEqual(request.httpMethod, "GET")
+        let ok = #"{"is_available":true,"balance_infos":[{"currency":"CNY","total_balance":"110.00","granted_balance":"10.00","topped_up_balance":"100.00"}]}"#
+        XCTAssertEqual(DeepSeekAPI.parseBalance(Data(ok.utf8)), "баланс 110.00 CNY")
+        let empty = #"{"is_available":false,"balance_infos":[{"currency":"USD","total_balance":"0.00"}]}"#
+        XCTAssertEqual(DeepSeekAPI.parseBalance(Data(empty.utf8)), "баланс 0.00 USD (недостаточно для запросов)")
+        XCTAssertNil(DeepSeekAPI.parseBalance(Data("не json".utf8)))
+        XCTAssertNil(DeepSeekAPI.parseBalance(Data(#"{"balance_infos":[]}"#.utf8)))
+    }
+
+    func testNormalizedKey() {
+        XCTAssertEqual(DeepSeekAPI.normalizedKey("  Bearer sk-abc\n"), "sk-abc")
+        XCTAssertEqual(DeepSeekAPI.normalizedKey("sk-abc"), "sk-abc")
+        XCTAssertNil(DeepSeekAPI.normalizedKey("Bearer "))
+        XCTAssertNil(DeepSeekAPI.normalizedKey("  "))
+    }
+
+    func testReasoningContentIsIgnored() throws {
+        let json = #"{"choices":[{"message":{"role":"assistant","content":" ответ ","reasoning_content":"рассуждение"},"finish_reason":"stop"}]}"#
+        XCTAssertEqual(try LLMResponse.parseChat(Data(json.utf8)), "ответ")
+        // Пустые строки перед JSON (сервер шлёт их, пока модель думает) разбору не мешают.
+        XCTAssertEqual(try LLMResponse.parseChat(Data(("\n\n\n" + json).utf8)), "ответ")
+    }
+
+    func testErrorDetailShapes() {
+        XCTAssertEqual(LLMResponse.errorDetail(Data(#"{"error":{"message":"Authentication Fails","type":"authentication_error"}}"#.utf8)), "Authentication Fails")
+        XCTAssertEqual(LLMResponse.errorDetail(Data(#"{"error":"bad"}"#.utf8)), "bad")
+        XCTAssertEqual(LLMResponse.errorDetail(Data(#"{"message":"x"}"#.utf8)), "x")
+        XCTAssertNil(LLMResponse.errorDetail(Data("<html>".utf8)))
+    }
+
+    func testDirectErrorTexts() {
+        XCTAssertEqual(LLMError.http(401, nil, .direct).errorDescription, "Ключ API не подходит")
+        XCTAssertEqual(LLMError.http(402, "Insufficient Balance", .direct).errorDescription, "Недостаточно средств на балансе — Insufficient Balance")
+        XCTAssertEqual(LLMError.http(503, nil, .direct).errorDescription, "Сервис перегружен, попробуйте позже")
+    }
+
+    func testProviderCatalog() {
+        XCTAssertEqual(LLMProvider.allCases, [.gigachat, .deepseek])
+        XCTAssertEqual(LLMProvider.deepseek.defaultModel, "deepseek-flash")
+        XCTAssertFalse(LLMProvider.deepseek.usesScope)
+        XCTAssertTrue(LLMProvider.gigachat.usesScope)
+        XCTAssertEqual(LLMConnection(name: "d", provider: .deepseek).model, "deepseek-flash")
+        XCTAssertEqual(LLMConnection(name: "g").model, "GigaChat")
+        XCTAssertTrue(GigaChatAPI.models.contains("GigaChat-3-Ultra"))
+        XCTAssertEqual(LLMProvider.deepseek.normalizedKey("Bearer k"), "k")
+        XCTAssertEqual(LLMProvider.gigachat.normalizedKey("Basic k"), "k")
+    }
+}
+
 final class PhraseBookTests: XCTestCase {
     func testHasAtLeastFortyPhrases() {
         let ambient = PhraseBook.general + PhraseBook.morning + PhraseBook.day + PhraseBook.evening + PhraseBook.night

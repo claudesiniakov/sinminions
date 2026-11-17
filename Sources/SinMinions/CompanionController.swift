@@ -25,6 +25,8 @@ final class CompanionController: NSObject {
     private var timer: Timer?
     private var ticks = 0
     private var nextBlinkAt: Double = 0
+    private var lastMouse: CGPoint?
+    private var lastMouseTime: Double?
     private var flight: Flight?
     private var flightTimer: Timer?
     private var power: PowerState?
@@ -47,6 +49,8 @@ final class CompanionController: NSObject {
         let duration: Double
         /// Обычный перелёт (в отличие от перемещения к терминалу и обратно).
         let wander: Bool
+        /// Перелёт к курсору: на месте призрак говорит реплику.
+        var chase = false
     }
 
     private struct PowerState: Equatable {
@@ -194,11 +198,13 @@ final class CompanionController: NSObject {
     /// Подключает чат терминала к клиенту нейросети.
     func attachChat(
         send: @escaping @MainActor ([ChatMessage]) async throws -> String,
-        hasCredentials: @escaping () -> Bool
+        hasCredentials: @escaping () -> Bool,
+        speaker: @escaping () -> String
     ) {
         let chat = console.model.chat
         chat.send = send
         chat.hasCredentials = hasCredentials
+        chat.speaker = speaker
         chat.needCredentials = { [weak self] in
             guard let self else { return }
             self.apply(self.engine.handle(.closeConsole, now: self.now))
@@ -487,6 +493,18 @@ final class CompanionController: NSObject {
             if panel.ignoresMouseEvents == inside { panel.ignoresMouseEvents = !inside }
         }
         let time = now
+        // Испуг: курсор быстро пронёсся рядом с призраком.
+        if let last = lastMouse, let lastTime = lastMouseTime, !isSleeping, !view.isDragging,
+           engine.mode == .idle || engine.mode == .wandering {
+            let dt = time - lastTime
+            if dt > 0.02, dt < 0.5 {
+                let speed = hypot(mouse.x - last.x, mouse.y - last.y) / dt
+                let near = view.mothFrame.offsetBy(dx: panel.frame.minX, dy: panel.frame.minY).insetBy(dx: -140, dy: -140)
+                if speed > 1500, near.contains(mouse) { apply(engine.handle(.scare, now: time)) }
+            }
+        }
+        lastMouse = mouse
+        lastMouseTime = time
         if !isSleeping {
             view.look(at: mouse)
             if time >= nextBlinkAt {
@@ -522,6 +540,8 @@ final class CompanionController: NSObject {
             case .openConsole: openConsole()
             case .closeConsole: closeConsole(returnHome: !view.isDragging)
             case .startTeleport: startTeleport()
+            case .shake: view.shake()
+            case .startChase: startChase()
             case .stopTeleport: stopTeleport()
             }
         }
@@ -553,9 +573,9 @@ final class CompanionController: NSObject {
 
     // MARK: - Перелёт
 
-    private func startFlight() {
+    private func startFlight(to explicit: CGPoint? = nil, chase: Bool = false) {
         let from = panel.frame.origin
-        let to = Layout.randomTarget(size: panel.frame.size, in: area, from: from)
+        let to = explicit ?? Layout.randomTarget(size: panel.frame.size, in: area, from: from)
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             // «Уменьшение движения»: вместо перелёта — плавное появление в новой точке.
             NSAnimationContext.runAnimationGroup({ context in
@@ -576,7 +596,7 @@ final class CompanionController: NSObject {
         }
         let speed = Double.random(in: 40...80)
         let distance = Double(hypot(to.x - from.x, to.y - from.y))
-        flight = Flight(from: from, to: to, start: now, duration: max(distance / speed, 0.5), wander: true)
+        flight = Flight(from: from, to: to, start: now, duration: max(distance / speed, 0.5), wander: true, chase: chase)
         startFlightTimer()
     }
 
@@ -607,10 +627,22 @@ final class CompanionController: NSObject {
         if progress >= 1 { finishFlight() }
     }
 
+    /// Подлёт к курсору: призрак встаёт рядом с ним, со стороны центра экрана, и говорит реплику.
+    private func startChase() {
+        let mouse = NSEvent.mouseLocation
+        let moth = view.mothFrame
+        let side: CGFloat = mouse.x > area.midX ? -1 : 1
+        let center = CGPoint(x: mouse.x + side * 110, y: mouse.y - 20)
+        let origin = CGPoint(x: center.x - moth.midX, y: center.y - moth.midY)
+        startFlight(to: clamped(origin, size: panel.frame.size), chase: true)
+    }
+
     private func finishFlight() {
-        let wasWander = flight?.wander ?? true
+        let finished = flight
         stopFlight()
-        if wasWander { apply(engine.handle(.arrived, now: now)) }
+        guard finished?.wander ?? true else { return }
+        apply(engine.handle(.arrived, now: now))
+        if finished?.chase == true { announce(.curious) }
     }
 
     /// `snap` — прерванное перемещение к терминалу или обратно сразу довести до цели

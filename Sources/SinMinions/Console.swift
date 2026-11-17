@@ -135,6 +135,8 @@ struct ChatEntry: Identifiable, Equatable {
     let id = UUID()
     let kind: ChatEntryKind
     let text: String
+    /// Кто ответил (для реплик модели): название провайдера на момент ответа.
+    var speaker: String? = nil
 }
 
 /// Переписка в терминале: журнал на экране и история для модели.
@@ -150,6 +152,7 @@ final class ChatSession {
     @ObservationIgnored var send: @MainActor ([ChatMessage]) async throws -> String = { _ in throw LLMError.noCredentials }
     @ObservationIgnored var hasCredentials: () -> Bool = { false }
     @ObservationIgnored var needCredentials: () -> Void = {}
+    @ObservationIgnored var speaker: () -> String = { "LLM" }
     @ObservationIgnored private var history = [ChatMessage(.system, ChatSession.systemPrompt)]
     @ObservationIgnored private var task: Task<Void, Never>?
     /// Меняется при сбросе и отмене: ответ на устаревший запрос не попадает в журнал.
@@ -174,13 +177,14 @@ final class ChatSession {
         isSending = true
         let snapshot = history
         let mine = generation
+        let who = speaker()
         task = Task { [weak self] in
             guard let self else { return }
             do {
                 let answer = try await self.send(snapshot)
                 guard mine == self.generation else { return }
                 self.history.append(ChatMessage(.assistant, answer))
-                self.entries.append(ChatEntry(kind: .assistant, text: answer))
+                self.entries.append(ChatEntry(kind: .assistant, text: answer, speaker: who))
             } catch {
                 guard mine == self.generation else { return }
                 // Неудавшийся вопрос из истории убираем, чтобы его можно было задать заново.
@@ -221,7 +225,7 @@ final class ChatSession {
     func loadDemo() {
         entries = [
             ChatEntry(kind: .user, text: "привет, как дела?"),
-            ChatEntry(kind: .assistant, text: "всё под контролем, смотритель. радиация в норме, периметр чист. текст можно выделить мышью и скопировать по ⌘C."),
+            ChatEntry(kind: .assistant, text: "всё под контролем, смотритель. радиация в норме, периметр чист. текст можно выделить мышью и скопировать по ⌘C.", speaker: "GIGACHAT"),
             ChatEntry(kind: .user, text: "а если без шуток?"),
             ChatEntry(kind: .error, text: "Сервис GigaChat недоступен (503)"),
         ]
@@ -413,7 +417,7 @@ private struct ChatScreen: View {
                 line = AttributedString("> " + entry.text)
                 line.foregroundColor = Term.green
             case .assistant:
-                line = AttributedString("GIGACHAT: " + entry.text)
+                line = AttributedString((entry.speaker ?? "LLM") + ": " + entry.text)
                 line.foregroundColor = Term.green
             case .error:
                 line = AttributedString("ОШИБКА: " + entry.text)

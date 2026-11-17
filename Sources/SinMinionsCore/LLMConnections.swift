@@ -2,10 +2,32 @@ import Foundation
 
 public enum LLMProvider: String, Codable, CaseIterable, Sendable {
     case gigachat
+    case deepseek
 
     public var title: String {
         switch self {
         case .gigachat: return "GigaChat"
+        case .deepseek: return "DeepSeek"
+        }
+    }
+
+    /// Модели, которые предлагаются списком; остальные можно ввести вручную.
+    public var models: [String] {
+        switch self {
+        case .gigachat: return GigaChatAPI.models
+        case .deepseek: return DeepSeekAPI.models
+        }
+    }
+
+    public var defaultModel: String { models[0] }
+
+    /// У GigaChat есть область доступа (физлица, ИП и юрлица); у DeepSeek её нет.
+    public var usesScope: Bool { self == .gigachat }
+
+    public func normalizedKey(_ raw: String) -> String? {
+        switch self {
+        case .gigachat: return GigaChatAPI.normalizedKey(raw)
+        case .deepseek: return DeepSeekAPI.normalizedKey(raw)
         }
     }
 }
@@ -22,13 +44,13 @@ public struct LLMConnection: Codable, Equatable, Identifiable, Sendable {
 
     public init(
         id: UUID = UUID(), name: String, provider: LLMProvider = .gigachat,
-        scope: String = GigaChatAPI.scopes[0], model: String = GigaChatAPI.models[0], keyAccount: String? = nil
+        scope: String = GigaChatAPI.scopes[0], model: String? = nil, keyAccount: String? = nil
     ) {
         self.id = id
         self.name = name
         self.provider = provider
         self.scope = scope
-        self.model = model
+        self.model = model ?? provider.defaultModel
         self.keyAccount = keyAccount ?? "llm-" + id.uuidString.lowercased()
     }
 }

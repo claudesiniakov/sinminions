@@ -11,7 +11,8 @@ public struct ChatMessage: Equatable, Sendable {
     }
 }
 
-public enum LLMStage: Sendable { case token, chat }
+/// Этап запроса: у GigaChat сначала токен, потом чат; `direct` — провайдеры, где ключ идёт прямо в запросе.
+public enum LLMStage: Sendable { case token, chat, direct }
 
 public enum LLMError: LocalizedError, Equatable, Sendable {
     case noCredentials
@@ -20,11 +21,28 @@ public enum LLMError: LocalizedError, Equatable, Sendable {
     case invalidResponse
     case emptyAnswer
 
+    private static func describeDirect(_ status: Int, _ detail: String?) -> String {
+        let base: String
+        switch status {
+        case 400: base = "Некорректный запрос"
+        case 401: base = "Ключ API не подходит"
+        case 402: base = "Недостаточно средств на балансе"
+        case 404: base = "Модель или адрес не найдены"
+        case 422: base = "Сервер отклонил параметры запроса"
+        case 429: base = "Слишком много запросов"
+        case 500: base = "Ошибка на стороне сервиса"
+        case 503: base = "Сервис перегружен, попробуйте позже"
+        default: base = "Ошибка \(status)"
+        }
+        return detail.map { "\(base) — \($0)" } ?? base
+    }
+
     public var errorDescription: String? {
         switch self {
         case .noCredentials:
             return "Ключ GigaChat не задан"
         case let .http(status, detail, stage):
+            if stage == .direct { return Self.describeDirect(status, detail) }
             let base: String
             switch status {
             case 400: base = stage == .token ? "Запрос токена отклонён, проверьте ключ" : "Некорректный запрос"
@@ -76,7 +94,9 @@ public enum GigaChatAPI {
 
     /// Область доступа ключа: физлица, ИП и юрлица с пакетами, ИП и юрлица с оплатой по факту.
     public static let scopes = ["GIGACHAT_API_PERS", "GIGACHAT_API_B2B", "GIGACHAT_API_CORP"]
-    public static let models = ["GigaChat", "GigaChat-2-Pro", "GigaChat-2-Max"]
+    /// Модели из документации (тарифы для физлиц, 7 октября 2026). `GigaChat-3-Ultra` доступна физлицам
+    /// только по бесплатному пакету; псевдонимы `GigaChat-Pro` и `GigaChat-Max` вводятся вручную.
+    public static let models = ["GigaChat", "GigaChat-2", "GigaChat-2-Pro", "GigaChat-2-Max", "GigaChat-3-Ultra"]
 
     /// Ключ авторизации без пробелов, переводов строк и приставки «Basic »; nil — ключа нет.
     public static func normalizedKey(_ raw: String) -> String? {
@@ -130,6 +150,14 @@ public enum GigaChatAPI {
         return AccessToken(value: token, expiresAt: Date(timeIntervalSince1970: seconds))
     }
 
+    public static func parseChat(_ data: Data) throws -> String { try LLMResponse.parseChat(data) }
+
+    /// Пояснение из тела ошибки; не длиннее 120 знаков.
+    public static func errorDetail(_ data: Data) -> String? { LLMResponse.errorDetail(data) }
+}
+
+/// Разбор ответов в формате OpenAI: так отвечают GigaChat и DeepSeek.
+public enum LLMResponse {
     public static func parseChat(_ data: Data) throws -> String {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let choices = json["choices"] as? [[String: Any]],
@@ -141,12 +169,18 @@ public enum GigaChatAPI {
         return text
     }
 
-    /// Пояснение из тела ошибки `{"status": 401, "message": "..."}`; не длиннее 120 знаков.
+    /// Пояснение из тела ошибки: `{"message": "..."}` или `{"error": {"message": "..."}}`.
     public static func errorDetail(_ data: Data) -> String? {
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let message = json["message"] as? String else { return nil }
-        let text = message.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return nil }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        let message: String?
+        if let top = json["message"] as? String {
+            message = top
+        } else if let error = json["error"] as? [String: Any] {
+            message = error["message"] as? String
+        } else {
+            message = json["error"] as? String
+        }
+        guard let text = message?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
         return text.count > 120 ? String(text.prefix(120)) + "…" : text
     }
 }

@@ -2,7 +2,7 @@ import Foundation
 
 /// Повод для реплики.
 public enum PhraseKind: String, Sendable, CaseIterable {
-    case ambient, click, charging, lowBattery, wake, updateAvailable, needAccess, spotlightOff, teleport
+    case ambient, click, charging, lowBattery, wake, updateAvailable, needAccess, spotlightOff, teleport, scared, curious
 }
 
 public struct BehaviorConfig: Equatable, Sendable {
@@ -25,6 +25,12 @@ public struct BehaviorConfig: Equatable, Sendable {
     public var teleportEnabled = false
     /// Пауза между телепортами, секунды.
     public var teleportInterval: ClosedRange<Double> = 90...240
+    /// Испуг: курсор быстро пронёсся рядом с призраком.
+    public var scareEnabled = false
+    /// Любопытство: вместо случайного перелёта призрак иногда подлетает к курсору.
+    public var chaseEnabled = false
+    /// Доля перелётов, которые превращаются в подлёт к курсору.
+    public var chaseShare: Double = 0.3
 
     public init() {}
 }
@@ -46,6 +52,7 @@ public enum Effect: Equatable, Sendable {
     case openSpotlight
     case openConsole, closeConsole
     case startTeleport, stopTeleport
+    case shake, startChase
 }
 
 public enum Event: Equatable, Sendable {
@@ -67,6 +74,8 @@ public enum Event: Equatable, Sendable {
     case teleportNow
     /// Телепорт закончен.
     case teleportDone
+    /// Курсор быстро пронёсся рядом с призраком.
+    case scare
 }
 
 /// Конечный автомат поведения компаньона. Не знает об интерфейсе: время и случайность
@@ -79,6 +88,9 @@ public struct BehaviorEngine {
     public private(set) var nextTeleportAt: Double
     public private(set) var napUntil: Double?
     private var modeEndsAt: Double = 0
+    private var scareCooldownUntil: Double = 0
+    /// После испуга призрак не пугается заново столько секунд.
+    public static let scareCooldown: Double = 20
     private let random: (ClosedRange<Double>) -> Double
 
     /// Ввод моложе этого числа секунд будит спящего компаньона.
@@ -137,6 +149,8 @@ public struct BehaviorEngine {
             }
             if config.wanderEnabled, now >= nextWanderAt {
                 mode = .wandering
+                // Иногда вместо случайной точки призрак подлетает к курсору.
+                if config.chaseEnabled, random(0...1) < config.chaseShare { return [.startChase] }
                 return [.startWander]
             }
             return []
@@ -214,6 +228,16 @@ public struct BehaviorEngine {
 
         case .closeConsole:
             return mode == .console ? closeConsole(now: now) : []
+
+        case .scare:
+            guard config.scareEnabled, now >= scareCooldownUntil,
+                  mode == .idle || mode == .wandering else { return [] }
+            scareCooldownUntil = now + Self.scareCooldown
+            let effects = interrupt()
+            mode = .reacting
+            modeEndsAt = now + config.talkDuration
+            postpone(now: now + config.talkDuration)
+            return effects + [.shake, .say(.scared)]
 
         case .teleportNow:
             guard mode == .idle else { return [] }

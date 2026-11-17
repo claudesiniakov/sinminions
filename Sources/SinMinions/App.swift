@@ -7,7 +7,7 @@ import SinMinionsCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let prefs = Prefs()
     private let updater = Updater()
-    private let gigaChat = GigaChatClient()
+    private let llm = LLMService()
     private let settingsRouter = SettingsRouter()
     private var controller: CompanionController?
     private var statusMenu: StatusMenu?
@@ -33,13 +33,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             send: { [weak self] messages in
                 guard let self, let connection = self.prefs.connections.active,
                       let key = Keychain.read(connection.keyAccount) else { throw LLMError.noCredentials }
-                return try await self.gigaChat.send(
-                    messages, key: key, scope: connection.scope, model: connection.model
-                )
+                return try await self.llm.send(messages, connection: connection, key: key)
             },
             hasCredentials: { [weak self] in
                 guard let connection = self?.prefs.connections.active else { return false }
                 return Keychain.exists(connection.keyAccount)
+            },
+            speaker: { [weak self] in
+                self?.prefs.connections.active?.provider.title.uppercased() ?? "LLM"
             }
         )
 
@@ -71,8 +72,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             func wait(_ seconds: Double) async { try? await Task.sleep(for: .seconds(seconds)) }
             // Для снимков: три подключения вместо пустого списка.
             if prefs.connections.items.isEmpty {
-                for (name, model) in [("GigaChat", "GigaChat"), ("GigaChat Pro", "GigaChat-2-Pro"), ("GigaChat Max", "GigaChat-2-Max")] {
-                    prefs.connections.add(LLMConnection(name: name, model: model))
+                let samples: [(String, LLMProvider, String)] = [
+                    ("GigaChat", .gigachat, "GigaChat"), ("GigaChat Pro", .gigachat, "GigaChat-2-Pro"),
+                    ("DeepSeek", .deepseek, "deepseek-flash"),
+                ]
+                for (name, provider, model) in samples {
+                    prefs.connections.add(LLMConnection(name: name, provider: provider, model: model))
                 }
                 prefs.connections.setActive(prefs.connections.items[1].id)
             }
@@ -130,7 +135,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let tab { settingsRouter.tab = tab }
         if settingsWindow == nil {
             let hosting = NSHostingController(rootView: SettingsView(
-                prefs: prefs, updater: updater, router: settingsRouter, gigaChat: gigaChat
+                prefs: prefs, updater: updater, router: settingsRouter, llm: llm
             ))
             // Размер окна не диктуется содержимым: иначе на небольшом экране низ уходит под Dock.
             hosting.sizingOptions = []

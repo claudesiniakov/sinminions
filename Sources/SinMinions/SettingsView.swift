@@ -17,14 +17,14 @@ struct SettingsView: View {
     @Bindable var prefs: Prefs
     @Bindable var updater: Updater
     @Bindable var router: SettingsRouter
-    let gigaChat: GigaChatClient
+    let llm: LLMService
 
     var body: some View {
         TabView(selection: $router.tab) {
             GeneralSettings(prefs: prefs)
                 .tabItem { Label("Основные", systemImage: "gearshape") }
                 .tag(SettingsTab.general)
-            LLMSettings(prefs: prefs, gigaChat: gigaChat)
+            LLMSettings(prefs: prefs, llm: llm)
                 .tabItem { Label("Нейросеть", systemImage: "brain") }
                 .tag(SettingsTab.llm)
             AboutSettings(updater: updater)
@@ -61,6 +61,9 @@ private struct GeneralSettings: View {
             Section("Поведение") {
                 Toggle("Перелёты по экрану", isOn: $prefs.wanderEnabled)
                 Toggle("Телепорты через порталы", isOn: $prefs.teleportEnabled)
+                Toggle("Подлетает к курсору (в составе перелётов)", isOn: $prefs.chaseEnabled)
+                    .disabled(!prefs.wanderEnabled)
+                Toggle("Пугается быстрого курсора", isOn: $prefs.scareEnabled)
                 Picker("Частота перелётов и телепортов", selection: $prefs.wanderFrequency) {
                     Text("Редко (3–6 мин)").tag(Frequency.rare)
                     Text("Обычно (1–3 мин)").tag(Frequency.normal)
@@ -135,7 +138,9 @@ private struct GeneralSettings: View {
 // MARK: - Нейросеть
 
 enum CheckState: Equatable {
-    case idle, running, ok
+    case idle, running
+    /// Подключение работает; строка — дополнительные сведения (например, баланс).
+    case ok(String?)
     case failed(String)
 }
 
@@ -159,7 +164,7 @@ private enum EditorTarget: Identifiable {
 /// Список подключений к нейросетям: до десяти, одно из них выбрано — оно отвечает в чате терминала.
 private struct LLMSettings: View {
     @Bindable var prefs: Prefs
-    let gigaChat: GigaChatClient
+    let llm: LLMService
 
     @State private var editing: EditorTarget?
     @State private var pendingDelete: LLMConnection?
@@ -194,7 +199,7 @@ private struct LLMSettings: View {
         }
         .formStyle(.grouped)
         .sheet(item: $editing) { target in
-            ConnectionEditor(prefs: prefs, gigaChat: gigaChat, existing: target.connection) {
+            ConnectionEditor(prefs: prefs, llm: llm, existing: target.connection) {
                 editing = nil
                 refresh += 1
             }
@@ -246,33 +251,47 @@ private struct LLMSettings: View {
 /// Окно добавления и изменения подключения.
 private struct ConnectionEditor: View {
     @Bindable var prefs: Prefs
-    let gigaChat: GigaChatClient
+    let llm: LLMService
     let existing: LLMConnection?
     let close: () -> Void
+
+    private static let customTag = "__custom__"
 
     @State private var name: String
     @State private var provider: LLMProvider
     @State private var scope: String
-    @State private var model: String
+    @State private var modelChoice: String
+    @State private var customModel: String
     @State private var keyDraft = ""
     @State private var error: String?
     @State private var check: CheckState = .idle
 
-    init(prefs: Prefs, gigaChat: GigaChatClient, existing: LLMConnection?, close: @escaping () -> Void) {
+    init(prefs: Prefs, llm: LLMService, existing: LLMConnection?, close: @escaping () -> Void) {
         self.prefs = prefs
-        self.gigaChat = gigaChat
+        self.llm = llm
         self.existing = existing
         self.close = close
-        _name = State(initialValue: existing?.name ?? "GigaChat")
-        _provider = State(initialValue: existing?.provider ?? .gigachat)
+        let provider = existing?.provider ?? .gigachat
+        let model = existing?.model ?? provider.defaultModel
+        let isCustom = !provider.models.contains(model)
+        _name = State(initialValue: existing?.name ?? provider.title)
+        _provider = State(initialValue: provider)
         _scope = State(initialValue: existing?.scope ?? GigaChatAPI.scopes[0])
-        _model = State(initialValue: existing?.model ?? GigaChatAPI.models[0])
+        _modelChoice = State(initialValue: isCustom ? Self.customTag : model)
+        _customModel = State(initialValue: isCustom ? model : "")
     }
 
-    private var storedKey: String? { existing.flatMap { Keychain.read($0.keyAccount) } }
-    private var effectiveKey: String? { GigaChatAPI.normalizedKey(keyDraft) ?? storedKey }
+    private var model: String {
+        modelChoice == Self.customTag ? customModel.trimmingCharacters(in: .whitespaces) : modelChoice
+    }
+    /// Прежний ключ подходит, пока провайдер не сменили.
+    private var keepsStoredKey: Bool { existing != nil && existing?.provider == provider }
+    private var hasDraftKey: Bool { provider.normalizedKey(keyDraft) != nil }
     private var canSave: Bool {
-        !name.trimmingCharacters(in: .whitespaces).isEmpty && (existing != nil || GigaChatAPI.normalizedKey(keyDraft) != nil)
+        !name.trimmingCharacters(in: .whitespaces).isEmpty && !model.isEmpty && (keepsStoredKey || hasDraftKey)
+    }
+    private var canCheck: Bool {
+        hasDraftKey || (keepsStoredKey && existing.map { Keychain.exists($0.keyAccount) } == true)
     }
 
     var body: some View {
@@ -283,25 +302,37 @@ private struct ConnectionEditor: View {
                     Picker("Провайдер", selection: $provider) {
                         ForEach(LLMProvider.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
-                    SecureField(existing == nil ? "Ключ авторизации" : "Новый ключ (пусто — оставить прежний)", text: $keyDraft)
-                    Picker("Область доступа", selection: $scope) {
-                        Text("Физлица (GIGACHAT_API_PERS)").tag("GIGACHAT_API_PERS")
-                        Text("ИП и юрлица, пакеты (GIGACHAT_API_B2B)").tag("GIGACHAT_API_B2B")
-                        Text("ИП и юрлица, по факту (GIGACHAT_API_CORP)").tag("GIGACHAT_API_CORP")
+                    .onChange(of: provider) { old, new in
+                        modelChoice = new.defaultModel
+                        customModel = ""
+                        check = .idle
+                        if name == old.title { name = new.title }
                     }
-                    Picker("Модель", selection: $model) {
-                        ForEach(GigaChatAPI.models, id: \.self) { Text($0).tag($0) }
+                    SecureField(keyLabel, text: $keyDraft)
+                    if provider.usesScope {
+                        Picker("Область доступа", selection: $scope) {
+                            Text("Физлица (GIGACHAT_API_PERS)").tag("GIGACHAT_API_PERS")
+                            Text("ИП и юрлица, пакеты (GIGACHAT_API_B2B)").tag("GIGACHAT_API_B2B")
+                            Text("ИП и юрлица, по факту (GIGACHAT_API_CORP)").tag("GIGACHAT_API_CORP")
+                        }
+                    }
+                    Picker("Модель", selection: $modelChoice) {
+                        ForEach(provider.models, id: \.self) { Text($0).tag($0) }
+                        Text("Другая…").tag(Self.customTag)
+                    }
+                    if modelChoice == Self.customTag {
+                        TextField("Идентификатор модели", text: $customModel)
                     }
                     LabeledContent("Проверка") {
                         HStack {
                             switch check {
                             case .idle: EmptyView()
                             case .running: Text("проверка…").foregroundStyle(.secondary)
-                            case .ok: Text("работает").foregroundStyle(.secondary)
+                            case let .ok(info): Text("работает" + (info.map { " · " + $0 } ?? "")).foregroundStyle(.secondary)
                             case .failed: Text("не удалось").foregroundStyle(.red)
                             }
                             Button("Проверить") { runCheck() }
-                                .disabled(effectiveKey == nil || check == .running)
+                                .disabled(!canCheck || check == .running)
                         }
                     }
                     if case let .failed(message) = check {
@@ -312,9 +343,7 @@ private struct ConnectionEditor: View {
                     }
                 }
                 Section {
-                    Text("Ключ — это «Authorization data» из личного кабинета GigaChat API на developers.sber.ru.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    Text(note).font(.footnote).foregroundStyle(.secondary)
                 }
             }
             .formStyle(.grouped)
@@ -328,17 +357,38 @@ private struct ConnectionEditor: View {
             }
             .padding(16)
         }
-        .frame(width: 460, height: 460)
+        .frame(width: 460, height: 500)
+    }
+
+    private var keyLabel: String {
+        let base = provider == .gigachat ? "Ключ авторизации" : "API-ключ"
+        return keepsStoredKey ? base + " (пусто — оставить прежний)" : base
+    }
+
+    private var note: String {
+        switch provider {
+        case .gigachat:
+            return "Ключ — это «Authorization data» из личного кабинета GigaChat API на developers.sber.ru. Модель GigaChat-3-Ultra доступна физлицам только по бесплатному пакету. Нужной модели нет в списке — выберите «Другая…» и введите идентификатор."
+        case .deepseek:
+            return "API-ключ создаётся на platform.deepseek.com/api_keys. Запросы идут без режима размышления — так ответы короче и быстрее. Проверка показывает баланс. Нужной модели нет в списке — выберите «Другая…» и введите идентификатор."
+        }
+    }
+
+    private func draft() -> LLMConnection {
+        LLMConnection(
+            id: existing?.id ?? UUID(), name: name, provider: provider, scope: scope, model: model,
+            keyAccount: existing?.keyAccount
+        )
     }
 
     private func runCheck() {
-        guard let key = effectiveKey else { return }
+        let stored = keepsStoredKey ? existing.flatMap { Keychain.read($0.keyAccount) } : nil
+        guard let key = provider.normalizedKey(keyDraft) ?? stored else { return }
+        let connection = draft()
         check = .running
-        let scope = scope
         Task {
             do {
-                try await gigaChat.checkConnection(key: key, scope: scope)
-                check = .ok
+                check = .ok(try await llm.check(connection: connection, key: key))
             } catch {
                 check = .failed(error.localizedDescription)
             }
@@ -346,13 +396,10 @@ private struct ConnectionEditor: View {
     }
 
     private func save() {
-        var connection = existing ?? LLMConnection(name: "", provider: provider, scope: scope, model: model)
+        var connection = draft()
         connection.name = name.trimmingCharacters(in: .whitespaces)
-        connection.provider = provider
-        connection.scope = scope
-        connection.model = model
         do {
-            if let key = GigaChatAPI.normalizedKey(keyDraft) {
+            if let key = provider.normalizedKey(keyDraft) {
                 try Keychain.write(key, account: connection.keyAccount)
             }
         } catch {
