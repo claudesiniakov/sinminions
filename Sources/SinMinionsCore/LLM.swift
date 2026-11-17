@@ -81,6 +81,7 @@ public enum GigaChatAPI {
     /// Ключ авторизации без пробелов, переводов строк и приставки «Basic »; nil — ключа нет.
     public static func normalizedKey(_ raw: String) -> String? {
         var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.lowercased() == "basic" { return nil }
         if text.lowercased().hasPrefix("basic ") { text = String(text.dropFirst(6)) }
         text = text.filter { !$0.isWhitespace }
         return text.isEmpty ? nil : text
