@@ -398,6 +398,23 @@ final class CompanionController: NSObject {
         }
     }
 
+    /// Для CI: набирает текст настоящими событиями клавиатуры, как пользователь (в CI «Универсальный доступ» выдан).
+    /// Проверяет, что ввод в строку чата доходит до окна, которое не забирает фокус у других приложений.
+    func typeInConsoleForDemo(_ text: String) async {
+        for scalar in text.unicodeScalars {
+            var utf16 = Array(String(scalar).utf16)
+            for down in [true, false] {
+                guard let event = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: down) else { continue }
+                event.keyboardSetUnicodeString(stringLength: utf16.count, unicodeString: &utf16)
+                event.post(tap: .cghidEventTap)
+            }
+            try? await Task.sleep(for: .milliseconds(80))
+        }
+    }
+
+    /// Что сейчас в строке ввода чата (для проверки в CI).
+    var consoleInputForDemo: String { console.model.chat.input }
+
     /// Для снимка в CI: окна разблокированы.
     func unlockConsoleForDemo() {
         console.setUnlocked(true)
