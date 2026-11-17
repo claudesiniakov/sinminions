@@ -31,6 +31,11 @@ jobs:
       - name: Test
         run: swift test
 
+      # Серверы GigaChat подписаны корнем Минцифры: проверяем, что встроенный корень принимается системой.
+      - name: Live TLS check (GigaChat)
+        continue-on-error: true
+        run: SINMINIONS_LIVE_TLS=1 swift test --filter LiveTLSTests 2>&1 | tee live-tls.log
+
       # Постоянный самоподписанный сертификат: подпись всех сборок одинакова для системы,
       # поэтому разрешение «Универсальный доступ» не сбрасывается при обновлении.
       - name: Signing certificate

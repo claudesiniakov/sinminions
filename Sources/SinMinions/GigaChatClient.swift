@@ -2,34 +2,6 @@ import Foundation
 import Security
 import SinMinionsCore
 
-/// Проверка сертификата сервера: хостам GigaChat дополнительно доверяем по корню Минцифры.
-/// Всем остальным хостам — обычная системная проверка.
-final class GigaChatTrust: NSObject, URLSessionDelegate, @unchecked Sendable {
-    private let anchors: [SecCertificate] = {
-        guard let der = RussianTrustedRoot.der,
-              let certificate = SecCertificateCreateWithData(nil, der as CFData) else { return [] }
-        return [certificate]
-    }()
-
-    func urlSession(
-        _ session: URLSession, didReceive challenge: URLAuthenticationChallenge
-    ) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
-        let space = challenge.protectionSpace
-        guard space.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-              let trust = space.serverTrust,
-              GigaChatAPI.trustedHosts.contains(space.host),
-              !anchors.isEmpty else { return (.performDefaultHandling, nil) }
-        _ = SecTrustSetAnchorCertificates(trust, anchors as CFArray)
-        // Системные корни остаются в силе: меняется только набор доверенных точек для этих хостов.
-        _ = SecTrustSetAnchorCertificatesOnly(trust, false)
-        if SecTrustEvaluateWithError(trust, nil) {
-            return (.useCredential, URLCredential(trust: trust))
-        }
-        // Не прошла и наша проверка: пусть система сама откажет с понятной ошибкой сертификата.
-        return (.performDefaultHandling, nil)
-    }
-}
-
 /// Клиент GigaChat: получает токен доступа (живёт 30 минут), кэширует его и отправляет переписку.
 actor GigaChatClient {
     private let session: URLSession
@@ -95,8 +67,10 @@ actor GigaChatClient {
         case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed: return "Не удалось связаться с сервером GigaChat"
         case .serverCertificateUntrusted, .serverCertificateHasBadDate, .serverCertificateHasUnknownRoot,
              .serverCertificateNotYetValid, .secureConnectionFailed:
-            return "Не удалось проверить сертификат сервера GigaChat"
-        default: return error.localizedDescription
+            var text = "Не удалось проверить сертификат сервера GigaChat (код \(error.code.rawValue))"
+            if let reason = GigaChatTrust.lastFailure { text += ": " + reason }
+            return text
+        default: return error.localizedDescription + " (код \(error.code.rawValue))"
         }
     }
 }
