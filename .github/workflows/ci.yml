@@ -70,7 +70,7 @@ jobs:
           SINMINIONS_DEMO=1 SINMINIONS_SHOT_DIR="$PWD/build" build/SinMinions.app/Contents/MacOS/SinMinions > smoke.log 2>&1 &
           PID=$!
           # Приложение само проходит сцены и перед каждой ставит метку <сцена>.ready — по ней делается снимок.
-          for scene in screen settings console chat teleport; do
+          for scene in screen settings llm console chat teleport; do
             for i in $(seq 1 120); do [ -f "build/$scene.ready" ] && break; sleep 0.5; done
             sleep 0.5
             screencapture -x "build/$scene.png" || true
@@ -96,6 +96,7 @@ jobs:
             build/SinMinions.zip.sha256
             build/screen.png
             build/settings.png
+            build/llm.png
             build/console.png
             build/teleport.png
             build/chat.png

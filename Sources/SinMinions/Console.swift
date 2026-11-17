@@ -165,7 +165,7 @@ final class ChatSession {
             return
         }
         guard hasCredentials() else {
-            entries.append(ChatEntry(kind: .info, text: "КЛЮЧ GIGACHAT НЕ ЗАДАН — ОТКРЫВАЮ НАСТРОЙКИ"))
+            entries.append(ChatEntry(kind: .info, text: "НЕТ ПОДКЛЮЧЕНИЯ С КЛЮЧОМ — ОТКРЫВАЮ НАСТРОЙКИ"))
             needCredentials()
             return
         }
@@ -191,6 +191,10 @@ final class ChatSession {
             }
             self.isSending = false
         }
+    }
+
+    func addInfo(_ text: String) {
+        entries.append(ChatEntry(kind: .info, text: text))
     }
 
     /// Терминал закрыт во время запроса: ответ уже не нужен.
@@ -232,6 +236,11 @@ final class ConsoleModel {
     var screen = Screen.menu
     let chat = ChatSession()
     var selected = 0
+    /// Выбранное подключение к нейросети («интеллект») — для монитора и заголовка чата.
+    var llmName: String?
+    var llmPosition = ""
+    var llmCount = 0
+    @ObservationIgnored var switchConnection: (Int) -> Void = { _ in }
     var snapshot = SystemSnapshot()
     @ObservationIgnored var run: (ConsoleCommand) -> Void = { _ in }
 
@@ -248,6 +257,9 @@ final class ConsoleModel {
 // MARK: - Оформление терминала
 
 private enum Term {
+    static let body = Color(nsColor: CompanionView.Palette.body)
+    static let bodyStroke = Color(nsColor: CompanionView.Palette.bodyStroke)
+    static let pupil = Color(nsColor: CompanionView.Palette.pupil)
     static let amber = Color(red: 1, green: 0.69, blue: 0.2)
     static let green = Color(nsColor: CompanionView.Palette.green)
     static let dim = Color(nsColor: CompanionView.Palette.greenDim)
@@ -328,7 +340,7 @@ struct TerminalView: View {
                     }
                 }
                 Spacer(minLength: 6)
-                Text("↑↓ ВЫБОР · ENTER · ESC ВЫХОД")
+                Text("↑↓ ВЫБОР · ENTER · +/− LLM · ESC ВЫХОД")
                     .font(Term.small)
                     .foregroundStyle(Term.dim)
             }
@@ -343,7 +355,7 @@ private struct ChatScreen: View {
 
     var body: some View {
         @Bindable var chat = model.chat
-        TerminalFrame(title: "MOTH-OS // GIGACHAT") {
+        TerminalFrame(title: "MOTH-OS // " + (model.llmName ?? "НЕЙРОСЕТЬ").uppercased()) {
             VStack(alignment: .leading, spacing: 8) {
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -406,6 +418,27 @@ private struct ChatScreen: View {
     }
 }
 
+/// Призрак Moth для монитора: тот же контур, что и у персонажа на экране.
+private struct GhostFigure: View {
+    var body: some View {
+        Canvas { context, size in
+            let k = size.width / MothShape.size.width
+            let transform = CGAffineTransform(scaleX: k, y: k)
+            let body = Path(MothShape.body(transform))
+            context.fill(body, with: .color(Term.body))
+            context.stroke(body, with: .color(Term.bodyStroke), lineWidth: 1.5 * k)
+            for center in MothShape.eyeCenters {
+                context.fill(Path(MothShape.ellipse(center: center, radii: MothShape.eyeRadii, transform)), with: .color(Term.green))
+            }
+            for center in MothShape.shineCenters {
+                context.fill(Path(MothShape.ellipse(center: center, radii: CGSize(width: 1, height: 1), transform)), with: .color(Term.pupil))
+            }
+        }
+        .aspectRatio(MothShape.size.width / MothShape.size.height, contentMode: .fit)
+        .shadow(color: Term.green.opacity(0.6), radius: 8)
+    }
+}
+
 struct MonitorView: View {
     var model: ConsoleModel
 
@@ -421,6 +454,40 @@ struct MonitorView: View {
         case .critical: return "КРИТИЧЕСКИЙ"
         @unknown default: return "—"
         }
+    }
+
+    /// Призрак вместо человечка Pip-Boy и переключатель «интеллекта»: «−» и «+» меняют подключение к нейросети.
+    private var intelligence: some View {
+        VStack(spacing: 6) {
+            GhostFigure()
+                .frame(width: 72, height: 84)
+            Text("ИНТЕЛЛЕКТ")
+                .foregroundStyle(Term.dim)
+            HStack(spacing: 10) {
+                stepButton("−", delta: -1)
+                VStack(spacing: 1) {
+                    Text((model.llmName ?? "НЕТ ПОДКЛЮЧЕНИЙ").uppercased())
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    if !model.llmPosition.isEmpty {
+                        Text(model.llmPosition).foregroundStyle(Term.dim)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                stepButton("+", delta: 1)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func stepButton(_ symbol: String, delta: Int) -> some View {
+        let enabled = model.llmCount > 1
+        return Text(symbol)
+            .frame(width: 26, height: 26)
+            .overlay(Rectangle().strokeBorder(enabled ? Term.green : Term.dark, lineWidth: 1))
+            .opacity(enabled ? 1 : 0.45)
+            .contentShape(Rectangle())
+            .onTapGesture { if enabled { model.switchConnection(delta) } }
     }
 
     private func gauge(_ label: String, _ value: String, _ fraction: Double) -> some View {
@@ -449,6 +516,8 @@ struct MonitorView: View {
         let s = model.snapshot
         TerminalFrame(title: "СИСТЕМА // МОНИТОР") {
             VStack(alignment: .leading, spacing: 9) {
+                intelligence
+                Rectangle().fill(Term.dark).frame(height: 1)
                 gauge("ЦП", s.cpu.map { Gauge.percent($0) } ?? "…", s.cpu ?? 0)
                 gauge("ПАМЯТЬ", "\(MetricFormat.bytes(s.memoryUsed)) / \(MetricFormat.bytes(s.memoryTotal))",
                       fraction(s.memoryUsed, s.memoryTotal))
@@ -493,7 +562,7 @@ final class ConsoleController: NSObject, NSWindowDelegate {
     /// Размеры окон вместе с полями под свечение (10 pt с каждой стороны).
     static let terminalSize = CGSize(width: 460, height: 380)
     static let monitorWidth: CGFloat = 300
-    static let monitorMinHeight: CGFloat = 330
+    static let monitorMinHeight: CGFloat = 470
 
     let model = ConsoleModel()
     private let terminal: ConsolePanel
@@ -519,7 +588,8 @@ final class ConsoleController: NSObject, NSWindowDelegate {
             panel.isReleasedWhenClosed = false
             panel.alphaValue = 0
         }
-        monitor.ignoresMouseEvents = true
+        // Окно мониторинга принимает щелчки по «+» и «−», но не забирает фокус у терминала.
+        monitor.ignoresMouseEvents = false
         terminal.contentView = NSHostingView(rootView: TerminalView(model: model))
         monitor.contentView = NSHostingView(rootView: MonitorView(model: model))
         terminal.delegate = self
@@ -582,6 +652,8 @@ final class ConsoleController: NSObject, NSWindowDelegate {
         case 126: model.move(-1)
         case 125: model.move(1)
         case 36, 76: model.runSelected()
+        case 24, 69: model.switchConnection(1)
+        case 27, 78: model.switchConnection(-1)
         case 53: onDismiss()
         default: return false
         }

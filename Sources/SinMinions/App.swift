@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let prefs = Prefs()
     private let updater = Updater()
     private let gigaChat = GigaChatClient()
+    private let settingsRouter = SettingsRouter()
     private var controller: CompanionController?
     private var statusMenu: StatusMenu?
     private var settingsWindow: NSWindow?
@@ -22,7 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         prefs.onChange = { [weak controller] in controller?.prefsChanged() }
         updater.beforeRestart = { [weak controller] in controller?.savePosition() }
 
-        controller.onOpenSettings = { [weak self] in self?.showSettings() }
+        controller.onOpenSettings = { [weak self] tab in self?.showSettings(tab: tab) }
         let statusMenu = StatusMenu(controller: controller, updater: updater, prefs: prefs) { [weak self] in
             self?.showSettings()
         }
@@ -30,12 +31,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.onStateChange = { [weak statusMenu] in statusMenu?.refresh() }
         controller.attachChat(
             send: { [weak self] messages in
-                guard let self, let key = Keychain.read(GigaChatAccount.key) else { throw LLMError.noCredentials }
+                guard let self, let connection = self.prefs.connections.active,
+                      let key = Keychain.read(connection.keyAccount) else { throw LLMError.noCredentials }
                 return try await self.gigaChat.send(
-                    messages, key: key, scope: self.prefs.llmScope, model: self.prefs.llmModel
+                    messages, key: key, scope: connection.scope, model: connection.model
                 )
             },
-            hasCredentials: { Keychain.exists(GigaChatAccount.key) }
+            hasCredentials: { [weak self] in
+                guard let connection = self?.prefs.connections.active else { return false }
+                return Keychain.exists(connection.keyAccount)
+            }
         )
 
         observeUpdater()
@@ -64,6 +69,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func runDemo(_ controller: CompanionController) {
         Task { @MainActor in
             func wait(_ seconds: Double) async { try? await Task.sleep(for: .seconds(seconds)) }
+            // Для снимков: три подключения вместо пустого списка.
+            if prefs.connections.items.isEmpty {
+                for (name, model) in [("GigaChat", "GigaChat"), ("GigaChat Pro", "GigaChat-2-Pro"), ("GigaChat Max", "GigaChat-2-Max")] {
+                    prefs.connections.add(LLMConnection(name: name, model: model))
+                }
+                prefs.connections.setActive(prefs.connections.items[1].id)
+            }
             await wait(2)
             controller.announce(.ambient, force: true)
             await wait(1)
@@ -72,6 +84,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             showSettings()
             await wait(1.5)
             demoMark("settings")
+            await wait(4)
+            settingsRouter.tab = .llm
+            await wait(1.5)
+            demoMark("llm")
             await wait(4)
             settingsWindow?.close()
             controller.openConsoleForDemo()
@@ -110,24 +126,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func showSettings() {
+    private func showSettings(tab: SettingsTab? = nil) {
+        if let tab { settingsRouter.tab = tab }
         if settingsWindow == nil {
-            let hosting = NSHostingController(rootView: SettingsView(prefs: prefs, updater: updater, gigaChat: gigaChat))
+            let hosting = NSHostingController(rootView: SettingsView(
+                prefs: prefs, updater: updater, router: settingsRouter, gigaChat: gigaChat
+            ))
             // Размер окна не диктуется содержимым: иначе на небольшом экране низ уходит под Dock.
             hosting.sizingOptions = []
-            let ideal = hosting.sizeThatFits(in: CGSize(width: 460, height: 10_000))
             let window = NSWindow(contentViewController: hosting)
             window.title = "SinMinions"
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             // Зелёная кнопка разворачивает окно на весь экран (без отдельного полноэкранного пространства).
             window.collectionBehavior = [.fullScreenNone]
             window.isReleasedWhenClosed = false
-            window.contentMinSize = NSSize(width: 420, height: 280)
+            window.contentMinSize = NSSize(width: 460, height: 320)
             let visible = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame
                 ?? CGRect(x: 0, y: 0, width: 1280, height: 720)
             let titleBar = window.frame.height - window.contentLayoutRect.height
-            let height = min(max(ideal.height, 280), visible.height - titleBar - 16)
-            window.setContentSize(NSSize(width: 460, height: height))
+            let height = min(620, visible.height - titleBar - 16)
+            window.setContentSize(NSSize(width: 500, height: max(height, 320)))
             window.center()
             settingsWindow = window
         }

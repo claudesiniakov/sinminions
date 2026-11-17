@@ -37,7 +37,8 @@ final class CompanionController: NSObject {
 
     /// Меняется то, что показывает меню (скрыт, спит).
     var onStateChange: () -> Void = {}
-    var onOpenSettings: () -> Void = {}
+    /// Открыть настройки; `nil` — на той вкладке, что открыта.
+    var onOpenSettings: (SettingsTab?) -> Void = { _ in }
 
     private struct Flight {
         let from: CGPoint
@@ -94,6 +95,7 @@ final class CompanionController: NSObject {
             self.apply(self.engine.handle(.closeConsole, now: self.now))
         }
         console.onCommand = { [weak self] command in self?.run(command) }
+        console.model.switchConnection = { [weak self] delta in self?.switchConnection(delta) }
         power = Self.readPower()
 
         let workspace = NSWorkspace.shared.notificationCenter
@@ -147,7 +149,27 @@ final class CompanionController: NSObject {
         apply(engine.handle(.announce(kind), now: now))
     }
 
+    /// Выбранное подключение к нейросети — в модель терминала и монитора.
+    private func refreshLLM() {
+        let list = prefs.connections
+        console.model.llmName = list.active?.name
+        console.model.llmCount = list.items.count
+        console.model.llmPosition = list.activePosition.map { "\($0)/\(list.items.count)" } ?? ""
+    }
+
+    /// «+» и «−» на мониторе: следующее или предыдущее подключение по кругу.
+    private func switchConnection(_ delta: Int) {
+        var list = prefs.connections
+        guard let active = list.cycle(by: delta) else { return }
+        prefs.connections = list
+        refreshLLM()
+        if !console.model.chat.entries.isEmpty {
+            console.model.chat.addInfo("ПОДКЛЮЧЕНИЕ: " + active.name.uppercased())
+        }
+    }
+
     func prefsChanged() {
+        refreshLLM()
         if view.scale != CGFloat(prefs.scale) { rebuildView() }
         applyCollectionBehavior()
         engine.reconfigure(prefs.behaviorConfig(lowPower: lowPower), now: now)
@@ -179,7 +201,7 @@ final class CompanionController: NSObject {
         chat.needCredentials = { [weak self] in
             guard let self else { return }
             self.apply(self.engine.handle(.closeConsole, now: self.now))
-            self.onOpenSettings()
+            self.onOpenSettings(.llm)
         }
     }
 
@@ -289,6 +311,7 @@ final class CompanionController: NSObject {
     // MARK: - Средний режим
 
     private func openConsole() {
+        refreshLLM()
         let mothSize = view.mothFrame.size
         let terminalSize = ConsoleController.terminalSize
         let monitorSize = CGSize(
@@ -340,7 +363,7 @@ final class CompanionController: NSObject {
             apply(engine.handle(.closeConsole, now: now))
         case .settings:
             apply(engine.handle(.closeConsole, now: now))
-            onOpenSettings()
+            onOpenSettings(nil)
         }
     }
 

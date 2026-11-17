@@ -469,6 +469,100 @@ final class CurlTransportTests: XCTestCase {
     }
 }
 
+final class LLMConnectionsTests: XCTestCase {
+    private func make(_ count: Int) -> LLMConnections {
+        var list = LLMConnections()
+        for index in 1...max(count, 1) where count > 0 { list.add(LLMConnection(name: "Подключение \(index)")) }
+        return list
+    }
+
+    func testLimitIsTen() {
+        var list = make(10)
+        XCTAssertEqual(list.items.count, 10)
+        XCTAssertTrue(list.isFull)
+        XCTAssertFalse(list.add(LLMConnection(name: "лишнее")))
+        XCTAssertEqual(list.items.count, 10)
+    }
+
+    func testFirstAddedBecomesActive() {
+        let list = make(3)
+        XCTAssertEqual(list.active?.name, "Подключение 1")
+        XCTAssertEqual(list.activePosition, 1)
+        XCTAssertNil(LLMConnections().active)
+        XCTAssertNil(LLMConnections().activePosition)
+    }
+
+    func testCycleWrapsBothWays() {
+        var list = make(3)
+        XCTAssertEqual(list.cycle(by: 1)?.name, "Подключение 2")
+        XCTAssertEqual(list.cycle(by: 1)?.name, "Подключение 3")
+        XCTAssertEqual(list.cycle(by: 1)?.name, "Подключение 1")
+        XCTAssertEqual(list.cycle(by: -1)?.name, "Подключение 3")
+        XCTAssertEqual(list.activePosition, 3)
+        XCTAssertNil(LLMConnections().cycle(by: 1))
+        var single = make(1)
+        XCTAssertEqual(single.cycle(by: 1)?.name, "Подключение 1")
+        XCTAssertEqual(single.cycle(by: -1)?.name, "Подключение 1")
+    }
+
+    func testRemoveMovesActive() {
+        var list = make(3)
+        let second = list.items[1]
+        list.setActive(second.id)
+        XCTAssertEqual(list.remove(id: second.id)?.id, second.id)
+        XCTAssertEqual(list.items.count, 2)
+        XCTAssertEqual(list.active?.name, "Подключение 1")
+        // Удаление невыбранного выбор не трогает.
+        let third = list.items[1]
+        list.remove(id: list.items[0].id)
+        XCTAssertEqual(list.active?.id, third.id)
+        XCTAssertNil(list.remove(id: UUID()))
+    }
+
+    func testUpdateReplacesByID() {
+        var list = make(2)
+        var changed = list.items[1]
+        changed.model = "GigaChat-2-Max"
+        list.update(changed)
+        XCTAssertEqual(list.items[1].model, "GigaChat-2-Max")
+        XCTAssertEqual(list.items.count, 2)
+        list.update(LLMConnection(name: "чужое"))
+        XCTAssertEqual(list.items.count, 2)
+    }
+
+    func testSetActiveIgnoresUnknown() {
+        var list = make(2)
+        list.setActive(UUID())
+        XCTAssertEqual(list.active?.name, "Подключение 1")
+    }
+
+    func testKeyAccountDefaultsToIDAndLegacyIsKept() {
+        let connection = LLMConnection(name: "a")
+        XCTAssertEqual(connection.keyAccount, "llm-" + connection.id.uuidString.lowercased())
+        XCTAssertEqual(LLMConnection(name: "b", keyAccount: "gigachat-authorization-key").keyAccount, "gigachat-authorization-key")
+    }
+
+    func testJSONRoundTripAndBrokenData() throws {
+        var list = make(3)
+        list.setActive(list.items[2].id)
+        let data = try XCTUnwrap(list.json())
+        XCTAssertEqual(LLMConnections.decode(data), list)
+        XCTAssertNil(LLMConnections.decode(nil))
+        XCTAssertNil(LLMConnections.decode(Data("не json".utf8)))
+    }
+
+    func testDecodeTruncatesAndFixesActive() throws {
+        let many = (1...12).map { LLMConnection(name: "n\($0)") }
+        let raw = LLMConnections(items: many, activeID: UUID())
+        XCTAssertEqual(raw.items.count, 10)
+        XCTAssertEqual(raw.active?.name, "n1")
+        let encoded = try JSONEncoder().encode(["items": many.map { ["id": $0.id.uuidString, "name": $0.name, "provider": "gigachat", "scope": "GIGACHAT_API_PERS", "model": "GigaChat", "keyAccount": $0.keyAccount] }])
+        let decoded = try XCTUnwrap(LLMConnections.decode(encoded))
+        XCTAssertEqual(decoded.items.count, 10)
+        XCTAssertEqual(decoded.active?.name, "n1")
+    }
+}
+
 final class PhraseBookTests: XCTestCase {
     func testHasAtLeastFortyPhrases() {
         let ambient = PhraseBook.general + PhraseBook.morning + PhraseBook.day + PhraseBook.evening + PhraseBook.night

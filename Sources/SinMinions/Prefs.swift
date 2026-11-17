@@ -56,8 +56,7 @@ final class Prefs {
     static let sleepOptions: [Int] = [1, 5, 15, 0]
 
     var mode: CompanionMode { didSet { store(mode.rawValue, "mode") } }
-    var llmScope: String { didSet { store(llmScope, "llmScope") } }
-    var llmModel: String { didSet { store(llmModel, "llmModel") } }
+    var connections: LLMConnections { didSet { store(connections.json() ?? Data(), "llmConnections") } }
     var scale: Double { didSet { store(scale, "scale") } }
     var wanderEnabled: Bool { didSet { store(wanderEnabled, "wanderEnabled") } }
     var teleportEnabled: Bool { didSet { store(teleportEnabled, "teleportEnabled") } }
@@ -75,10 +74,7 @@ final class Prefs {
     init() {
         let d = UserDefaults.standard
         mode = CompanionMode(rawValue: d.string(forKey: "mode") ?? "") ?? .minimal
-        let savedScope = d.string(forKey: "llmScope") ?? ""
-        llmScope = GigaChatAPI.scopes.contains(savedScope) ? savedScope : GigaChatAPI.scopes[0]
-        let savedModel = d.string(forKey: "llmModel") ?? ""
-        llmModel = GigaChatAPI.models.contains(savedModel) ? savedModel : GigaChatAPI.models[0]
+        connections = LLMConnections.decode(d.data(forKey: "llmConnections")) ?? Self.legacyConnections(d)
         let savedScale = d.object(forKey: "scale") as? Double ?? 1.5
         scale = Self.scales.contains(savedScale) ? savedScale : 1.5
         wanderEnabled = d.object(forKey: "wanderEnabled") as? Bool ?? true
@@ -90,6 +86,23 @@ final class Prefs {
         sleepMinutes = Self.sleepOptions.contains(savedSleep) ? savedSleep : 5
         spotlightEnabled = d.object(forKey: "spotlightEnabled") as? Bool ?? true
         hideInFullScreen = d.object(forKey: "hideInFullScreen") as? Bool ?? true
+    }
+
+    /// До v0.1.8 было одно подключение GigaChat: ключ лежал в Связке ключей под прежним именем,
+    /// область доступа и модель — в отдельных настройках. Переносим его в список.
+    private static func legacyConnections(_ d: UserDefaults) -> LLMConnections {
+        guard Keychain.exists(GigaChatAccount.key) else { return LLMConnections() }
+        let scope = d.string(forKey: "llmScope") ?? ""
+        let model = d.string(forKey: "llmModel") ?? ""
+        let connection = LLMConnection(
+            name: "GigaChat",
+            scope: GigaChatAPI.scopes.contains(scope) ? scope : GigaChatAPI.scopes[0],
+            model: GigaChatAPI.models.contains(model) ? model : GigaChatAPI.models[0],
+            keyAccount: GigaChatAccount.key
+        )
+        var list = LLMConnections()
+        list.add(connection)
+        return list
     }
 
     private func store(_ value: Any, _ key: String) {

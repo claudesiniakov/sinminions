@@ -1,63 +1,51 @@
 import SwiftUI
 import Combine
+import Observation
 import SinMinionsCore
 
-/// Окно настроек.
+enum SettingsTab: Hashable { case general, llm, about }
+
+/// Какая вкладка открыта: на нужную вкладку окно переключается извне (например, из чата без ключа).
+@MainActor
+@Observable
+final class SettingsRouter {
+    var tab: SettingsTab = .general
+}
+
+/// Окно настроек: три вкладки.
 struct SettingsView: View {
     @Bindable var prefs: Prefs
     @Bindable var updater: Updater
+    @Bindable var router: SettingsRouter
     let gigaChat: GigaChatClient
+
+    var body: some View {
+        TabView(selection: $router.tab) {
+            GeneralSettings(prefs: prefs)
+                .tabItem { Label("Основные", systemImage: "gearshape") }
+                .tag(SettingsTab.general)
+            LLMSettings(prefs: prefs, gigaChat: gigaChat)
+                .tabItem { Label("Нейросеть", systemImage: "brain") }
+                .tag(SettingsTab.llm)
+            AboutSettings(updater: updater)
+                .tabItem { Label("О программе", systemImage: "info.circle") }
+                .tag(SettingsTab.about)
+        }
+        // Высоту задаёт окно: если всё не помещается на экран, формы прокручиваются.
+        .frame(minWidth: 460, maxWidth: .infinity, minHeight: 320, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Основные
+
+private struct GeneralSettings: View {
+    @Bindable var prefs: Prefs
 
     @State private var hasAccess = SpotlightLauncher.hasAccess
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var loginError: String?
     @State private var resetFailed = false
-    @State private var keyDraft = ""
-    @State private var hasKey = Keychain.exists(GigaChatAccount.key)
-    @State private var keyError: String?
-    @State private var check: CheckState = .idle
-
-    enum CheckState: Equatable {
-        case idle, running, ok
-        case failed(String)
-    }
     private let accessTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
-
-    private func saveKey() {
-        guard let key = GigaChatAPI.normalizedKey(keyDraft) else { return }
-        do {
-            try Keychain.write(key, account: GigaChatAccount.key)
-            keyDraft = ""
-            keyError = nil
-            hasKey = true
-            check = .idle
-        } catch {
-            keyError = "Не удалось сохранить ключ: " + error.localizedDescription
-        }
-    }
-
-    private func removeKey() {
-        Keychain.delete(GigaChatAccount.key)
-        hasKey = false
-        check = .idle
-    }
-
-    private func checkConnection() {
-        guard let key = Keychain.read(GigaChatAccount.key) else {
-            check = .failed("Ключ не читается из Связки ключей")
-            return
-        }
-        check = .running
-        let scope = prefs.llmScope
-        Task {
-            do {
-                try await gigaChat.checkConnection(key: key, scope: scope)
-                check = .ok
-            } catch {
-                check = .failed(error.localizedDescription)
-            }
-        }
-    }
 
     var body: some View {
         Form {
@@ -123,49 +111,6 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Нейросеть — GigaChat") {
-                SecureField("Ключ авторизации", text: $keyDraft)
-                HStack {
-                    Button("Сохранить ключ") { saveKey() }
-                        .disabled(GigaChatAPI.normalizedKey(keyDraft) == nil)
-                    if hasKey {
-                        Button("Удалить ключ", role: .destructive) { removeKey() }
-                    }
-                }
-                LabeledContent("Ключ") {
-                    Text(hasKey ? "сохранён в Связке ключей" : "не задан").foregroundStyle(.secondary)
-                }
-                if let keyError {
-                    Text(keyError).font(.footnote).foregroundStyle(.red)
-                }
-                Picker("Область доступа", selection: $prefs.llmScope) {
-                    Text("Физлица (GIGACHAT_API_PERS)").tag("GIGACHAT_API_PERS")
-                    Text("ИП и юрлица, пакеты (GIGACHAT_API_B2B)").tag("GIGACHAT_API_B2B")
-                    Text("ИП и юрлица, по факту (GIGACHAT_API_CORP)").tag("GIGACHAT_API_CORP")
-                }
-                Picker("Модель", selection: $prefs.llmModel) {
-                    ForEach(GigaChatAPI.models, id: \.self) { Text($0).tag($0) }
-                }
-                LabeledContent("Подключение") {
-                    HStack {
-                        switch check {
-                        case .idle: EmptyView()
-                        case .running: Text("проверка…").foregroundStyle(.secondary)
-                        case .ok: Text("работает").foregroundStyle(.secondary)
-                        case .failed: Text("не удалось").foregroundStyle(.red)
-                        }
-                        Button("Проверить") { checkConnection() }
-                            .disabled(!hasKey || check == .running)
-                    }
-                }
-                if case let .failed(message) = check {
-                    Text(message).font(.footnote).foregroundStyle(.secondary)
-                }
-                Text("Ключ — это «Authorization data» из личного кабинета GigaChat API на developers.sber.ru. В GigaChat уходит только текст, который вы вводите в чате терминала (средний режим → «Чат с GigaChat»); данные о Mac не передаются.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
             Section("Система") {
                 Toggle("Скрывать в полноэкранных приложениях", isOn: $prefs.hideInFullScreen)
                 Toggle("Запускать при входе в систему", isOn: $launchAtLogin)
@@ -181,7 +126,256 @@ struct SettingsView: View {
                     Text(loginError).font(.footnote).foregroundStyle(.red)
                 }
             }
+        }
+        .formStyle(.grouped)
+        .onReceive(accessTimer) { _ in hasAccess = SpotlightLauncher.hasAccess }
+    }
+}
 
+// MARK: - Нейросеть
+
+enum CheckState: Equatable {
+    case idle, running, ok
+    case failed(String)
+}
+
+private enum EditorTarget: Identifiable {
+    case new
+    case edit(LLMConnection)
+
+    var id: String {
+        switch self {
+        case .new: return "new"
+        case let .edit(connection): return connection.id.uuidString
+        }
+    }
+
+    var connection: LLMConnection? {
+        if case let .edit(connection) = self { return connection }
+        return nil
+    }
+}
+
+/// Список подключений к нейросетям: до десяти, одно из них выбрано — оно отвечает в чате терминала.
+private struct LLMSettings: View {
+    @Bindable var prefs: Prefs
+    let gigaChat: GigaChatClient
+
+    @State private var editing: EditorTarget?
+    @State private var pendingDelete: LLMConnection?
+    /// Меняется при каждом сохранении ключа, чтобы строки перечитали состояние Связки ключей.
+    @State private var refresh = 0
+
+    var body: some View {
+        Form {
+            Section {
+                if prefs.connections.items.isEmpty {
+                    Text("Подключений пока нет. Добавьте первое — например, GigaChat.")
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(prefs.connections.items) { connection in
+                    row(connection)
+                }
+                Button("Добавить подключение…") { editing = .new }
+                    .disabled(prefs.connections.isFull)
+            } header: {
+                Text("Подключения (\(prefs.connections.items.count) из \(LLMConnections.limit))")
+            } footer: {
+                if prefs.connections.isFull {
+                    Text("Достигнут предел: \(LLMConnections.limit) подключений. Удалите ненужное, чтобы добавить новое.")
+                }
+            }
+
+            Section {
+                Text("Отмеченное подключение отвечает в чате терминала. В терминале и на мониторе призрака его можно переключать кнопками «+» и «−» (в терминале — клавишами + и −). В нейросеть уходит только текст, который вы вводите в чате; данные о Mac не передаются. Ключи хранятся в Связке ключей.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .sheet(item: $editing) { target in
+            ConnectionEditor(prefs: prefs, gigaChat: gigaChat, existing: target.connection) {
+                editing = nil
+                refresh += 1
+            }
+        }
+        .confirmationDialog(
+            "Удалить подключение «\(pendingDelete?.name ?? "")»?",
+            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+            presenting: pendingDelete
+        ) { connection in
+            Button("Удалить вместе с ключом", role: .destructive) { remove(connection) }
+        }
+    }
+
+    private func row(_ connection: LLMConnection) -> some View {
+        let isActive = prefs.connections.active?.id == connection.id
+        let hasKey = Keychain.exists(connection.keyAccount)
+        return HStack(spacing: 10) {
+            Button {
+                prefs.connections.setActive(connection.id)
+            } label: {
+                Image(systemName: isActive ? "largecircle.fill.circle" : "circle")
+            }
+            .buttonStyle(.plain)
+            .help("Сделать выбранным")
+            VStack(alignment: .leading, spacing: 2) {
+                Text(connection.name)
+                Text("\(connection.provider.title) · \(connection.model) · " + (hasKey ? "ключ сохранён" : "ключ не задан"))
+                    .font(.footnote)
+                    .foregroundStyle(hasKey ? Color.secondary : Color.red)
+            }
+            Spacer()
+            Button { editing = .edit(connection) } label: { Image(systemName: "pencil") }
+                .buttonStyle(.borderless)
+                .help("Изменить")
+            Button { pendingDelete = connection } label: { Image(systemName: "trash") }
+                .buttonStyle(.borderless)
+                .help("Удалить")
+        }
+        .id("\(connection.id)-\(refresh)")
+    }
+
+    private func remove(_ connection: LLMConnection) {
+        Keychain.delete(connection.keyAccount)
+        prefs.connections.remove(id: connection.id)
+        pendingDelete = nil
+    }
+}
+
+/// Окно добавления и изменения подключения.
+private struct ConnectionEditor: View {
+    @Bindable var prefs: Prefs
+    let gigaChat: GigaChatClient
+    let existing: LLMConnection?
+    let close: () -> Void
+
+    @State private var name: String
+    @State private var provider: LLMProvider
+    @State private var scope: String
+    @State private var model: String
+    @State private var keyDraft = ""
+    @State private var error: String?
+    @State private var check: CheckState = .idle
+
+    init(prefs: Prefs, gigaChat: GigaChatClient, existing: LLMConnection?, close: @escaping () -> Void) {
+        self.prefs = prefs
+        self.gigaChat = gigaChat
+        self.existing = existing
+        self.close = close
+        _name = State(initialValue: existing?.name ?? "GigaChat")
+        _provider = State(initialValue: existing?.provider ?? .gigachat)
+        _scope = State(initialValue: existing?.scope ?? GigaChatAPI.scopes[0])
+        _model = State(initialValue: existing?.model ?? GigaChatAPI.models[0])
+    }
+
+    private var storedKey: String? { existing.flatMap { Keychain.read($0.keyAccount) } }
+    private var effectiveKey: String? { GigaChatAPI.normalizedKey(keyDraft) ?? storedKey }
+    private var canSave: Bool {
+        !name.trimmingCharacters(in: .whitespaces).isEmpty && (existing != nil || GigaChatAPI.normalizedKey(keyDraft) != nil)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Form {
+                Section(existing == nil ? "Новое подключение" : "Подключение") {
+                    TextField("Название", text: $name)
+                    Picker("Провайдер", selection: $provider) {
+                        ForEach(LLMProvider.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    SecureField(existing == nil ? "Ключ авторизации" : "Новый ключ (пусто — оставить прежний)", text: $keyDraft)
+                    Picker("Область доступа", selection: $scope) {
+                        Text("Физлица (GIGACHAT_API_PERS)").tag("GIGACHAT_API_PERS")
+                        Text("ИП и юрлица, пакеты (GIGACHAT_API_B2B)").tag("GIGACHAT_API_B2B")
+                        Text("ИП и юрлица, по факту (GIGACHAT_API_CORP)").tag("GIGACHAT_API_CORP")
+                    }
+                    Picker("Модель", selection: $model) {
+                        ForEach(GigaChatAPI.models, id: \.self) { Text($0).tag($0) }
+                    }
+                    LabeledContent("Проверка") {
+                        HStack {
+                            switch check {
+                            case .idle: EmptyView()
+                            case .running: Text("проверка…").foregroundStyle(.secondary)
+                            case .ok: Text("работает").foregroundStyle(.secondary)
+                            case .failed: Text("не удалось").foregroundStyle(.red)
+                            }
+                            Button("Проверить") { runCheck() }
+                                .disabled(effectiveKey == nil || check == .running)
+                        }
+                    }
+                    if case let .failed(message) = check {
+                        Text(message).font(.footnote).foregroundStyle(.secondary)
+                    }
+                    if let error {
+                        Text(error).font(.footnote).foregroundStyle(.red)
+                    }
+                }
+                Section {
+                    Text("Ключ — это «Authorization data» из личного кабинета GigaChat API на developers.sber.ru.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .formStyle(.grouped)
+            HStack {
+                Spacer()
+                Button("Отмена", role: .cancel) { close() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Сохранить") { save() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!canSave)
+            }
+            .padding(16)
+        }
+        .frame(width: 460, height: 460)
+    }
+
+    private func runCheck() {
+        guard let key = effectiveKey else { return }
+        check = .running
+        let scope = scope
+        Task {
+            do {
+                try await gigaChat.checkConnection(key: key, scope: scope)
+                check = .ok
+            } catch {
+                check = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    private func save() {
+        var connection = existing ?? LLMConnection(name: "", provider: provider, scope: scope, model: model)
+        connection.name = name.trimmingCharacters(in: .whitespaces)
+        connection.provider = provider
+        connection.scope = scope
+        connection.model = model
+        do {
+            if let key = GigaChatAPI.normalizedKey(keyDraft) {
+                try Keychain.write(key, account: connection.keyAccount)
+            }
+        } catch {
+            self.error = "Не удалось сохранить ключ: " + error.localizedDescription
+            return
+        }
+        if existing != nil {
+            prefs.connections.update(connection)
+        } else if !prefs.connections.add(connection) {
+            error = "Достигнут предел: \(LLMConnections.limit) подключений."
+            return
+        }
+        close()
+    }
+}
+
+// MARK: - О программе
+
+private struct AboutSettings: View {
+    @Bindable var updater: Updater
+
+    var body: some View {
+        Form {
             Section("Обновление") {
                 Toggle("Проверять обновления автоматически", isOn: $updater.autoCheck)
                 LabeledContent(updater.statusLine) {
@@ -193,10 +387,14 @@ struct SettingsView: View {
                     Text(details).font(.footnote).foregroundStyle(.secondary)
                 }
             }
+            Section("О программе") {
+                LabeledContent("Версия", value: updater.currentVersionString)
+                Link("Репозиторий на GitHub", destination: URL(string: "https://github.com/claudesiniakov/sinminions")!)
+                Text("SinMinions — компаньон для macOS: призрак Moth живёт на рабочем столе, двойной щелчок открывает Spotlight или терминал с монитором и чатом с нейросетью. Персонаж взят из claudesiniakov/summary.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
-        // Высоту задаёт окно: если всё не помещается на экран, форма прокручивается.
-        .frame(minWidth: 420, maxWidth: .infinity, minHeight: 280, maxHeight: .infinity)
-        .onReceive(accessTimer) { _ in hasAccess = SpotlightLauncher.hasAccess }
     }
 }
