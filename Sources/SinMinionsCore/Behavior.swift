@@ -2,7 +2,7 @@ import Foundation
 
 /// Повод для реплики.
 public enum PhraseKind: String, Sendable, CaseIterable {
-    case ambient, click, charging, lowBattery, wake, updateAvailable, needAccess, spotlightOff
+    case ambient, click, charging, lowBattery, wake, updateAvailable, needAccess, spotlightOff, teleport
 }
 
 public struct BehaviorConfig: Equatable, Sendable {
@@ -21,6 +21,10 @@ public struct BehaviorConfig: Equatable, Sendable {
     public var spotlightEnabled = true
     /// Средний режим: двойной щелчок открывает терминал и монитор вместо Spotlight.
     public var consoleEnabled = false
+    /// Телепорты через порталы; в настройках приложения включены по умолчанию.
+    public var teleportEnabled = false
+    /// Пауза между телепортами, секунды.
+    public var teleportInterval: ClosedRange<Double> = 90...240
 
     public init() {}
 }
@@ -29,6 +33,8 @@ public enum Mode: Equatable, Sendable {
     case idle, wandering, talking, reacting, sleeping, dragged
     /// Средний режим: призрак в центре экрана, под ним терминал, справа монитор.
     case console
+    /// Телепорт: призрак уходит в один портал и выходит из другого.
+    case teleporting
 }
 
 /// Что должен сделать интерфейс в ответ на переход автомата.
@@ -39,6 +45,7 @@ public enum Effect: Equatable, Sendable {
     case hop
     case openSpotlight
     case openConsole, closeConsole
+    case startTeleport, stopTeleport
 }
 
 public enum Event: Equatable, Sendable {
@@ -56,6 +63,10 @@ public enum Event: Equatable, Sendable {
     case resumed
     /// Терминал закрыт (Esc, щелчок мимо, выполнена команда).
     case closeConsole
+    /// Начать телепорт сейчас, не дожидаясь таймера.
+    case teleportNow
+    /// Телепорт закончен.
+    case teleportDone
 }
 
 /// Конечный автомат поведения компаньона. Не знает об интерфейсе: время и случайность
@@ -65,6 +76,7 @@ public struct BehaviorEngine {
     public private(set) var config: BehaviorConfig
     public private(set) var nextWanderAt: Double
     public private(set) var nextTalkAt: Double
+    public private(set) var nextTeleportAt: Double
     public private(set) var napUntil: Double?
     private var modeEndsAt: Double = 0
     private let random: (ClosedRange<Double>) -> Double
@@ -85,6 +97,7 @@ public struct BehaviorEngine {
         self.random = random
         nextWanderAt = now + random(config.wanderInterval)
         nextTalkAt = now + random(config.talkInterval)
+        nextTeleportAt = now + random(config.teleportInterval)
     }
 
     /// Новые настройки: таймеры перелёта и реплик запускаются заново.
@@ -93,12 +106,13 @@ public struct BehaviorEngine {
         config = newConfig
         nextWanderAt = now + random(config.wanderInterval)
         nextTalkAt = now + random(config.talkInterval)
+        nextTeleportAt = now + random(config.teleportInterval)
     }
 
     /// Раз в секунду. `idleSeconds` — время с последнего ввода с клавиатуры или мыши.
     public mutating func tick(now: Double, idleSeconds: Double) -> [Effect] {
         switch mode {
-        case .dragged, .wandering, .console:
+        case .dragged, .wandering, .console, .teleporting:
             return []
         case .sleeping:
             if let nap = napUntil {
@@ -116,6 +130,10 @@ public struct BehaviorEngine {
             }
             if config.talkEnabled, now >= nextTalkAt {
                 return startTalk(.ambient, now: now)
+            }
+            if config.teleportEnabled, now >= nextTeleportAt {
+                mode = .teleporting
+                return [.startTeleport]
             }
             if config.wanderEnabled, now >= nextWanderAt {
                 mode = .wandering
@@ -190,11 +208,24 @@ public struct BehaviorEngine {
             case .wandering: mode = .idle; return [.stopWander]
             case .talking, .reacting: mode = .idle; return [.hideBubble]
             case .console: mode = .idle; return [.closeConsole]
+            case .teleporting: mode = .idle; return [.stopTeleport]
             case .dragged, .idle: mode = .idle; return []
             }
 
         case .closeConsole:
             return mode == .console ? closeConsole(now: now) : []
+
+        case .teleportNow:
+            guard mode == .idle else { return [] }
+            mode = .teleporting
+            return [.startTeleport]
+
+        case .teleportDone:
+            guard mode == .teleporting else { return [] }
+            mode = .idle
+            nextTeleportAt = now + random(config.teleportInterval)
+            postpone(now: now)
+            return []
 
         case .resumed:
             postpone(now: now)
@@ -214,6 +245,7 @@ public struct BehaviorEngine {
             napUntil = nil
             return [.wakeUp]
         case .console: return [.closeConsole]
+        case .teleporting: return [.stopTeleport]
         case .idle, .dragged: return []
         }
     }
@@ -242,6 +274,7 @@ public struct BehaviorEngine {
 
     private mutating func postpone(now: Double) {
         nextWanderAt = max(nextWanderAt, now + Self.quietAfterInteraction)
+        nextTeleportAt = max(nextTeleportAt, now + Self.quietAfterInteraction)
         nextTalkAt = max(nextTalkAt, now + Self.quietAfterInteraction)
     }
 }

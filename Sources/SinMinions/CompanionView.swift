@@ -239,6 +239,37 @@ final class CompanionView: NSView {
         body.add(flash, forKey: "flash")
     }
 
+    /// Втягивание в портал: призрак сжимается до точки, поворачиваясь, и остаётся невидимым.
+    func vanish(duration: Double) {
+        var gone = CATransform3DMakeScale(0.05, 0.05, 1)
+        gone = CATransform3DRotate(gone, .pi, 0, 0, 1)
+        let animation = CABasicAnimation(keyPath: "transform")
+        animation.fromValue = NSValue(caTransform3D: CATransform3DIdentity)
+        animation.toValue = NSValue(caTransform3D: gone)
+        animation.duration = duration
+        animation.timingFunction = CAMediaTimingFunction(name: .easeIn)
+        animation.fillMode = .forwards
+        animation.isRemovedOnCompletion = false
+        moth.add(animation, forKey: "portal")
+    }
+
+    /// Выход из портала: обратное движение, после которого парение продолжается.
+    func appear(duration: Double) {
+        moth.removeAnimation(forKey: "portal")
+        var gone = CATransform3DMakeScale(0.05, 0.05, 1)
+        gone = CATransform3DRotate(gone, .pi, 0, 0, 1)
+        let animation = CABasicAnimation(keyPath: "transform")
+        animation.fromValue = NSValue(caTransform3D: gone)
+        animation.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+        animation.duration = duration
+        animation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        moth.add(animation, forKey: "portal")
+    }
+
+    func clearPortalEffect() {
+        moth.removeAnimation(forKey: "portal")
+    }
+
     func blink() {
         guard !sleeping else { return }
         let blink = CAKeyframeAnimation(keyPath: "transform.scale.y")

@@ -262,6 +262,71 @@ final class MetricsTests: XCTestCase {
     }
 }
 
+final class TeleportTests: XCTestCase {
+    private func makeEngine(enabled: Bool = true) -> BehaviorEngine {
+        var config = BehaviorConfig()
+        config.teleportEnabled = enabled
+        config.wanderEnabled = false
+        config.talkEnabled = false
+        config.sleepAfter = nil
+        return BehaviorEngine(config: config, now: 0, random: { $0.lowerBound })
+    }
+
+    func testTeleportsWhenTimerFires() {
+        var engine = makeEngine()
+        XCTAssertEqual(engine.tick(now: 89, idleSeconds: 1), [])
+        XCTAssertEqual(engine.tick(now: 90, idleSeconds: 1), [.startTeleport])
+        XCTAssertEqual(engine.mode, .teleporting)
+        // Пока идёт телепорт, таймеры молчат.
+        XCTAssertEqual(engine.tick(now: 500, idleSeconds: 1), [])
+    }
+
+    func testDisabledByDefaultAndByConfig() {
+        var engine = makeEngine(enabled: false)
+        XCTAssertEqual(engine.tick(now: 1000, idleSeconds: 1), [])
+        XCTAssertFalse(BehaviorConfig().teleportEnabled)
+    }
+
+    func testDoneReturnsToIdleAndSchedulesNext() {
+        var engine = makeEngine()
+        _ = engine.tick(now: 90, idleSeconds: 1)
+        XCTAssertEqual(engine.handle(.teleportDone, now: 92), [])
+        XCTAssertEqual(engine.mode, .idle)
+        XCTAssertEqual(engine.nextTeleportAt, 182)
+        XCTAssertEqual(engine.handle(.teleportDone, now: 93), [], "повторное завершение ничего не делает")
+    }
+
+    func testTeleportNowOnlyFromIdle() {
+        var engine = makeEngine(enabled: false)
+        XCTAssertEqual(engine.handle(.teleportNow, now: 1), [.startTeleport])
+        XCTAssertEqual(engine.handle(.teleportNow, now: 2), [])
+    }
+
+    func testInterruptionsStopTheTeleport() {
+        var drag = makeEngine()
+        _ = drag.tick(now: 90, idleSeconds: 1)
+        XCTAssertEqual(drag.handle(.dragBegan, now: 91), [.stopTeleport])
+        XCTAssertEqual(drag.mode, .dragged)
+
+        var click = makeEngine()
+        _ = click.tick(now: 90, idleSeconds: 1)
+        XCTAssertEqual(click.handle(.click, now: 91), [.stopTeleport, .hop, .say(.click)])
+
+        var hidden = makeEngine()
+        _ = hidden.tick(now: 90, idleSeconds: 1)
+        XCTAssertEqual(hidden.handle(.suspended, now: 91), [.stopTeleport])
+        XCTAssertEqual(hidden.mode, .idle)
+
+        var nap = makeEngine()
+        _ = nap.tick(now: 90, idleSeconds: 1)
+        XCTAssertEqual(nap.handle(.nap(3600), now: 91), [.stopTeleport, .fallAsleep])
+    }
+
+    func testTeleportHasPhrases() {
+        XCTAssertFalse(PhraseBook.pool(.teleport, hour: 10).isEmpty)
+    }
+}
+
 final class PhraseBookTests: XCTestCase {
     func testHasAtLeastFortyPhrases() {
         let ambient = PhraseBook.general + PhraseBook.morning + PhraseBook.day + PhraseBook.evening + PhraseBook.night

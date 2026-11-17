@@ -58,6 +58,7 @@ final class Prefs {
     var mode: CompanionMode { didSet { store(mode.rawValue, "mode") } }
     var scale: Double { didSet { store(scale, "scale") } }
     var wanderEnabled: Bool { didSet { store(wanderEnabled, "wanderEnabled") } }
+    var teleportEnabled: Bool { didSet { store(teleportEnabled, "teleportEnabled") } }
     var wanderFrequency: Frequency { didSet { store(wanderFrequency.rawValue, "wanderFrequency") } }
     var talkEnabled: Bool { didSet { store(talkEnabled, "talkEnabled") } }
     var talkFrequency: Frequency { didSet { store(talkFrequency.rawValue, "talkFrequency") } }
@@ -75,6 +76,7 @@ final class Prefs {
         let savedScale = d.object(forKey: "scale") as? Double ?? 1.5
         scale = Self.scales.contains(savedScale) ? savedScale : 1.5
         wanderEnabled = d.object(forKey: "wanderEnabled") as? Bool ?? true
+        teleportEnabled = d.object(forKey: "teleportEnabled") as? Bool ?? true
         wanderFrequency = Frequency(rawValue: d.string(forKey: "wanderFrequency") ?? "") ?? .normal
         talkEnabled = d.object(forKey: "talkEnabled") as? Bool ?? true
         talkFrequency = Frequency(rawValue: d.string(forKey: "talkFrequency") ?? "") ?? .normal
@@ -94,6 +96,8 @@ final class Prefs {
         var config = BehaviorConfig()
         config.wanderEnabled = wanderEnabled && !lowPower
         config.wanderInterval = wanderFrequency.wanderInterval
+        config.teleportEnabled = teleportEnabled
+        config.teleportInterval = wanderFrequency.wanderInterval
         config.talkEnabled = talkEnabled
         config.talkInterval = talkFrequency.talkInterval
         config.sleepAfter = sleepMinutes > 0 ? Double(sleepMinutes) * 60 : nil

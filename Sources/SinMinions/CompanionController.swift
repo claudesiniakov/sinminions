@@ -12,6 +12,13 @@ final class CompanionController: NSObject {
     private var view: CompanionView
     private let bubble = BubblePanel()
     private let console = ConsoleController()
+    private let portalA = PortalWindow(color: PortalWindow.blue)
+    private let portalB = PortalWindow(color: PortalWindow.orange)
+    private var teleportTask: Task<Void, Never>?
+    /// Меняется при каждом начале и прерывании телепорта: устаревшие шаги не выполняются.
+    private var teleportToken = 0
+    /// Демо-режим для снимка в CI: порталы остаются открытыми подольше.
+    private let demo = ProcessInfo.processInfo.environment["SINMINIONS_DEMO"] != nil
     /// Где призрак был до открытия терминала; nil — терминал закрыт.
     private var consoleHome: CGPoint?
 
@@ -161,6 +168,95 @@ final class CompanionController: NSObject {
         apply(engine.handle(.doubleClick, now: now))
     }
 
+    func closeConsoleForDemo() {
+        apply(engine.handle(.closeConsole, now: now))
+    }
+
+    func teleportForDemo() {
+        apply(engine.handle(.teleportNow, now: now))
+    }
+
+    // MARK: - Телепорт
+
+    private func pause(_ seconds: Double, token: Int) async -> Bool {
+        try? await Task.sleep(for: .seconds(seconds))
+        return !Task.isCancelled && token == teleportToken
+    }
+
+    /// Синий портал открывается под призраком, он втягивается и выходит из оранжевого в другой точке.
+    private func startTeleport() {
+        teleportToken += 1
+        let token = teleportToken
+        let moth = view.mothFrame
+        let from = panel.frame.origin
+        let target = Layout.randomTarget(size: panel.frame.size, in: area, from: from, minDistance: 240)
+
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            // «Уменьшение движения»: без порталов — плавное исчезновение и появление на новом месте.
+            teleportTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.bubble.hide()
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.3
+                    self.panel.animator().alphaValue = 0
+                }
+                guard await self.pause(0.35, token: token) else { return }
+                self.panel.setFrameOrigin(target)
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.3
+                    self.panel.animator().alphaValue = 1
+                }
+                guard await self.pause(0.35, token: token) else { return }
+                self.finishTeleport()
+            }
+            return
+        }
+
+        let portalSize = CGSize(width: moth.width * 0.75, height: moth.height * 1.25)
+        let source = CGPoint(x: from.x + moth.midX, y: from.y + moth.midY)
+        let destination = CGPoint(x: target.x + moth.midX, y: target.y + moth.midY)
+        let hold = demo ? 3.0 : 0.0
+        teleportTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.bubble.hide()
+            self.portalA.open(center: source, size: portalSize, duration: 0.3)
+            guard await self.pause(0.3, token: token) else { return }
+            self.view.vanish(duration: 0.3)
+            guard await self.pause(0.3, token: token) else { return }
+            self.panel.alphaValue = 0
+            self.panel.setFrameOrigin(target)
+            self.portalB.open(center: destination, size: portalSize, duration: 0.3)
+            guard await self.pause(0.3, token: token) else { return }
+            self.panel.alphaValue = 1
+            self.view.appear(duration: 0.3)
+            guard await self.pause(0.3 + hold, token: token) else { return }
+            self.portalA.close(duration: 0.3)
+            self.portalB.close(duration: 0.3)
+            guard await self.pause(0.3, token: token) else { return }
+            self.finishTeleport()
+        }
+    }
+
+    private func finishTeleport() {
+        teleportTask = nil
+        savePosition()
+        apply(engine.handle(.teleportDone, now: now))
+        // Иногда — реплика о том, что произошло.
+        if Int.random(in: 0..<3) == 0 { announce(.teleport) }
+    }
+
+    /// Прерванный телепорт (перетаскивание, щелчок, скрытие): порталы исчезают сразу, призрак виден.
+    private func stopTeleport() {
+        teleportToken += 1
+        teleportTask?.cancel()
+        teleportTask = nil
+        portalA.hide()
+        portalB.hide()
+        view.clearPortalEffect()
+        if isVisible { panel.alphaValue = 1 }
+        savePosition()
+    }
+
     // MARK: - Средний режим
 
     private func openConsole() {
@@ -270,6 +366,8 @@ final class CompanionController: NSObject {
         panel.collectionBehavior = behavior
         bubble.setCollectionBehavior(behavior)
         console.setCollectionBehavior(behavior)
+        portalA.setCollectionBehavior(behavior)
+        portalB.setCollectionBehavior(behavior)
     }
 
     private var area: CGRect {
@@ -368,6 +466,8 @@ final class CompanionController: NSObject {
             case .openSpotlight: openSpotlight()
             case .openConsole: openConsole()
             case .closeConsole: closeConsole(returnHome: !view.isDragging)
+            case .startTeleport: startTeleport()
+            case .stopTeleport: stopTeleport()
             }
         }
         if sleptBefore != isSleeping {

@@ -52,6 +52,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 try? await Task.sleep(for: .seconds(6))
                 self.settingsWindow?.close()
                 controller.openConsoleForDemo()
+                // …и порталы: терминал закрывается, призрак телепортируется.
+                try? await Task.sleep(for: .seconds(8))
+                controller.closeConsoleForDemo()
+                try? await Task.sleep(for: .seconds(1))
+                controller.teleportForDemo()
             }
         }
     }

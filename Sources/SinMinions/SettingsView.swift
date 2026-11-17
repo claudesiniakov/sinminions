@@ -25,12 +25,13 @@ struct SettingsView: View {
 
             Section("Поведение") {
                 Toggle("Перелёты по экрану", isOn: $prefs.wanderEnabled)
-                Picker("Частота перелётов", selection: $prefs.wanderFrequency) {
+                Toggle("Телепорты через порталы", isOn: $prefs.teleportEnabled)
+                Picker("Частота перелётов и телепортов", selection: $prefs.wanderFrequency) {
                     Text("Редко (3–6 мин)").tag(Frequency.rare)
                     Text("Обычно (1–3 мин)").tag(Frequency.normal)
                     Text("Часто (20–60 с)").tag(Frequency.often)
                 }
-                .disabled(!prefs.wanderEnabled)
+                .disabled(!prefs.wanderEnabled && !prefs.teleportEnabled)
                 Toggle("Реплики", isOn: $prefs.talkEnabled)
                 Picker("Частота реплик", selection: $prefs.talkFrequency) {
                     Text("Редко (5–15 мин)").tag(Frequency.rare)
