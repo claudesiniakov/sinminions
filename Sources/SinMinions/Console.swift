@@ -862,13 +862,14 @@ final class ConsoleController: NSObject, NSWindowDelegate {
     /// Окно терминала не активирует приложение, а клавиатура идёт в активное — поэтому в нём нельзя печатать.
     /// Входя в чат, делаем приложение активным и возвращаем фокус в строку ввода.
     func activateForTyping() {
-        guard isOpen, !NSApp.isActive else {
-            model.chat.focusTick += 1
-            return
+        guard isOpen else { return }
+        if !NSApp.isActive {
+            let front = NSWorkspace.shared.frontmostApplication
+            if front?.processIdentifier != ProcessInfo.processInfo.processIdentifier { previousApp = front }
+            NSApp.activate(ignoringOtherApps: true)
         }
-        let front = NSWorkspace.shared.frontmostApplication
-        if front?.processIdentifier != ProcessInfo.processInfo.processIdentifier { previousApp = front }
-        NSApp.activate(ignoringOtherApps: true)
+        // Приложение могло быть уже активным (например, после окна настроек), но ключевым окном — другое:
+        // клавиатура идёт только в ключевое окно.
         terminal.makeKeyAndOrderFront(nil)
         model.chat.focusTick += 1
     }
@@ -877,7 +878,8 @@ final class ConsoleController: NSObject, NSWindowDelegate {
     func debugState() -> String {
         let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?"
         let responder = terminal.firstResponder.map { String(describing: type(of: $0)) } ?? "nil"
-        return "active=\(NSApp.isActive) key=\(terminal.isKeyWindow) fr=\(responder) front=\(front)"
+        let keyWindow = NSApp.keyWindow.map { String(describing: type(of: $0)) } ?? "nil"
+        return "active=\(NSApp.isActive) key=\(terminal.isKeyWindow) keyWindow=\(keyWindow) canKey=\(terminal.canBecomeKey) visible=\(terminal.isVisible) fr=\(responder) front=\(front)"
     }
 
     /// Для CI: нажатия клавиш, отправленные прямо в окно терминала (мимо системы).

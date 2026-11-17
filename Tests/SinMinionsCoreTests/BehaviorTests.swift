@@ -224,6 +224,50 @@ final class ConsoleModeTests: XCTestCase {
     }
 }
 
+final class SlashCommandTests: XCTestCase {
+    func testParsesLatinAndRussianNames() {
+        XCTAssertEqual(SlashParser.parse("/help"), .command(.help))
+        XCTAssertEqual(SlashParser.parse("/помощь"), .command(.help))
+        XCTAssertEqual(SlashParser.parse("  /SLEEP  "), .command(.nap))
+        XCTAssertEqual(SlashParser.parse("/Сон"), .command(.nap))
+        XCTAssertEqual(SlashParser.parse("/unlock"), .command(.unlock))
+        XCTAssertEqual(SlashParser.parse("/заблокировать"), .command(.lock))
+        XCTAssertEqual(SlashParser.parse("/reset"), .command(.resetLayout))
+        XCTAssertEqual(SlashParser.parse("/настройки"), .command(.settings))
+        XCTAssertEqual(SlashParser.parse("/clear"), .command(.clear))
+        XCTAssertEqual(SlashParser.parse("/next"), .command(.next))
+        XCTAssertEqual(SlashParser.parse("/пред"), .command(.previous))
+        XCTAssertEqual(SlashParser.parse("/?"), .command(.help))
+    }
+
+    func testIgnoresArgumentsAndNonCommands() {
+        XCTAssertEqual(SlashParser.parse("/help me please"), .command(.help))
+        XCTAssertEqual(SlashParser.parse("привет"), .notACommand)
+        XCTAssertEqual(SlashParser.parse(""), .notACommand)
+        XCTAssertEqual(SlashParser.parse("а это /help не в начале"), .notACommand)
+    }
+
+    func testUnknownCommand() {
+        XCTAssertEqual(SlashParser.parse("/xyz"), .unknown("/xyz"))
+        XCTAssertEqual(SlashParser.parse("/"), .unknown("/"))
+        XCTAssertEqual(SlashParser.parse("/Foo bar"), .unknown("/Foo"))
+    }
+
+    func testEveryCommandHasNamesAndIsDocumentedInHelp() {
+        let help = SlashParser.helpLines.joined(separator: "\n")
+        for command in SlashCommand.allCases {
+            let variants = SlashParser.names[command] ?? []
+            XCTAssertFalse(variants.isEmpty, "\(command)")
+            // Первое (латинское) название команды есть в справке.
+            XCTAssertTrue(help.contains(variants[0]), "\(command): \(variants[0])")
+            for variant in variants { XCTAssertEqual(SlashParser.parse(variant), .command(command)) }
+        }
+        // Названия не пересекаются между командами.
+        let all = SlashParser.names.values.flatMap { $0 }
+        XCTAssertEqual(Set(all).count, all.count)
+    }
+}
+
 final class WindowPlacementTests: XCTestCase {
     private let area = CGRect(x: 0, y: 0, width: 1000, height: 800)
 
