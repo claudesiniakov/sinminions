@@ -215,7 +215,7 @@ final class CompanionController: NSObject {
         let portalSize = CGSize(width: moth.width * 0.75, height: moth.height * 1.25)
         let source = CGPoint(x: from.x + moth.midX, y: from.y + moth.midY)
         let destination = CGPoint(x: target.x + moth.midX, y: target.y + moth.midY)
-        let hold = demo ? 3.0 : 0.0
+        let hold = demo ? 8.0 : 0.0
         teleportTask = Task { @MainActor [weak self] in
             guard let self else { return }
             self.bubble.hide()
