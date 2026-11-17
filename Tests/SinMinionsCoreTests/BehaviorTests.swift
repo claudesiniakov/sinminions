@@ -433,6 +433,42 @@ final class GigaChatAPITests: XCTestCase {
     }
 }
 
+final class CurlTransportTests: XCTestCase {
+    func testEscape() {
+        XCTAssertEqual(CurlTransport.escape("a\"b\\c\nd\te"), "a\\\"b\\\\c\\nd\\te")
+        XCTAssertEqual(CurlTransport.escape("привет"), "привет")
+    }
+
+    func testConfigForChatRequest() {
+        var request = GigaChatAPI.chatRequest(token: "tok", model: "GigaChat", messages: [ChatMessage(.user, "привет")])
+        request.timeoutInterval = 90
+        let config = CurlTransport.config(for: request, caFile: "/tmp/ca.pem")
+        let lines = config.split(separator: "\n").map(String.init)
+        XCTAssertTrue(lines.contains("cacert = \"/tmp/ca.pem\""))
+        XCTAssertTrue(lines.contains("url = \"https://api.giga.chat/v1/chat/completions\""))
+        XCTAssertTrue(lines.contains("request = \"POST\""))
+        XCTAssertTrue(lines.contains("header = \"Authorization: Bearer tok\""))
+        XCTAssertTrue(lines.contains("max-time = 90"))
+        XCTAssertTrue(lines.contains("proto = \"=https\""))
+        XCTAssertTrue(lines.contains { $0.hasPrefix("data-raw = \"{") && $0.contains("\\\"model\\\"") })
+        XCTAssertEqual(lines.last, "write-out = \"\\n%{http_code}\"")
+        // Секреты идут только в конфигурации, а не в аргументах процесса.
+        XCTAssertFalse(config.contains("--"))
+    }
+
+    func testParseOutput() throws {
+        let ok = try XCTUnwrap(CurlTransport.parse(Data("{\"a\":1}\n401".utf8)))
+        XCTAssertEqual(ok.status, 401)
+        XCTAssertEqual(String(data: ok.body, encoding: .utf8), "{\"a\":1}")
+        // Многострочное тело: код берётся из последней строки.
+        let multi = try XCTUnwrap(CurlTransport.parse(Data("a\nb\n200".utf8)))
+        XCTAssertEqual(multi.status, 200)
+        XCTAssertEqual(String(data: multi.body, encoding: .utf8), "a\nb")
+        XCTAssertNil(CurlTransport.parse(Data("без кода".utf8)))
+        XCTAssertNil(CurlTransport.parse(Data()))
+    }
+}
+
 final class PhraseBookTests: XCTestCase {
     func testHasAtLeastFortyPhrases() {
         let ambient = PhraseBook.general + PhraseBook.morning + PhraseBook.day + PhraseBook.evening + PhraseBook.night

@@ -31,14 +31,16 @@ final class LiveTLSTests: XCTestCase {
         XCTAssertTrue([400, 401].contains(code), "ожидали 400 или 401, получили \(code)")
     }
 
-    /// Запасной путь приложения: те же серверы по TLS 1.2.
-    func testBothHostsOverTLS12() async throws {
+    /// Запасной транспорт приложения: те же серверы через системный curl.
+    func testBothHostsOverCurl() async throws {
         guard ProcessInfo.processInfo.environment["SINMINIONS_LIVE_TLS"] != nil else { throw XCTSkip("только в CI") }
         let token = GigaChatAPI.tokenRequest(authorizationKey: "dGVzdDp0ZXN0", scope: "GIGACHAT_API_PERS")
-        let tokenCode = try await status(of: token, label: "TLS1.2 ngw.devices.sberbank.ru:9443", tls12Only: true)
+        let (tokenBody, tokenCode) = try await CurlTransport.run(token)
+        print("LIVE curl ngw.devices.sberbank.ru:9443: HTTP \(tokenCode) \(String(data: tokenBody.prefix(120), encoding: .utf8) ?? "")")
         XCTAssertTrue([400, 401].contains(tokenCode), "ожидали 400 или 401, получили \(tokenCode)")
-        let chat = GigaChatAPI.chatRequest(token: "x", model: "GigaChat", messages: [ChatMessage(.user, "привет")])
-        let chatCode = try await status(of: chat, label: "TLS1.2 api.giga.chat", tls12Only: true)
+        let chat = GigaChatAPI.chatRequest(token: "x", model: "GigaChat", messages: [ChatMessage(.user, "привет \"мир\"")])
+        let (chatBody, chatCode) = try await CurlTransport.run(chat)
+        print("LIVE curl api.giga.chat: HTTP \(chatCode) \(String(data: chatBody.prefix(120), encoding: .utf8) ?? "")")
         XCTAssertTrue([400, 401, 403].contains(chatCode), "ожидали 400, 401 или 403, получили \(chatCode)")
     }
 

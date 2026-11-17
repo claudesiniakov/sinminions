@@ -3,22 +3,29 @@ import Security
 import SinMinionsCore
 
 /// Клиент GigaChat: получает токен доступа (живёт 30 минут), кэширует его и отправляет переписку.
+///
+/// Транспорта два: встроенный сетевой клиент и системный `curl`. На macOS 27 встроенный обрывает
+/// рукопожатие с серверами GigaChat, поэтому при такой ошибке запрос повторяется через `curl`,
+/// а удачный транспорт запоминается и в следующий раз пробуется первым.
 actor GigaChatClient {
+    private enum Transport { case urlSession, curl }
+
+    private struct TransportFailure: Error {
+        let text: String
+        /// Ошибка соединения, при которой есть смысл попробовать другой транспорт.
+        let canFallBack: Bool
+    }
+
+    private static let preferCurlKey = "gigachatPreferCurl"
+
     private let session: URLSession
-    /// Запасной сеанс только на TLS 1.2: если рукопожатие по TLS 1.3 обрывается (сервер не принимает
-    /// начало рукопожатия новой системы), повторяем по TLS 1.2 — серверы GigaChat его поддерживают.
-    private let legacySession: URLSession
-    private var useLegacy = false
+    private var preferCurl = UserDefaults.standard.bool(forKey: GigaChatClient.preferCurlKey)
     private var cached: (tag: String, token: AccessToken)?
 
     init() {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 90
         session = URLSession(configuration: configuration, delegate: GigaChatTrust(), delegateQueue: nil)
-        let legacy = URLSessionConfiguration.ephemeral
-        legacy.timeoutIntervalForRequest = 90
-        legacy.tlsMaximumSupportedProtocolVersion = .TLSv12
-        legacySession = URLSession(configuration: legacy, delegate: GigaChatTrust(), delegateQueue: nil)
     }
 
     /// Проверка ключа: запрашивает новый токен.
@@ -57,47 +64,77 @@ actor GigaChatClient {
         return token
     }
 
-    private func fetch(_ request: URLRequest, on session: URLSession) async throws -> (Data, Int) {
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse else { throw LLMError.invalidResponse }
-        return (data, http.statusCode)
-    }
+    // MARK: - Транспорт
 
     private func perform(_ request: URLRequest) async throws -> (Data, Int) {
-        var retriedOverTLS12 = false
+        let first: Transport = preferCurl ? .curl : .urlSession
+        let second: Transport = preferCurl ? .urlSession : .curl
         do {
-            if useLegacy { return try await fetch(request, on: legacySession) }
             do {
-                return try await fetch(request, on: session)
-            } catch let error as URLError where error.code == .secureConnectionFailed {
-                retriedOverTLS12 = true
-                let result = try await fetch(request, on: legacySession)
-                // Дальше сразу идём по TLS 1.2, чтобы не повторять неудачное рукопожатие.
-                useLegacy = true
-                return result
+                return try await run(request, via: first)
+            } catch let failure as TransportFailure where failure.canFallBack {
+                do {
+                    let result = try await run(request, via: second)
+                    // Запоминаем рабочий транспорт: неудачную попытку больше не повторяем.
+                    preferCurl = second == .curl
+                    UserDefaults.standard.set(preferCurl, forKey: Self.preferCurlKey)
+                    return result
+                } catch let other as TransportFailure {
+                    throw TransportFailure(text: failure.text + "; запасной путь: " + other.text, canFallBack: false)
+                }
             }
-        } catch let error as URLError {
-            if error.code == .cancelled { throw CancellationError() }
-            throw LLMError.network(Self.describe(error, retriedOverTLS12: retriedOverTLS12))
+        } catch let failure as TransportFailure {
+            throw LLMError.network(failure.text)
         }
     }
 
-    private static func describe(_ error: URLError, retriedOverTLS12: Bool) -> String {
+    private func run(_ request: URLRequest, via transport: Transport) async throws -> (Data, Int) {
+        switch transport {
+        case .urlSession:
+            do {
+                let (data, response) = try await session.data(for: request)
+                guard let http = response as? HTTPURLResponse else { throw LLMError.invalidResponse }
+                return (data, http.statusCode)
+            } catch let error as URLError {
+                if error.code == .cancelled { throw CancellationError() }
+                throw TransportFailure(text: Self.describe(error), canFallBack: Self.isHandshakeFailure(error))
+            }
+        case .curl:
+            do {
+                return try await CurlTransport.run(request)
+            } catch let failure as CurlTransport.Failure {
+                if Task.isCancelled { throw CancellationError() }
+                let canFallBack = failure.exitCode < 0 || CurlTransport.tlsExitCodes.contains(failure.exitCode)
+                throw TransportFailure(
+                    text: "curl: \(failure.message) (код \(failure.exitCode))", canFallBack: canFallBack
+                )
+            }
+        }
+    }
+
+    private static func isHandshakeFailure(_ error: URLError) -> Bool {
+        switch error.code {
+        case .secureConnectionFailed, .serverCertificateUntrusted, .serverCertificateHasBadDate,
+             .serverCertificateHasUnknownRoot, .serverCertificateNotYetValid: return true
+        default: return false
+        }
+    }
+
+    private static func describe(_ error: URLError) -> String {
         // Вложенные коды системы: по ним видно, на каком шаге оборвалось соединение.
         let ns = error as NSError
         var codes = ["код \(error.code.rawValue)"]
         if let stream = ns.userInfo["_kCFStreamErrorCodeKey"] as? Int { codes.append("поток \(stream)") }
         if let inner = (ns.userInfo[NSUnderlyingErrorKey] as? NSError)?.code { codes.append("вложенная \(inner)") }
         let suffix = " (" + codes.joined(separator: ", ") + ")"
-        let trust = GigaChatTrust.lastNote.map { ". Проверка доверия: " + $0 } ?? ". Проверка доверия не вызывалась"
+        let trust = GigaChatTrust.lastNote.map { ". Проверка доверия: " + $0 } ?? ""
         switch error.code {
         case .notConnectedToInternet, .networkConnectionLost: return "Нет подключения к сети" + suffix
         case .timedOut: return "Сервер не ответил вовремя" + suffix
         case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed:
             return "Не удалось связаться с сервером GigaChat" + suffix
         case .secureConnectionFailed:
-            let tried = retriedOverTLS12 ? " (повтор по TLS 1.2 тоже не удался)" : ""
-            return "Защищённое соединение с GigaChat не установилось" + tried + suffix + trust
+            return "Встроенный клиент не установил защищённое соединение" + suffix + trust
         case .serverCertificateUntrusted, .serverCertificateHasBadDate, .serverCertificateHasUnknownRoot,
              .serverCertificateNotYetValid:
             return "Не удалось проверить сертификат сервера GigaChat" + suffix + trust
