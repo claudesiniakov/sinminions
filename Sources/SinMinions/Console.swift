@@ -856,6 +856,30 @@ final class ConsoleController: NSObject, NSWindowDelegate {
         panel.setFrame(frame, display: true, animate: animated)
     }
 
+    /// Приложение, которое было активным до чата: ему возвращается фокус, когда терминал закрывают.
+    private var previousApp: NSRunningApplication?
+
+    /// Окно терминала не активирует приложение, а клавиатура идёт в активное — поэтому в нём нельзя печатать.
+    /// Входя в чат, делаем приложение активным и возвращаем фокус в строку ввода.
+    func activateForTyping() {
+        guard isOpen, !NSApp.isActive else {
+            model.chat.focusTick += 1
+            return
+        }
+        let front = NSWorkspace.shared.frontmostApplication
+        if front?.processIdentifier != ProcessInfo.processInfo.processIdentifier { previousApp = front }
+        NSApp.activate(ignoringOtherApps: true)
+        terminal.makeKeyAndOrderFront(nil)
+        model.chat.focusTick += 1
+    }
+
+    /// Терминал закрыт: фокус возвращается приложению, из которого его открыли.
+    private func restorePreviousApp() {
+        guard let previous = previousApp else { return }
+        previousApp = nil
+        if NSApp.isActive { previous.activate() }
+    }
+
     func setUnlocked(_ value: Bool) {
         guard model.unlocked != value else { return }
         model.unlocked = value
@@ -946,6 +970,7 @@ final class ConsoleController: NSObject, NSWindowDelegate {
         guard isOpen else { return }
         isOpen = false
         model.chat.cancel()
+        restorePreviousApp()
         timer?.invalidate()
         timer = nil
         terminal.alphaValue = 0

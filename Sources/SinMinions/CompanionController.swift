@@ -226,6 +226,7 @@ final class CompanionController: NSObject {
     func showChatDemo() {
         console.model.chat.loadDemo()
         console.model.screen = .chat
+        console.activateForTyping()
     }
 
     func closeConsoleForDemo() {
@@ -379,6 +380,7 @@ final class CompanionController: NSObject {
             }
         case .chat:
             console.model.screen = .chat
+            console.activateForTyping()
         case .nap:
             nap(seconds: 3600)
         case .hide:
