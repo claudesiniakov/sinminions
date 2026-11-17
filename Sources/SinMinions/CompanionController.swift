@@ -196,16 +196,16 @@ final class CompanionController: NSObject {
             teleportTask = Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.bubble.hide()
-                NSAnimationContext.runAnimationGroup { context in
-                    context.duration = 0.3
-                    self.panel.animator().alphaValue = 0
-                }
+                NSAnimationContext.beginGrouping()
+                NSAnimationContext.current.duration = 0.3
+                self.panel.animator().alphaValue = 0
+                NSAnimationContext.endGrouping()
                 guard await self.pause(0.35, token: token) else { return }
                 self.panel.setFrameOrigin(target)
-                NSAnimationContext.runAnimationGroup { context in
-                    context.duration = 0.3
-                    self.panel.animator().alphaValue = 1
-                }
+                NSAnimationContext.beginGrouping()
+                NSAnimationContext.current.duration = 0.3
+                self.panel.animator().alphaValue = 1
+                NSAnimationContext.endGrouping()
                 guard await self.pause(0.35, token: token) else { return }
                 self.finishTeleport()
             }
