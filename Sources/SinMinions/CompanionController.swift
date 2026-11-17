@@ -100,6 +100,7 @@ final class CompanionController: NSObject {
         }
         console.onCommand = { [weak self] command in self?.run(command) }
         console.model.switchConnection = { [weak self] delta in self?.switchConnection(delta) }
+        console.onSlash = { [weak self] command in self?.perform(command) }
         power = Self.readPower()
 
         let workspace = NSWorkspace.shared.notificationCenter
@@ -173,12 +174,12 @@ final class CompanionController: NSObject {
     }
 
     /// «+» и «−» на мониторе: следующее или предыдущее подключение по кругу.
-    private func switchConnection(_ delta: Int) {
+    private func switchConnection(_ delta: Int, announce: Bool = true) {
         var list = prefs.connections
         guard let active = list.cycle(by: delta) else { return }
         prefs.connections = list
         refreshLLM()
-        if !console.model.chat.entries.isEmpty {
+        if announce, !console.model.chat.entries.isEmpty {
             console.model.chat.addInfo("ПОДКЛЮЧЕНИЕ: " + active.name.uppercased())
         }
     }
@@ -354,6 +355,8 @@ final class CompanionController: NSObject {
         bubble.hide(animated: false)
         glide(to: CGPoint(x: place.moth.x - view.mothFrame.minX, y: place.moth.y - view.mothFrame.minY))
         console.open(terminalRect: terminalRect, monitorRect: monitorRect)
+        // В меню есть строка ввода: клавиатуре нужно ключевое окно.
+        console.activateForTyping()
         onStateChange()
     }
 
@@ -381,22 +384,43 @@ final class CompanionController: NSObject {
         case .chat:
             console.model.screen = .chat
             console.activateForTyping()
+        }
+    }
+
+    /// Команды со «/» из терминала и чата. Возвращает строку-подтверждение для журнала.
+    private func perform(_ command: SlashCommand) -> String? {
+        switch command {
         case .nap:
             nap(seconds: 3600)
+            return "ПРИЗРАК УСНУЛ НА 1 ЧАС"
         case .hide:
             setHidden(true)
+            return nil
         case .corner:
             if let visible = (panel.screen ?? NSScreen.main)?.visibleFrame {
                 consoleHome = Layout.corner(size: panel.frame.size, in: visible, margin: 8)
             }
             apply(engine.handle(.closeConsole, now: now))
+            return nil
         case .unlock:
-            console.setUnlocked(!console.model.unlocked)
+            console.setUnlocked(true)
+            return "ОКНА РАЗБЛОКИРОВАНЫ: ДВИГАЙТЕ ЗА ЗАГОЛОВОК, РАЗМЕР — ЗА УГОЛОК ◢"
+        case .lock:
+            console.setUnlocked(false)
+            return "ОКНА ЗАБЛОКИРОВАНЫ"
         case .resetLayout:
             console.resetLayout()
+            return "РАСКЛАДКА ОКОН СБРОШЕНА"
         case .settings:
             apply(engine.handle(.closeConsole, now: now))
             onOpenSettings(nil)
+            return nil
+        case .next, .previous:
+            switchConnection(command == .next ? 1 : -1, announce: false)
+            guard let active = prefs.connections.active else { return "ПОДКЛЮЧЕНИЙ НЕТ" }
+            return "ПОДКЛЮЧЕНИЕ: " + active.name.uppercased() + " · " + active.model.uppercased()
+        case .help, .clear:
+            return nil
         }
     }
 
@@ -420,6 +444,12 @@ final class CompanionController: NSObject {
 
     /// Что сейчас в строке ввода чата (для проверки в CI).
     var consoleInputForDemo: String { console.model.chat.input }
+
+    /// Для снимка в CI: в меню выполнена команда /help.
+    func showHelpForDemo() {
+        console.model.shellLog.append("> /help")
+        console.model.runSlash("/help", output: .shell)
+    }
 
     /// Для снимка в CI: окна разблокированы.
     func unlockConsoleForDemo() {

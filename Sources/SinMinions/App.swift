@@ -101,6 +101,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             await wait(4)
             settingsWindow?.close()
             controller.openConsoleForDemo()
+            controller.showHelpForDemo()
             await wait(1.5)
             demoMark("console")
             await wait(4)

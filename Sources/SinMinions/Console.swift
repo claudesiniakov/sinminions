@@ -4,21 +4,15 @@ import Observation
 import IOKit.ps
 import SinMinionsCore
 
-/// Команды терминала среднего режима.
+/// Пункты меню терминала. Остальные команды вводятся со «/» (см. `SlashCommand`, «/help»).
 enum ConsoleCommand: Int, CaseIterable, Identifiable {
-    case spotlight, chat, nap, hide, corner, unlock, resetLayout, settings
+    case spotlight, chat
     var id: Int { rawValue }
 
-    func title(unlocked: Bool) -> String {
+    var title: String {
         switch self {
         case .spotlight: return "ПОИСК SPOTLIGHT"
-        case .chat: return "ЧАТ С GIGACHAT"
-        case .nap: return "УСЫПИТЬ НА 1 ЧАС"
-        case .hide: return "СКРЫТЬ"
-        case .corner: return "ВЕРНУТЬ В УГОЛ"
-        case .unlock: return unlocked ? "ЗАБЛОКИРОВАТЬ ОКНА" : "РАЗБЛОКИРОВАТЬ ОКНА"
-        case .resetLayout: return "СБРОСИТЬ РАСКЛАДКУ"
-        case .settings: return "НАСТРОЙКИ"
+        case .chat: return "ЧАТ С ИИ"
         }
     }
 }
@@ -168,13 +162,13 @@ final class ChatSession {
 
     var entries: [ChatEntry] = []
     var input = ""
-    /// Растёт, когда нужно вернуть фокус в строку ввода.
-    var focusTick = 0
     private(set) var isSending = false
 
     @ObservationIgnored var send: @MainActor ([ChatMessage]) async throws -> String = { _ in throw LLMError.noCredentials }
     @ObservationIgnored var hasCredentials: () -> Bool = { false }
     @ObservationIgnored var needCredentials: () -> Void = {}
+    /// Команда со «/», набранная в чате: выполняет модель консоли.
+    @ObservationIgnored var onSlash: (String) -> Void = { _ in }
     @ObservationIgnored var speaker: () -> String = { "LLM" }
     @ObservationIgnored private var history = [ChatMessage(.system, ChatSession.systemPrompt)]
     @ObservationIgnored private var task: Task<Void, Never>?
@@ -185,9 +179,9 @@ final class ChatSession {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !isSending else { return }
         input = ""
-        if text == "/clear" || text == "/очистить" {
-            reset()
-            entries = [ChatEntry(kind: .info, text: "ИСТОРИЯ ОЧИЩЕНА")]
+        if text.hasPrefix("/") {
+            entries.append(ChatEntry(kind: .user, text: text))
+            onSlash(text)
             return
         }
         guard hasCredentials() else {
@@ -263,6 +257,11 @@ final class ConsoleModel {
     var screen = Screen.menu
     let chat = ChatSession()
     var selected = 0
+    /// Строка ввода меню (команды со «/») и журнал ответов.
+    var shellInput = ""
+    var shellLog: [String] = []
+    /// Растёт, когда нужно вернуть фокус в строку ввода.
+    var focusTick = 0
     /// Выбранное подключение к нейросети («интеллект») — для монитора и заголовка чата.
     var llmName: String?
     var llmModelName: String?
@@ -276,6 +275,62 @@ final class ConsoleModel {
     @ObservationIgnored var switchConnection: (Int) -> Void = { _ in }
     var snapshot = SystemSnapshot()
     @ObservationIgnored var run: (ConsoleCommand) -> Void = { _ in }
+    /// Выполняет команду со «/», которой нужны окна и призрак; возвращает строку-подтверждение.
+    @ObservationIgnored var slashAction: (SlashCommand) -> String? = { _ in nil }
+
+    enum SlashOutput { case shell, chat }
+
+    init() {
+        chat.onSlash = { [weak self] text in self?.runSlash(text, output: .chat) }
+    }
+
+    /// Enter в строке меню: пусто — выбранный пункт, «/…» — команда.
+    func submitShell() {
+        let text = shellInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        shellInput = ""
+        if text.isEmpty {
+            runSelected()
+            return
+        }
+        shellLog.append("> " + text)
+        if text.hasPrefix("/") {
+            runSlash(text, output: .shell)
+        } else {
+            shellLog.append("КОМАНДЫ НАЧИНАЮТСЯ СО «/». /HELP — СПИСОК.")
+        }
+        trimLog()
+    }
+
+    private func trimLog() {
+        if shellLog.count > 80 { shellLog.removeFirst(shellLog.count - 80) }
+    }
+
+    /// Команда со «/» из меню или чата; ответ выводится туда же, откуда команда пришла.
+    func runSlash(_ text: String, output: SlashOutput) {
+        func say(_ lines: [String]) {
+            switch output {
+            case .shell: shellLog.append(contentsOf: lines)
+            case .chat: lines.forEach { chat.addInfo($0) }
+            }
+            trimLog()
+        }
+        switch SlashParser.parse(text) {
+        case .notACommand:
+            return
+        case let .unknown(name):
+            say(["НЕИЗВЕСТНАЯ КОМАНДА \(name.uppercased()) — /HELP ПОКАЖЕТ СПИСОК"])
+        case let .command(command):
+            switch command {
+            case .help:
+                say(SlashParser.helpLines)
+            case .clear:
+                chat.reset()
+                say(["ИСТОРИЯ ЧАТА ОЧИЩЕНА"])
+            default:
+                if let reply = slashAction(command) { say([reply]) }
+            }
+        }
+    }
 
     func move(_ delta: Int) {
         let count = ConsoleCommand.allCases.count
@@ -413,35 +468,86 @@ struct TerminalView: View {
 
     private var menu: some View {
         TerminalFrame(title: "MOTH-OS // ТЕРМИНАЛ", window: .terminal, model: model) {
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach(ConsoleCommand.allCases) { command in
-                    let active = model.selected == command.rawValue
-                    HStack(spacing: 8) {
-                        Text(active ? ">" : " ")
-                        Text(command.title(unlocked: model.unlocked))
-                        Spacer(minLength: 0)
-                    }
-                    .font(Term.font)
-                    .foregroundStyle(active ? Term.background : Term.green)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 4)
-                    .background(active ? Term.green : Color.clear)
-                    .shadow(color: active ? .clear : Term.green.opacity(0.5), radius: 3)
-                    .contentShape(Rectangle())
-                    .onHover { inside in
-                        if inside { model.selected = command.rawValue }
-                    }
-                    .onTapGesture {
-                        model.selected = command.rawValue
-                        model.runSelected()
-                    }
-                }
-                Spacer(minLength: 6)
-                Text("↑↓ ВЫБОР · ENTER · +/− LLM · ESC ВЫХОД")
-                    .font(Term.small)
-                    .foregroundStyle(Term.dim)
-            }
+            ShellScreen(model: model)
         }
+    }
+}
+
+/// Экран меню: два пункта, журнал ответов на команды и строка ввода («/help» — список команд).
+private struct ShellScreen: View {
+    var model: ConsoleModel
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        @Bindable var model = model
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(ConsoleCommand.allCases) { command in
+                let active = model.selected == command.rawValue
+                HStack(spacing: 8) {
+                    Text(active ? ">" : " ")
+                    Text(command.title)
+                    Spacer(minLength: 0)
+                }
+                .font(Term.font)
+                .foregroundStyle(active ? Term.background : Term.green)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .background(active ? Term.green : Color.clear)
+                .shadow(color: active ? .clear : Term.green.opacity(0.5), radius: 3)
+                .contentShape(Rectangle())
+                .onHover { inside in
+                    if inside { model.selected = command.rawValue }
+                }
+                .onTapGesture {
+                    model.selected = command.rawValue
+                    model.runSelected()
+                }
+            }
+            Rectangle().fill(Term.dark).frame(height: 1).padding(.vertical, 6)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 3) {
+                        if model.shellLog.isEmpty {
+                            Text("КОМАНДЫ НАЧИНАЮТСЯ СО «/». ВВЕДИТЕ /HELP — СПИСОК.")
+                                .foregroundStyle(Term.dim)
+                        }
+                        ForEach(Array(model.shellLog.enumerated()), id: \.offset) { _, line in
+                            Text(line).foregroundStyle(line.hasPrefix(">") ? Term.green : Term.dim)
+                        }
+                        Color.clear.frame(height: 1).id("end")
+                    }
+                    .font(Term.small)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .onChange(of: model.shellLog.count) { proxy.scrollTo("end", anchor: .bottom) }
+            }
+            Rectangle().fill(Term.dark).frame(height: 1)
+            HStack(spacing: 6) {
+                Text(">")
+                TextField("", text: $model.shellInput)
+                    .textFieldStyle(.plain)
+                    .focused($focused)
+                    .onSubmit { model.submitShell() }
+                    // Стрелки выбирают пункт меню, а не двигают курсор в строке.
+                    .onKeyPress(.upArrow) { model.move(-1); return .handled }
+                    .onKeyPress(.downArrow) { model.move(1); return .handled }
+                    // «+» и «−» в пустой строке переключают подключение к нейросети.
+                    .onKeyPress(characters: CharacterSet(charactersIn: "+-=")) { press in
+                        guard model.shellInput.isEmpty else { return .ignored }
+                        model.switchConnection(press.characters == "-" ? -1 : 1)
+                        return .handled
+                    }
+            }
+            .font(Term.small)
+            .foregroundStyle(Term.green)
+            Text("↑↓ ВЫБОР · ENTER · /HELP · ESC ВЫХОД")
+                .font(Term.small)
+                .foregroundStyle(Term.dim)
+        }
+        .tint(Term.green)
+        .onAppear { focused = true }
+        .onChange(of: model.focusTick) { focused = true }
     }
 }
 
@@ -486,14 +592,14 @@ private struct ChatScreen: View {
                         .onSubmit { chat.submit() }
                 }
                 .foregroundStyle(Term.green)
-                Text("ENTER ОТПРАВИТЬ · ESC НАЗАД")
+                Text("ENTER ОТПРАВИТЬ · /HELP · ESC НАЗАД")
                     .foregroundStyle(Term.dim)
             }
             .font(Term.small)
             .tint(Term.green)
         }
         .onAppear { focused = true }
-        .onChange(of: chat.focusTick) { focused = true }
+        .onChange(of: model.focusTick) { focused = true }
     }
 
     /// Журнал одной строкой с цветом по видам реплик.
@@ -713,6 +819,9 @@ struct MonitorView: View {
 /// Окно терминала: принимает клавиатуру, не активируя приложение.
 final class ConsolePanel: NSPanel {
     var onKey: (UInt16) -> Bool = { _ in false }
+
+    /// Без этого окно без рамки не может стать ключевым и клавиатура в него не попадает.
+    override var canBecomeKey: Bool { true }
     /// Что скопировать по ⌘C, если ничего не выделено.
     var copyFallback: () -> String? = { nil }
 
@@ -788,6 +897,8 @@ final class ConsoleController: NSObject, NSWindowDelegate {
     private(set) var isOpen = false
 
     var onCommand: (ConsoleCommand) -> Void = { _ in }
+    /// Команды со «/»: возвращает подтверждение для журнала.
+    var onSlash: (SlashCommand) -> String? = { _ in nil }
     /// Область экрана, в которой можно двигать окна.
     var areaProvider: () -> CGRect = { .zero }
     /// Занятое призраком место (с запасом на парение и свечение): окна на него не наезжают.
@@ -828,12 +939,17 @@ final class ConsoleController: NSObject, NSWindowDelegate {
             self?.model.chat.entries.last(where: { $0.kind == .assistant })?.text
         }
         terminal.pasteFallback = { [weak self] text in
-            guard let self, self.model.screen == .chat else { return }
+            guard let self else { return }
             // Строка ввода однострочная: переводы строк заменяем пробелами.
-            self.model.chat.input += text.replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "\r", with: " ")
-            self.model.chat.focusTick += 1
+            let line = text.replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "\r", with: " ")
+            switch self.model.screen {
+            case .chat: self.model.chat.input += line
+            case .menu: self.model.shellInput += line
+            }
+            self.model.focusTick += 1
         }
         model.run = { [weak self] command in self?.onCommand(command) }
+        model.slashAction = { [weak self] command in self?.onSlash(command) }
         model.layoutEvent = { [weak self] window, event in self?.handleLayout(window, event) }
     }
 
@@ -871,7 +987,7 @@ final class ConsoleController: NSObject, NSWindowDelegate {
         // Приложение могло быть уже активным (например, после окна настроек), но ключевым окном — другое:
         // клавиатура идёт только в ключевое окно.
         terminal.makeKeyAndOrderFront(nil)
-        model.chat.focusTick += 1
+        model.focusTick += 1
     }
 
     /// Для CI: состояние фокуса окна терминала.
@@ -964,6 +1080,8 @@ final class ConsoleController: NSObject, NSWindowDelegate {
         isOpen = true
         model.screen = .menu
         model.selected = 0
+        model.shellInput = ""
+        model.shellLog = []
         model.unlocked = false
         session = nil
         sampler.reset()
