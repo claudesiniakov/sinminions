@@ -111,7 +111,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Ввод в чат: набираем текст настоящими событиями клавиатуры и смотрим, что попало в строку.
             await controller.typeInConsoleForDemo("привет")
             await wait(1)
-            fputs("DEMO input after typing: [\(controller.consoleInputForDemo)]\n", stderr)
+            fputs("DEMO input after system typing: [\(controller.consoleInputForDemo)] \(controller.debugConsoleForDemo())\n", stderr)
+            controller.sendKeysForDemo("ab")
+            await wait(0.5)
+            fputs("DEMO input after window typing: [\(controller.consoleInputForDemo)] \(controller.debugConsoleForDemo())\n", stderr)
             demoMark("typing")
             await wait(4)
             controller.unlockConsoleForDemo()

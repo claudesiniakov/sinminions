@@ -873,6 +873,26 @@ final class ConsoleController: NSObject, NSWindowDelegate {
         model.chat.focusTick += 1
     }
 
+    /// Для CI: состояние фокуса окна терминала.
+    func debugState() -> String {
+        let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?"
+        let responder = terminal.firstResponder.map { String(describing: type(of: $0)) } ?? "nil"
+        return "active=\(NSApp.isActive) key=\(terminal.isKeyWindow) fr=\(responder) front=\(front)"
+    }
+
+    /// Для CI: нажатия клавиш, отправленные прямо в окно терминала (мимо системы).
+    func sendKeysForDemo(_ text: String) {
+        for character in text {
+            let string = String(character)
+            guard let event = NSEvent.keyEvent(
+                with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                windowNumber: terminal.windowNumber, context: nil, characters: string,
+                charactersIgnoringModifiers: string, isARepeat: false, keyCode: 0
+            ) else { continue }
+            terminal.sendEvent(event)
+        }
+    }
+
     /// Терминал закрыт: фокус возвращается приложению, из которого его открыли.
     private func restorePreviousApp() {
         guard let previous = previousApp else { return }

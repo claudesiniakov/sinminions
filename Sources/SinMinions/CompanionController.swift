@@ -414,6 +414,10 @@ final class CompanionController: NSObject {
         }
     }
 
+    func debugConsoleForDemo() -> String { console.debugState() }
+
+    func sendKeysForDemo(_ text: String) { console.sendKeysForDemo(text) }
+
     /// Что сейчас в строке ввода чата (для проверки в CI).
     var consoleInputForDemo: String { console.model.chat.input }
 
