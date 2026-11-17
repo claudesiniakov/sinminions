@@ -147,6 +147,8 @@ final class ChatSession {
 
     var entries: [ChatEntry] = []
     var input = ""
+    /// Растёт, когда нужно вернуть фокус в строку ввода.
+    var focusTick = 0
     private(set) var isSending = false
 
     @ObservationIgnored var send: @MainActor ([ChatMessage]) async throws -> String = { _ in throw LLMError.noCredentials }
@@ -245,6 +247,9 @@ final class ConsoleModel {
     var llmModelName: String?
     var llmPosition = ""
     var llmCount = 0
+    var llmCanStepUp = false
+    var llmCanStepDown = false
+    @ObservationIgnored var switchModel: (Int) -> Void = { _ in }
     @ObservationIgnored var switchConnection: (Int) -> Void = { _ in }
     var snapshot = SystemSnapshot()
     @ObservationIgnored var run: (ConsoleCommand) -> Void = { _ in }
@@ -349,7 +354,7 @@ struct TerminalView: View {
                     }
                 }
                 Spacer(minLength: 6)
-                Text("↑↓ ВЫБОР · ENTER · +/− LLM · ESC ВЫХОД")
+                Text("↑↓ ВЫБОР · ENTER · +/− LLM · ⌥↑↓ МОДЕЛЬ · ESC")
                     .font(Term.small)
                     .foregroundStyle(Term.dim)
             }
@@ -398,13 +403,14 @@ private struct ChatScreen: View {
                         .onSubmit { chat.submit() }
                 }
                 .foregroundStyle(Term.green)
-                Text("ENTER ОТПРАВИТЬ · ESC НАЗАД")
+                Text("ENTER ОТПРАВИТЬ · ⌥↑↓ МОДЕЛЬ · ESC НАЗАД")
                     .foregroundStyle(Term.dim)
             }
             .font(Term.small)
             .tint(Term.green)
         }
         .onAppear { focused = true }
+        .onChange(of: chat.focusTick) { focused = true }
     }
 
     /// Журнал одной строкой с цветом по видам реплик.
@@ -475,7 +481,8 @@ struct MonitorView: View {
         }
     }
 
-    /// Призрак вместо человечка Pip-Boy и переключатель «интеллекта»: «−» и «+» меняют подключение к нейросети.
+    /// Призрак вместо человечка Pip-Boy и переключатель «интеллекта»: «−» и «+» меняют подключение,
+    /// «▼» и «▲» — модель внутри него (по списку от простых к мощным).
     private var intelligence: some View {
         VStack(spacing: 6) {
             GhostFigure()
@@ -483,36 +490,40 @@ struct MonitorView: View {
             Text("ИНТЕЛЛЕКТ")
                 .foregroundStyle(Term.dim)
             HStack(spacing: 10) {
-                stepButton("−", delta: -1)
+                stepButton("−", enabled: model.llmCount > 1) { model.switchConnection(-1) }
                 VStack(spacing: 1) {
                     Text((model.llmName ?? "НЕТ ПОДКЛЮЧЕНИЙ").uppercased())
                         .lineLimit(1)
                         .truncationMode(.tail)
-                    if let modelName = model.llmModelName {
-                        Text(modelName.uppercased())
-                            .foregroundStyle(Term.dim)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                    }
                     if !model.llmPosition.isEmpty {
                         Text(model.llmPosition).foregroundStyle(Term.dim)
                     }
                 }
                 .frame(maxWidth: .infinity)
-                stepButton("+", delta: 1)
+                stepButton("+", enabled: model.llmCount > 1) { model.switchConnection(1) }
+            }
+            if let modelName = model.llmModelName {
+                HStack(spacing: 10) {
+                    stepButton("▼", enabled: model.llmCanStepDown) { model.switchModel(-1) }
+                    Text(modelName.uppercased())
+                        .foregroundStyle(Term.dim)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity)
+                    stepButton("▲", enabled: model.llmCanStepUp) { model.switchModel(1) }
+                }
             }
         }
         .frame(maxWidth: .infinity)
     }
 
-    private func stepButton(_ symbol: String, delta: Int) -> some View {
-        let enabled = model.llmCount > 1
-        return Text(symbol)
+    private func stepButton(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Text(symbol)
             .frame(width: 26, height: 26)
             .overlay(Rectangle().strokeBorder(enabled ? Term.green : Term.dark, lineWidth: 1))
             .opacity(enabled ? 1 : 0.45)
             .contentShape(Rectangle())
-            .onTapGesture { if enabled { model.switchConnection(delta) } }
+            .onTapGesture { if enabled { action() } }
     }
 
     private func gauge(_ label: String, _ value: String, _ fraction: Double) -> some View {
@@ -572,10 +583,28 @@ final class ConsolePanel: NSPanel {
     /// Что скопировать по ⌘C, если ничего не выделено.
     var copyFallback: () -> String? = { nil }
 
-    /// У приложения без значка в Dock нет меню «Правка», поэтому ⌘C и ⌘A обрабатываем сами.
+    /// Куда вставить текст, если строка ввода не в фокусе.
+    var pasteFallback: (String) -> Void = { _ in }
+    /// ⌥↑ и ⌥↓: модель выше и ниже.
+    var onModelStep: (Int) -> Void = { _ in }
+
+    /// У приложения без значка в Dock нет меню «Правка», поэтому сочетания ⌘C, ⌘X, ⌘V, ⌘A, ⌘Z
+    /// обрабатываем сами, отправляя действие тому, кто сейчас в фокусе.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if flags == .option {
+            switch event.keyCode {
+            case 126: onModelStep(1); return true
+            case 125: onModelStep(-1); return true
+            default: break
+            }
+        }
+        guard flags == .command || flags == [.command, .shift],
               let key = event.charactersIgnoringModifiers?.lowercased() else {
+            return super.performKeyEquivalent(with: event)
+        }
+        if flags == [.command, .shift] {
+            if key == "z", NSApp.sendAction(Selector(("redo:")), to: nil, from: self) { return true }
             return super.performKeyEquivalent(with: event)
         }
         switch key {
@@ -589,15 +618,23 @@ final class ConsolePanel: NSPanel {
                 board.setString(text, forType: .string)
             }
             return true
+        case "x":
+            if NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: self) { return true }
+        case "v":
+            if let editor = firstResponder as? NSTextView, editor.isEditable,
+               NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: self) { return true }
+            // Строка ввода не в фокусе (например, выделяли текст журнала): вставляем в неё напрямую.
+            if let text = NSPasteboard.general.string(forType: .string) { pasteFallback(text) }
+            return true
         case "a":
             if NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: self) { return true }
-            return super.performKeyEquivalent(with: event)
+        case "z":
+            if NSApp.sendAction(Selector(("undo:")), to: nil, from: self) { return true }
         default:
-            return super.performKeyEquivalent(with: event)
+            break
         }
+        return super.performKeyEquivalent(with: event)
     }
-
-    override var canBecomeKey: Bool { true }
 
     override func keyDown(with event: NSEvent) {
         if !onKey(event.keyCode) { super.keyDown(with: event) }
@@ -648,6 +685,13 @@ final class ConsoleController: NSObject, NSWindowDelegate {
         terminal.onKey = { [weak self] code in self?.handleKey(code) ?? false }
         terminal.copyFallback = { [weak self] in
             self?.model.chat.entries.last(where: { $0.kind == .assistant })?.text
+        }
+        terminal.onModelStep = { [weak self] delta in self?.model.switchModel(delta) }
+        terminal.pasteFallback = { [weak self] text in
+            guard let self, self.model.screen == .chat else { return }
+            // Строка ввода однострочная: переводы строк заменяем пробелами.
+            self.model.chat.input += text.replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "\r", with: " ")
+            self.model.chat.focusTick += 1
         }
         model.run = { [weak self] command in self?.onCommand(command) }
     }

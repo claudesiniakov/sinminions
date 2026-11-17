@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var announcedVersion: AppVersion?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        installMainMenu()
         LoginItem.repairIfMoved()
         let controller = CompanionController(prefs: prefs)
         self.controller = controller
@@ -107,6 +108,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             await wait(1)
             controller.teleportForDemo()
         }
+    }
+
+    /// У приложения без значка в Dock нет меню, а без него не работают ⌘C, ⌘V, ⌘X, ⌘A и ⌘Z в полях ввода
+    /// окна настроек. Меню в строке меню не показывается, но сочетания клавиш в нём действуют.
+    private func installMainMenu() {
+        let main = NSMenu()
+        main.addItem(NSMenuItem())
+        let editItem = NSMenuItem()
+        let edit = NSMenu(title: "Правка")
+        edit.addItem(withTitle: "Отменить", action: Selector(("undo:")), keyEquivalent: "z")
+        let redo = edit.addItem(withTitle: "Повторить", action: Selector(("redo:")), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        edit.addItem(.separator())
+        edit.addItem(withTitle: "Вырезать", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: "Копировать", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: "Вставить", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: "Выбрать всё", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editItem.submenu = edit
+        main.addItem(editItem)
+        let windowItem = NSMenuItem()
+        let window = NSMenu(title: "Окно")
+        window.addItem(withTitle: "Закрыть", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        windowItem.submenu = window
+        main.addItem(windowItem)
+        NSApp.mainMenu = main
     }
 
     func applicationWillTerminate(_ notification: Notification) {

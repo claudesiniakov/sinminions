@@ -21,6 +21,15 @@ public enum LLMProvider: String, Codable, CaseIterable, Sendable {
 
     public var defaultModel: String { models[0] }
 
+    /// Модель на `delta` позиций выше (+1) или ниже (−1) в списке; список идёт от простых моделей к мощным.
+    /// nil — дальше некуда. Для модели не из списка (введённой вручную) вверх — первая, вниз — последняя.
+    public func step(model: String, by delta: Int) -> String? {
+        guard !models.isEmpty, delta != 0 else { return nil }
+        guard let index = models.firstIndex(of: model) else { return delta > 0 ? models.first : models.last }
+        let next = index + (delta > 0 ? 1 : -1)
+        return models.indices.contains(next) ? models[next] : nil
+    }
+
     /// У GigaChat есть область доступа (физлица, ИП и юрлица); у DeepSeek её нет.
     public var usesScope: Bool { self == .gigachat }
 

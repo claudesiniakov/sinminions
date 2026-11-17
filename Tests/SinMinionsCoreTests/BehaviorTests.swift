@@ -643,6 +643,31 @@ final class NewBehaviorsTests: XCTestCase {
     }
 }
 
+final class ModelStepTests: XCTestCase {
+    func testStepsAlongTheListAndStopsAtEnds() {
+        let provider = LLMProvider.gigachat
+        XCTAssertEqual(provider.step(model: "GigaChat", by: 1), "GigaChat-2")
+        XCTAssertEqual(provider.step(model: "GigaChat-2-Pro", by: 1), "GigaChat-2-Max")
+        XCTAssertEqual(provider.step(model: "GigaChat-2-Max", by: -1), "GigaChat-2-Pro")
+        XCTAssertNil(provider.step(model: "GigaChat", by: -1))
+        XCTAssertNil(provider.step(model: "GigaChat-3-Ultra", by: 1))
+        XCTAssertNil(provider.step(model: "GigaChat", by: 0))
+    }
+
+    func testCustomModelJumpsToAnEnd() {
+        XCTAssertEqual(LLMProvider.gigachat.step(model: "GigaChat-Pro", by: 1), "GigaChat")
+        XCTAssertEqual(LLMProvider.gigachat.step(model: "GigaChat-Pro", by: -1), "GigaChat-3-Ultra")
+        XCTAssertEqual(LLMProvider.deepseek.step(model: "deepseek-flash", by: 1), "deepseek-v4-pro")
+        XCTAssertNil(LLMProvider.deepseek.step(model: "deepseek-v4-pro", by: 1))
+    }
+
+    func testListsGoFromSimpleToPowerful() {
+        XCTAssertEqual(GigaChatAPI.models.first, "GigaChat")
+        XCTAssertEqual(GigaChatAPI.models.last, "GigaChat-3-Ultra")
+        XCTAssertEqual(DeepSeekAPI.models, ["deepseek-flash", "deepseek-v4-pro"])
+    }
+}
+
 final class DeepSeekAPITests: XCTestCase {
     func testChatRequestShape() throws {
         let request = DeepSeekAPI.chatRequest(key: "sk-abc", model: "deepseek-flash", messages: [ChatMessage(.system, "кратко"), ChatMessage(.user, "привет")])
