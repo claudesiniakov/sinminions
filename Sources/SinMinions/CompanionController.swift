@@ -191,7 +191,8 @@ final class CompanionController: NSObject {
         let from = panel.frame.origin
         let target = Layout.randomTarget(size: panel.frame.size, in: area, from: from, minDistance: 240)
 
-        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+        // В демо-режиме для снимка в CI порталы рисуются всегда: на раннере «Уменьшение движения» включено.
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion && !demo {
             // «Уменьшение движения»: без порталов — плавное исчезновение и появление на новом месте.
             teleportTask = Task { @MainActor [weak self] in
                 guard let self else { return }
