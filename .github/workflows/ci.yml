@@ -62,7 +62,7 @@ jobs:
       - name: Smoke test (приложение не падает при запуске, компаньон на экране)
         run: |
           # SINMINIONS_DEMO=1: компаньон говорит реплику, затем открывает настройки — оба состояния попадают на снимки.
-          SINMINIONS_DEMO=1 build/SinMinions.app/Contents/MacOS/SinMinions > smoke.log 2>&1 &
+          SINMINIONS_DEMO=1 SINMINIONS_SHOT_DIR="$PWD/build" build/SinMinions.app/Contents/MacOS/SinMinions > smoke.log 2>&1 &
           PID=$!
           sleep 6
           screencapture -x build/screen.png || true
@@ -72,11 +72,10 @@ jobs:
           sleep 7
           # …а затем терминал и монитор среднего режима.
           screencapture -x build/console.png || true
-          sleep 6
-          # …и порталы: оба открыты, призрак вышел из второго.
-          screencapture -x build/teleport.png || true
+          # …и порталы: снимок делает само приложение в момент, когда оба портала открыты.
+          sleep 12
           if kill -0 $PID 2>/dev/null; then
-            echo "Процесс жив через 25 с"
+            echo "Процесс жив через 31 с"
             cat smoke.log
             kill $PID
           else

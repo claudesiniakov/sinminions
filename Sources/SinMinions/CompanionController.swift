@@ -215,7 +215,7 @@ final class CompanionController: NSObject {
         let portalSize = CGSize(width: moth.width * 0.75, height: moth.height * 1.25)
         let source = CGPoint(x: from.x + moth.midX, y: from.y + moth.midY)
         let destination = CGPoint(x: target.x + moth.midX, y: target.y + moth.midY)
-        let hold = demo ? 8.0 : 0.0
+        let hold = demo ? 2.0 : 0.0
         teleportTask = Task { @MainActor [weak self] in
             guard let self else { return }
             self.bubble.hide()
@@ -229,12 +229,23 @@ final class CompanionController: NSObject {
             guard await self.pause(0.3, token: token) else { return }
             self.panel.alphaValue = 1
             self.view.appear(duration: 0.3)
-            guard await self.pause(0.3 + hold, token: token) else { return }
+            guard await self.pause(0.3 + (self.demo ? 1.0 : 0.0), token: token) else { return }
+            if self.demo { self.captureDemoShot() }
+            guard await self.pause(hold, token: token) else { return }
             self.portalA.close(duration: 0.3)
             self.portalB.close(duration: 0.3)
             guard await self.pause(0.3, token: token) else { return }
             self.finishTeleport()
         }
+    }
+
+    /// Для CI: снимок экрана в момент, когда оба портала открыты и призрак вышел из второго.
+    private func captureDemoShot() {
+        guard let dir = ProcessInfo.processInfo.environment["SINMINIONS_SHOT_DIR"] else { return }
+        let capture = Process()
+        capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        capture.arguments = ["-x", dir + "/teleport.png"]
+        try? capture.run()
     }
 
     private func finishTeleport() {
