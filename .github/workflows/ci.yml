@@ -72,10 +72,13 @@ jobs:
           sleep 7
           # …а затем терминал и монитор среднего режима.
           screencapture -x build/console.png || true
-          # …и порталы: снимок делает само приложение в момент, когда оба портала открыты.
-          sleep 12
+          # …и порталы: приложение ставит метку, когда оба портала открыты и призрак вышел из второго.
+          for i in $(seq 1 100); do [ -f build/teleport.ready ] && break; sleep 0.5; done
+          sleep 0.5
+          screencapture -x build/teleport.png || true
+          rm -f build/teleport.ready
           if kill -0 $PID 2>/dev/null; then
-            echo "Процесс жив через 31 с"
+            echo "Процесс жив после демонстрации порталов"
             cat smoke.log
             kill $PID
           else
