@@ -5,12 +5,20 @@ import SinMinionsCore
 /// Клиент GigaChat: получает токен доступа (живёт 30 минут), кэширует его и отправляет переписку.
 actor GigaChatClient {
     private let session: URLSession
+    /// Запасной сеанс только на TLS 1.2: если рукопожатие по TLS 1.3 обрывается (сервер не принимает
+    /// начало рукопожатия новой системы), повторяем по TLS 1.2 — серверы GigaChat его поддерживают.
+    private let legacySession: URLSession
+    private var useLegacy = false
     private var cached: (tag: String, token: AccessToken)?
 
     init() {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 90
         session = URLSession(configuration: configuration, delegate: GigaChatTrust(), delegateQueue: nil)
+        let legacy = URLSessionConfiguration.ephemeral
+        legacy.timeoutIntervalForRequest = 90
+        legacy.tlsMaximumSupportedProtocolVersion = .TLSv12
+        legacySession = URLSession(configuration: legacy, delegate: GigaChatTrust(), delegateQueue: nil)
     }
 
     /// Проверка ключа: запрашивает новый токен.
@@ -49,18 +57,32 @@ actor GigaChatClient {
         return token
     }
 
+    private func fetch(_ request: URLRequest, on session: URLSession) async throws -> (Data, Int) {
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw LLMError.invalidResponse }
+        return (data, http.statusCode)
+    }
+
     private func perform(_ request: URLRequest) async throws -> (Data, Int) {
+        var retriedOverTLS12 = false
         do {
-            let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse else { throw LLMError.invalidResponse }
-            return (data, http.statusCode)
+            if useLegacy { return try await fetch(request, on: legacySession) }
+            do {
+                return try await fetch(request, on: session)
+            } catch let error as URLError where error.code == .secureConnectionFailed {
+                retriedOverTLS12 = true
+                let result = try await fetch(request, on: legacySession)
+                // Дальше сразу идём по TLS 1.2, чтобы не повторять неудачное рукопожатие.
+                useLegacy = true
+                return result
+            }
         } catch let error as URLError {
             if error.code == .cancelled { throw CancellationError() }
-            throw LLMError.network(Self.describe(error))
+            throw LLMError.network(Self.describe(error, retriedOverTLS12: retriedOverTLS12))
         }
     }
 
-    private static func describe(_ error: URLError) -> String {
+    private static func describe(_ error: URLError, retriedOverTLS12: Bool) -> String {
         // Вложенные коды системы: по ним видно, на каком шаге оборвалось соединение.
         let ns = error as NSError
         var codes = ["код \(error.code.rawValue)"]
@@ -74,7 +96,8 @@ actor GigaChatClient {
         case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed:
             return "Не удалось связаться с сервером GigaChat" + suffix
         case .secureConnectionFailed:
-            return "Защищённое соединение с GigaChat не установилось" + suffix + trust
+            let tried = retriedOverTLS12 ? " (повтор по TLS 1.2 тоже не удался)" : ""
+            return "Защищённое соединение с GigaChat не установилось" + tried + suffix + trust
         case .serverCertificateUntrusted, .serverCertificateHasBadDate, .serverCertificateHasUnknownRoot,
              .serverCertificateNotYetValid:
             return "Не удалось проверить сертификат сервера GigaChat" + suffix + trust

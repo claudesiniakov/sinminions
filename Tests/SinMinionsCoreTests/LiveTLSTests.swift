@@ -4,8 +4,10 @@ import XCTest
 /// Живая проверка TLS: серверы GigaChat с корнем Минцифры. Запускается только в CI (SINMINIONS_LIVE_TLS=1)
 /// и ходит с заведомо неверным ключом — достаточно, чтобы сервер ответил кодом, а не ошибкой сертификата.
 final class LiveTLSTests: XCTestCase {
-    private func status(of request: URLRequest, label: String) async throws -> Int {
-        let session = URLSession(configuration: .ephemeral, delegate: GigaChatTrust(), delegateQueue: nil)
+    private func status(of request: URLRequest, label: String, tls12Only: Bool = false) async throws -> Int {
+        let configuration = URLSessionConfiguration.ephemeral
+        if tls12Only { configuration.tlsMaximumSupportedProtocolVersion = .TLSv12 }
+        let session = URLSession(configuration: configuration, delegate: GigaChatTrust(), delegateQueue: nil)
         do {
             let (data, response) = try await session.data(for: request)
             let code = (response as? HTTPURLResponse)?.statusCode ?? -1
@@ -27,6 +29,17 @@ final class LiveTLSTests: XCTestCase {
         let request = GigaChatAPI.tokenRequest(authorizationKey: "dGVzdDp0ZXN0", scope: "GIGACHAT_API_PERS")
         let code = try await status(of: request, label: "ngw.devices.sberbank.ru:9443")
         XCTAssertTrue([400, 401].contains(code), "ожидали 400 или 401, получили \(code)")
+    }
+
+    /// Запасной путь приложения: те же серверы по TLS 1.2.
+    func testBothHostsOverTLS12() async throws {
+        guard ProcessInfo.processInfo.environment["SINMINIONS_LIVE_TLS"] != nil else { throw XCTSkip("только в CI") }
+        let token = GigaChatAPI.tokenRequest(authorizationKey: "dGVzdDp0ZXN0", scope: "GIGACHAT_API_PERS")
+        let tokenCode = try await status(of: token, label: "TLS1.2 ngw.devices.sberbank.ru:9443", tls12Only: true)
+        XCTAssertTrue([400, 401].contains(tokenCode), "ожидали 400 или 401, получили \(tokenCode)")
+        let chat = GigaChatAPI.chatRequest(token: "x", model: "GigaChat", messages: [ChatMessage(.user, "привет")])
+        let chatCode = try await status(of: chat, label: "TLS1.2 api.giga.chat", tls12Only: true)
+        XCTAssertTrue([400, 401, 403].contains(chatCode), "ожидали 400, 401 или 403, получили \(chatCode)")
     }
 
     func testChatHost() async throws {
