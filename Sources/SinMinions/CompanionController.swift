@@ -11,6 +11,9 @@ final class CompanionController: NSObject {
     private let panel: NSPanel
     private var view: CompanionView
     private let bubble = BubblePanel()
+    private let console = ConsoleController()
+    /// Где призрак был до открытия терминала; nil — терминал закрыт.
+    private var consoleHome: CGPoint?
 
     private var timer: Timer?
     private var ticks = 0
@@ -27,12 +30,15 @@ final class CompanionController: NSObject {
 
     /// Меняется то, что показывает меню (скрыт, спит).
     var onStateChange: () -> Void = {}
+    var onOpenSettings: () -> Void = {}
 
     private struct Flight {
         let from: CGPoint
         let to: CGPoint
         let start: Double
         let duration: Double
+        /// Обычный перелёт (в отличие от перемещения к терминалу и обратно).
+        let wander: Bool
     }
 
     private struct PowerState: Equatable {
@@ -76,6 +82,11 @@ final class CompanionController: NSObject {
         wire(view)
         applyCollectionBehavior()
         restorePosition()
+        console.onDismiss = { [weak self] in
+            guard let self else { return }
+            self.apply(self.engine.handle(.closeConsole, now: self.now))
+        }
+        console.onCommand = { [weak self] command in self?.run(command) }
         power = Self.readPower()
 
         let workspace = NSWorkspace.shared.notificationCenter
@@ -136,8 +147,74 @@ final class CompanionController: NSObject {
     }
 
     func savePosition() {
-        UserDefaults.standard.set(Double(panel.frame.origin.x), forKey: Keys.x)
-        UserDefaults.standard.set(Double(panel.frame.origin.y), forKey: Keys.y)
+        // Пока открыт терминал, призрак временно в центре — запоминаем его обычное место.
+        let origin = consoleHome ?? panel.frame.origin
+        UserDefaults.standard.set(Double(origin.x), forKey: Keys.x)
+        UserDefaults.standard.set(Double(origin.y), forKey: Keys.y)
+    }
+
+    /// Для снимка в CI: открывает терминал и монитор независимо от выбранного режима.
+    func openConsoleForDemo() {
+        var config = prefs.behaviorConfig(lowPower: lowPower)
+        config.consoleEnabled = true
+        engine.reconfigure(config, now: now)
+        apply(engine.handle(.doubleClick, now: now))
+    }
+
+    // MARK: - Средний режим
+
+    private func openConsole() {
+        let mothSize = view.mothFrame.size
+        let terminalSize = ConsoleController.terminalSize
+        let monitorSize = CGSize(
+            width: ConsoleController.monitorWidth,
+            height: max(mothSize.height + 16 + terminalSize.height, ConsoleController.monitorMinHeight)
+        )
+        let place = Layout.console(moth: mothSize, terminal: terminalSize, monitor: monitorSize, in: area)
+        consoleHome = panel.frame.origin
+        bubble.hide(animated: false)
+        glide(to: CGPoint(x: place.moth.x - view.mothFrame.minX, y: place.moth.y - view.mothFrame.minY))
+        console.open(
+            terminalFrame: CGRect(origin: place.terminal, size: terminalSize),
+            monitorFrame: CGRect(origin: place.monitor, size: monitorSize)
+        )
+        onStateChange()
+    }
+
+    private func closeConsole(returnHome: Bool) {
+        console.close()
+        let home = consoleHome
+        consoleHome = nil
+        if returnHome, let home {
+            glide(to: clamped(home, size: panel.frame.size))
+        } else {
+            stopFlight(snap: false)
+        }
+        onStateChange()
+    }
+
+    private func run(_ command: ConsoleCommand) {
+        switch command {
+        case .spotlight:
+            apply(engine.handle(.closeConsole, now: now))
+            // Даём терминалу отдать клавиатуру, затем нажимаем сочетание Spotlight.
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(200))
+                self?.openSpotlight()
+            }
+        case .nap:
+            nap(seconds: 3600)
+        case .hide:
+            setHidden(true)
+        case .corner:
+            if let visible = (panel.screen ?? NSScreen.main)?.visibleFrame {
+                consoleHome = Layout.corner(size: panel.frame.size, in: visible, margin: 8)
+            }
+            apply(engine.handle(.closeConsole, now: now))
+        case .settings:
+            apply(engine.handle(.closeConsole, now: now))
+            onOpenSettings()
+        }
     }
 
     // MARK: - Окно
@@ -153,6 +230,7 @@ final class CompanionController: NSObject {
         }
         view.onDragBegan = { [weak self] in
             guard let self else { return }
+            self.stopFlight(snap: false)
             self.apply(self.engine.handle(.dragBegan, now: self.now))
         }
         view.onDragMoved = { [weak self] origin in
@@ -191,6 +269,7 @@ final class CompanionController: NSObject {
         if !prefs.hideInFullScreen { behavior.insert(.fullScreenAuxiliary) }
         panel.collectionBehavior = behavior
         bubble.setCollectionBehavior(behavior)
+        console.setCollectionBehavior(behavior)
     }
 
     private var area: CGRect {
@@ -287,6 +366,8 @@ final class CompanionController: NSObject {
             case .wakeUp: view.setSleeping(false)
             case .hop: view.hop()
             case .openSpotlight: openSpotlight()
+            case .openConsole: openConsole()
+            case .closeConsole: closeConsole(returnHome: !view.isDragging)
             }
         }
         if sleptBefore != isSleeping {
@@ -340,7 +421,19 @@ final class CompanionController: NSObject {
         }
         let speed = Double.random(in: 40...80)
         let distance = Double(hypot(to.x - from.x, to.y - from.y))
-        flight = Flight(from: from, to: to, start: now, duration: max(distance / speed, 0.5))
+        flight = Flight(from: from, to: to, start: now, duration: max(distance / speed, 0.5), wander: true)
+        startFlightTimer()
+    }
+
+    /// Быстрое перемещение к терминалу и обратно.
+    private func glide(to target: CGPoint, duration: Double = 0.45) {
+        stopFlight(snap: false)
+        flight = Flight(from: panel.frame.origin, to: target, start: now, duration: duration, wander: false)
+        startFlightTimer()
+    }
+
+    private func startFlightTimer() {
+        flightTimer?.invalidate()
         let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.flightStep() }
         }
@@ -360,15 +453,19 @@ final class CompanionController: NSObject {
     }
 
     private func finishFlight() {
+        let wasWander = flight?.wander ?? true
         stopFlight()
-        apply(engine.handle(.arrived, now: now))
+        if wasWander { apply(engine.handle(.arrived, now: now)) }
     }
 
-    private func stopFlight() {
+    /// `snap` — прерванное перемещение к терминалу или обратно сразу довести до цели
+    /// (обычный перелёт просто останавливается там, где его прервали).
+    private func stopFlight(snap: Bool = true) {
         flightTimer?.invalidate()
         flightTimer = nil
-        if flight != nil {
+        if let interrupted = flight {
             flight = nil
+            if snap, !interrupted.wander { panel.setFrameOrigin(interrupted.to) }
             savePosition()
         }
         if isVisible { panel.alphaValue = 1 }

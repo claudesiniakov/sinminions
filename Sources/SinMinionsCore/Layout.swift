@@ -64,6 +64,31 @@ public enum Layout {
         return BubblePlacement(origin: origin, below: below, tailX: tail)
     }
 
+    public struct ConsolePlacement: Equatable, Sendable {
+        /// Левый нижний угол самого персонажа (не его окна).
+        public let moth: CGPoint
+        public let terminal: CGPoint
+        public let monitor: CGPoint
+    }
+
+    /// Средний режим: персонаж по центру области, терминал под ним, монитор справа от терминала
+    /// (слева, если справа нет места); верх монитора — на уровне верха персонажа.
+    public static func console(
+        moth: CGSize, terminal: CGSize, monitor: CGSize, in area: CGRect, gap: CGFloat = 16
+    ) -> ConsolePlacement {
+        let blockHeight = moth.height + gap + terminal.height
+        let top = min(area.maxY, area.midY + blockHeight / 2)
+        let mothOrigin = CGPoint(x: area.midX - moth.width / 2, y: top - moth.height)
+        let terminalOrigin = clamp(
+            origin: CGPoint(x: area.midX - terminal.width / 2, y: mothOrigin.y - gap - terminal.height),
+            size: terminal, in: area
+        )
+        var monitorX = terminalOrigin.x + terminal.width + gap
+        if monitorX + monitor.width > area.maxX { monitorX = terminalOrigin.x - gap - monitor.width }
+        let monitorOrigin = clamp(origin: CGPoint(x: monitorX, y: top - monitor.height), size: monitor, in: area)
+        return ConsolePlacement(moth: mothOrigin, terminal: terminalOrigin, monitor: monitorOrigin)
+    }
+
     /// Плавный разгон и торможение: доля пути по доле времени.
     public static func ease(_ t: Double) -> Double {
         let x = min(max(t, 0), 1)

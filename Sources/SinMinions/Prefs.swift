@@ -31,6 +31,22 @@ enum Frequency: String, CaseIterable, Identifiable {
     }
 }
 
+/// Режим компаньона: что происходит по двойному щелчку.
+enum CompanionMode: String, CaseIterable, Identifiable {
+    /// Двойной щелчок открывает Spotlight.
+    case minimal
+    /// Двойной щелчок: призрак в центре экрана, под ним терминал, справа монитор.
+    case medium
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .minimal: return "Минимальный — Spotlight по двойному щелчку"
+        case .medium: return "Средний — терминал и монитор по двойному щелчку"
+        }
+    }
+}
+
 /// Настройки пользователя; хранятся в UserDefaults.
 @MainActor
 @Observable
@@ -39,6 +55,7 @@ final class Prefs {
     /// Минуты до сна; 0 — никогда.
     static let sleepOptions: [Int] = [1, 5, 15, 0]
 
+    var mode: CompanionMode { didSet { store(mode.rawValue, "mode") } }
     var scale: Double { didSet { store(scale, "scale") } }
     var wanderEnabled: Bool { didSet { store(wanderEnabled, "wanderEnabled") } }
     var wanderFrequency: Frequency { didSet { store(wanderFrequency.rawValue, "wanderFrequency") } }
@@ -54,6 +71,7 @@ final class Prefs {
 
     init() {
         let d = UserDefaults.standard
+        mode = CompanionMode(rawValue: d.string(forKey: "mode") ?? "") ?? .minimal
         let savedScale = d.object(forKey: "scale") as? Double ?? 1.5
         scale = Self.scales.contains(savedScale) ? savedScale : 1.5
         wanderEnabled = d.object(forKey: "wanderEnabled") as? Bool ?? true
@@ -80,6 +98,7 @@ final class Prefs {
         config.talkInterval = talkFrequency.talkInterval
         config.sleepAfter = sleepMinutes > 0 ? Double(sleepMinutes) * 60 : nil
         config.spotlightEnabled = spotlightEnabled
+        config.consoleEnabled = mode == .medium
         return config
     }
 }

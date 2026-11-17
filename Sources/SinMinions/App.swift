@@ -21,7 +21,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         prefs.onChange = { [weak controller] in controller?.prefsChanged() }
         updater.beforeRestart = { [weak controller] in controller?.savePosition() }
 
-        let statusMenu = StatusMenu(controller: controller, updater: updater) { [weak self] in
+        controller.onOpenSettings = { [weak self] in self?.showSettings() }
+        let statusMenu = StatusMenu(controller: controller, updater: updater, prefs: prefs) { [weak self] in
             self?.showSettings()
         }
         self.statusMenu = statusMenu
@@ -47,6 +48,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 // Для снимка в CI: через несколько секунд открываются настройки.
                 try? await Task.sleep(for: .seconds(5))
                 self.showSettings()
+                // …а затем — терминал и монитор среднего режима.
+                try? await Task.sleep(for: .seconds(6))
+                self.settingsWindow?.close()
+                controller.openConsoleForDemo()
             }
         }
     }

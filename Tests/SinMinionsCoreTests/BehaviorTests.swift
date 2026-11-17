@@ -139,6 +139,129 @@ final class BehaviorEngineTests: XCTestCase {
     }
 }
 
+final class ConsoleModeTests: XCTestCase {
+    private func makeEngine() -> BehaviorEngine {
+        var config = BehaviorConfig()
+        config.consoleEnabled = true
+        return BehaviorEngine(config: config, now: 0, random: { $0.lowerBound })
+    }
+
+    func testDoubleClickOpensConsoleInsteadOfSpotlight() {
+        var engine = makeEngine()
+        XCTAssertEqual(engine.handle(.doubleClick, now: 1), [.openConsole])
+        XCTAssertEqual(engine.mode, .console)
+    }
+
+    func testConsoleFreezesTimersAndIgnoresClicks() {
+        var engine = makeEngine()
+        _ = engine.handle(.doubleClick, now: 1)
+        XCTAssertEqual(engine.tick(now: 1000, idleSeconds: 999), [])
+        XCTAssertEqual(engine.handle(.click, now: 1001), [])
+        XCTAssertEqual(engine.handle(.announce(.charging), now: 1002), [])
+        XCTAssertEqual(engine.mode, .console)
+    }
+
+    func testConsoleClosesOnSecondDoubleClickEscAndDrag() {
+        var engine = makeEngine()
+        _ = engine.handle(.doubleClick, now: 1)
+        XCTAssertEqual(engine.handle(.doubleClick, now: 2), [.closeConsole])
+        XCTAssertEqual(engine.mode, .idle)
+        // После закрытия призрак остаётся на месте не меньше минуты.
+        XCTAssertGreaterThanOrEqual(engine.nextWanderAt, 62)
+
+        _ = engine.handle(.doubleClick, now: 3)
+        XCTAssertEqual(engine.handle(.closeConsole, now: 4), [.closeConsole])
+        XCTAssertEqual(engine.handle(.closeConsole, now: 5), [])
+
+        _ = engine.handle(.doubleClick, now: 6)
+        XCTAssertEqual(engine.handle(.dragBegan, now: 7), [.closeConsole])
+        XCTAssertEqual(engine.mode, .dragged)
+    }
+
+    func testNapAndSuspendCloseConsole() {
+        var engine = makeEngine()
+        _ = engine.handle(.doubleClick, now: 1)
+        XCTAssertEqual(engine.handle(.nap(3600), now: 2), [.closeConsole, .fallAsleep])
+
+        var other = makeEngine()
+        _ = other.handle(.doubleClick, now: 1)
+        XCTAssertEqual(other.handle(.suspended, now: 2), [.closeConsole])
+        XCTAssertEqual(other.mode, .idle)
+    }
+
+    func testConsoleLayout() {
+        let area = CGRect(x: 0, y: 80, width: 1440, height: 800)
+        let place = Layout.console(
+            moth: CGSize(width: 72, height: 84), terminal: CGSize(width: 400, height: 250),
+            monitor: CGSize(width: 300, height: 350), in: area
+        )
+        // Призрак по центру, терминал под ним по центру, монитор справа, верх — на уровне призрака.
+        XCTAssertEqual(place.moth, CGPoint(x: 684, y: 571))
+        XCTAssertEqual(place.terminal, CGPoint(x: 520, y: 305))
+        XCTAssertEqual(place.monitor, CGPoint(x: 936, y: 305))
+    }
+
+    func testMonitorGoesLeftWhenNoRoomOnTheRight() {
+        let area = CGRect(x: 0, y: 0, width: 900, height: 700)
+        let place = Layout.console(
+            moth: CGSize(width: 72, height: 84), terminal: CGSize(width: 400, height: 250),
+            monitor: CGSize(width: 300, height: 350), in: area
+        )
+        XCTAssertLessThan(place.monitor.x, place.terminal.x)
+        XCTAssertGreaterThanOrEqual(place.monitor.x, 0)
+    }
+}
+
+final class MetricsTests: XCTestCase {
+    func testCPUUsage() {
+        let old = CPUTicks(user: 100, system: 50, idle: 850, nice: 0)
+        let new = CPUTicks(user: 130, system: 60, idle: 910, nice: 0)
+        XCTAssertEqual(CPUTicks.usage(from: old, to: new), 0.4)
+        XCTAssertNil(CPUTicks.usage(from: old, to: old))
+        XCTAssertNil(CPUTicks.usage(from: new, to: old))
+    }
+
+    func testGauge() {
+        XCTAssertEqual(Gauge.bar(0.62, width: 10), "██████░░░░")
+        XCTAssertEqual(Gauge.bar(0, width: 4), "░░░░")
+        XCTAssertEqual(Gauge.bar(7, width: 4), "████")
+        XCTAssertEqual(Gauge.bar(.nan, width: 4), "░░░░")
+        XCTAssertEqual(Gauge.percent(0.618), "62%")
+    }
+
+    func testFormats() {
+        XCTAssertEqual(MetricFormat.bytes(12_400_000_000), "12,4 ГБ")
+        XCTAssertEqual(MetricFormat.bytes(810_000_000), "810 МБ")
+        XCTAssertEqual(MetricFormat.rate(1_200_000), "1,2 МБ/с")
+        XCTAssertEqual(MetricFormat.rate(340_000), "340 КБ/с")
+        XCTAssertEqual(MetricFormat.rate(-5), "0 КБ/с")
+        XCTAssertEqual(MetricFormat.uptime(3 * 86400 + 4 * 3600 + 60), "3д 04ч")
+        XCTAssertEqual(MetricFormat.uptime(4 * 3600 + 12 * 60), "4ч 12м")
+        XCTAssertEqual(MetricFormat.uptime(12 * 60 + 5), "12м")
+    }
+
+    func testNetworkTotalsAndRates() {
+        let counters = [
+            "en0": InterfaceCounters(rx: 1000, tx: 200),
+            "en1": InterfaceCounters(rx: 500, tx: 100),
+            "utun3": InterfaceCounters(rx: 9999, tx: 9999),
+            "lo0": InterfaceCounters(rx: 7, tx: 7),
+        ]
+        let total = NetworkCounters.physicalTotal(counters)
+        XCTAssertEqual(total, InterfaceCounters(rx: 1500, tx: 300))
+        let rate = NetworkCounters.rate(from: InterfaceCounters(rx: 500, tx: 100), to: total, seconds: 2)
+        XCTAssertEqual(rate.rx, 500)
+        XCTAssertEqual(rate.tx, 100)
+        // Счётчик сбросился — скорость 0, а не отрицательная.
+        XCTAssertEqual(NetworkCounters.rate(from: total, to: InterfaceCounters(), seconds: 1).rx, 0)
+    }
+
+    func testReadsRealCounters() {
+        // На любой машине есть хотя бы петлевой интерфейс.
+        XCTAssertFalse(NetworkCounters.counters().isEmpty)
+    }
+}
+
 final class PhraseBookTests: XCTestCase {
     func testHasAtLeastFortyPhrases() {
         let ambient = PhraseBook.general + PhraseBook.morning + PhraseBook.day + PhraseBook.evening + PhraseBook.night

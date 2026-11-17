@@ -9,6 +9,9 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private let menu = NSMenu()
     private let controller: CompanionController
     private let updater: Updater
+    private let prefs: Prefs
+    private let modeItem = NSMenuItem(title: "Режим", action: nil, keyEquivalent: "")
+    private var modeItems: [(CompanionMode, NSMenuItem)] = []
     private let openSettings: () -> Void
 
     private let hideItem = NSMenuItem(title: "Скрыть", action: #selector(StatusMenu.toggleHidden), keyEquivalent: "")
@@ -19,16 +22,26 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private let settingsItem = NSMenuItem(title: "Настройки…", action: #selector(StatusMenu.showSettings), keyEquivalent: ",")
     private let quitItem = NSMenuItem(title: "Завершить SinMinions", action: #selector(StatusMenu.quit), keyEquivalent: "q")
 
-    init(controller: CompanionController, updater: Updater, openSettings: @escaping () -> Void) {
+    init(controller: CompanionController, updater: Updater, prefs: Prefs, openSettings: @escaping () -> Void) {
         self.controller = controller
         self.updater = updater
+        self.prefs = prefs
         self.openSettings = openSettings
         super.init()
 
         menu.autoenablesItems = false
         menu.delegate = self
         versionItem.isEnabled = false
-        for entry in [hideItem, napItem, cornerItem, .separator(), versionItem, updateItem, .separator(), settingsItem, quitItem] {
+        let modes = NSMenu()
+        for mode in CompanionMode.allCases {
+            let entry = NSMenuItem(title: mode.title, action: #selector(StatusMenu.selectMode(_:)), keyEquivalent: "")
+            entry.target = self
+            entry.representedObject = mode.rawValue
+            modes.addItem(entry)
+            modeItems.append((mode, entry))
+        }
+        modeItem.submenu = modes
+        for entry in [hideItem, napItem, cornerItem, .separator(), modeItem, .separator(), versionItem, updateItem, .separator(), settingsItem, quitItem] {
             entry.target = self
             menu.addItem(entry)
         }
@@ -48,6 +61,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         napItem.title = controller.isSleeping ? "Разбудить" : "Усыпить на 1 час"
         napItem.isEnabled = !controller.hiddenByUser
         cornerItem.isEnabled = !controller.hiddenByUser
+
+        for (mode, entry) in modeItems { entry.state = prefs.mode == mode ? .on : .off }
 
         versionItem.title = updater.statusLine
         switch updater.state {
@@ -95,6 +110,12 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     @objc private func returnToCorner() {
         controller.returnToCorner()
+    }
+
+    @objc private func selectMode(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let mode = CompanionMode(rawValue: raw) else { return }
+        prefs.mode = mode
+        refresh()
     }
 
     @objc private func updateAction() {

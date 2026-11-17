@@ -69,8 +69,11 @@ jobs:
           sleep 6
           # К этому моменту демо-режим открыл окно настроек.
           screencapture -x build/settings.png || true
+          sleep 7
+          # …а затем терминал и монитор среднего режима.
+          screencapture -x build/console.png || true
           if kill -0 $PID 2>/dev/null; then
-            echo "Процесс жив через 12 с"
+            echo "Процесс жив через 19 с"
             cat smoke.log
             kill $PID
           else
@@ -89,6 +92,7 @@ jobs:
             build/SinMinions.zip.sha256
             build/screen.png
             build/settings.png
+            build/console.png
 
       - name: Release notes from tag message
         if: startsWith(github.ref, 'refs/tags/v')

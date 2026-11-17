@@ -19,12 +19,16 @@ public struct BehaviorConfig: Equatable, Sendable {
     /// После перетаскивания компаньон остаётся на месте не меньше этого времени.
     public var holdAfterDrag: Double = 60
     public var spotlightEnabled = true
+    /// Средний режим: двойной щелчок открывает терминал и монитор вместо Spotlight.
+    public var consoleEnabled = false
 
     public init() {}
 }
 
 public enum Mode: Equatable, Sendable {
     case idle, wandering, talking, reacting, sleeping, dragged
+    /// Средний режим: призрак в центре экрана, под ним терминал, справа монитор.
+    case console
 }
 
 /// Что должен сделать интерфейс в ответ на переход автомата.
@@ -34,6 +38,7 @@ public enum Effect: Equatable, Sendable {
     case fallAsleep, wakeUp
     case hop
     case openSpotlight
+    case openConsole, closeConsole
 }
 
 public enum Event: Equatable, Sendable {
@@ -49,6 +54,8 @@ public enum Event: Equatable, Sendable {
     /// Компаньона скрыли: всё останавливается, сон сохраняется.
     case suspended
     case resumed
+    /// Терминал закрыт (Esc, щелчок мимо, выполнена команда).
+    case closeConsole
 }
 
 /// Конечный автомат поведения компаньона. Не знает об интерфейсе: время и случайность
@@ -91,7 +98,7 @@ public struct BehaviorEngine {
     /// Раз в секунду. `idleSeconds` — время с последнего ввода с клавиатуры или мыши.
     public mutating func tick(now: Double, idleSeconds: Double) -> [Effect] {
         switch mode {
-        case .dragged, .wandering:
+        case .dragged, .wandering, .console:
             return []
         case .sleeping:
             if let nap = napUntil {
@@ -133,7 +140,7 @@ public struct BehaviorEngine {
             return []
 
         case .click:
-            guard mode != .dragged else { return [] }
+            guard mode != .dragged, mode != .console else { return [] }
             let effects = interrupt()
             mode = .reacting
             modeEndsAt = now + config.talkDuration
@@ -142,8 +149,13 @@ public struct BehaviorEngine {
 
         case .doubleClick:
             guard mode != .dragged else { return [] }
+            if mode == .console { return closeConsole(now: now) }
             let effects = interrupt()
             postpone(now: now)
+            if config.consoleEnabled {
+                mode = .console
+                return effects + [.openConsole]
+            }
             return effects + (config.spotlightEnabled ? [.openSpotlight] : [])
 
         case .arrived:
@@ -154,7 +166,7 @@ public struct BehaviorEngine {
             return []
 
         case let .announce(kind):
-            guard mode != .dragged else { return [] }
+            guard mode != .dragged, mode != .console else { return [] }
             let effects = interrupt()
             return effects + startTalk(kind, now: now)
 
@@ -177,8 +189,12 @@ public struct BehaviorEngine {
             case .sleeping: return []
             case .wandering: mode = .idle; return [.stopWander]
             case .talking, .reacting: mode = .idle; return [.hideBubble]
+            case .console: mode = .idle; return [.closeConsole]
             case .dragged, .idle: mode = .idle; return []
             }
+
+        case .closeConsole:
+            return mode == .console ? closeConsole(now: now) : []
 
         case .resumed:
             postpone(now: now)
@@ -197,8 +213,16 @@ public struct BehaviorEngine {
         case .sleeping:
             napUntil = nil
             return [.wakeUp]
+        case .console: return [.closeConsole]
         case .idle, .dragged: return []
         }
+    }
+
+    private mutating func closeConsole(now: Double) -> [Effect] {
+        mode = .idle
+        nextWanderAt = max(nextWanderAt, now + config.holdAfterDrag)
+        nextTalkAt = max(nextTalkAt, now + Self.quietAfterInteraction)
+        return [.closeConsole]
     }
 
     private mutating func wake(now: Double) -> [Effect] {
