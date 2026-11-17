@@ -30,6 +30,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         self.statusMenu = statusMenu
         controller.onStateChange = { [weak statusMenu] in statusMenu?.refresh() }
+        controller.attachLimits { [weak self] connection, key in
+            guard let self else { return nil }
+            return try await self.llm.limits(connection: connection, key: key)
+        }
         controller.attachChat(
             send: { [weak self] messages in
                 guard let self, let connection = self.prefs.connections.active,

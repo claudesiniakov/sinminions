@@ -129,6 +129,13 @@ final class SystemMonitor {
     }
 }
 
+/// Строка списка подключений для блока лимитов.
+struct LLMConnectionRow: Identifiable, Equatable {
+    let connection: LLMConnection
+    let isActive: Bool
+    var id: UUID { connection.id }
+}
+
 enum ChatEntryKind { case user, assistant, error, info }
 
 struct ChatEntry: Identifiable, Equatable {
@@ -247,6 +254,8 @@ final class ConsoleModel {
     var llmModelName: String?
     var llmPosition = ""
     var llmCount = 0
+    var llmConnections: [LLMConnectionRow] = []
+    let limits = LimitsStore()
     var llmCanStepUp = false
     var llmCanStepDown = false
     @ObservationIgnored var switchModel: (Int) -> Void = { _ in }
@@ -526,6 +535,46 @@ struct MonitorView: View {
             .onTapGesture { if enabled { action() } }
     }
 
+    /// Остаток токенов или средств по каждому подключению; выбранное подсвечено. Длинный список прокручивается.
+    private var limitsBlock: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("ЛИМИТЫ").foregroundStyle(Term.dim)
+            if model.llmConnections.isEmpty {
+                Text("ПОДКЛЮЧЕНИЙ НЕТ").foregroundStyle(Term.dim)
+            } else {
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        ForEach(model.llmConnections) { item in limitRow(item) }
+                    }
+                }
+                .frame(height: min(CGFloat(model.llmConnections.count) * 16, 80))
+            }
+        }
+    }
+
+    private func limitRow(_ item: LLMConnectionRow) -> some View {
+        let state = model.limits.state(for: item.connection) ?? .loading
+        let text: String
+        var warning = false
+        switch state {
+        case .loading: text = "…"
+        case let .value(value): text = value
+        case let .failed(reason): text = reason; warning = true
+        case .noKey: text = "нет ключа"; warning = true
+        }
+        return HStack(spacing: 6) {
+            Text((item.isActive ? "▸ " : "  ") + item.connection.name.uppercased())
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 4)
+            Text(text.uppercased())
+                .foregroundStyle(warning ? Term.amber : (item.isActive ? Term.green : Term.dim))
+                .lineLimit(1)
+                .layoutPriority(1)
+        }
+        .foregroundStyle(item.isActive ? Term.green : Term.dim)
+    }
+
     private func gauge(_ label: String, _ value: String, _ fraction: Double) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
@@ -567,6 +616,8 @@ struct MonitorView: View {
                 line("СЕТЬ ↑", MetricFormat.rate(s.netUp))
                 line("НАГРЕВ", thermal)
                 line("В РАБОТЕ", MetricFormat.uptime(s.uptime))
+                Rectangle().fill(Term.dark).frame(height: 1)
+                limitsBlock
             }
             .font(Term.small)
             .foregroundStyle(Term.green)
@@ -651,7 +702,7 @@ final class ConsoleController: NSObject, NSWindowDelegate {
     /// Размеры окон вместе с полями под свечение (10 pt с каждой стороны).
     static let terminalSize = CGSize(width: 460, height: 380)
     static let monitorWidth: CGFloat = 300
-    static let monitorMinHeight: CGFloat = 470
+    static let monitorMinHeight: CGFloat = 610
 
     let model = ConsoleModel()
     private let terminal: ConsolePanel

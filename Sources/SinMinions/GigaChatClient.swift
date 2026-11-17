@@ -51,6 +51,21 @@ actor GigaChatClient {
         }
     }
 
+    /// Остаток токенов для модели подключения; nil — в ответе нет данных.
+    func limits(key: String, scope: String, model: String) async throws -> String? {
+        var refreshed = false
+        while true {
+            let token = try await token(key: key, scope: scope, forceRefresh: refreshed)
+            let (data, status) = try await perform(GigaChatAPI.balanceRequest(token: token.value))
+            if status == 401, !refreshed {
+                refreshed = true
+                continue
+            }
+            guard status == 200 else { throw LLMError.http(status, GigaChatAPI.errorDetail(data), .chat) }
+            return GigaChatAPI.parseBalance(data, model: model)
+        }
+    }
+
     private func token(key rawKey: String, scope: String, forceRefresh: Bool) async throws -> AccessToken {
         guard let key = GigaChatAPI.normalizedKey(rawKey) else { throw LLMError.noCredentials }
         let tag = scope + "|" + String(key.hashValue)

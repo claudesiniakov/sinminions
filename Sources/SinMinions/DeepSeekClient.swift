@@ -28,6 +28,13 @@ actor DeepSeekClient {
         return DeepSeekAPI.parseBalance(data)
     }
 
+    /// Остаток на счёте: «110.00 CNY»; nil — в ответе нет данных.
+    func limits(key: String) async throws -> String? {
+        let (data, status) = try await perform(DeepSeekAPI.balanceRequest(key: key))
+        guard status == 200 else { throw LLMError.http(status, LLMResponse.errorDetail(data), .direct) }
+        return DeepSeekAPI.balanceSummary(data)
+    }
+
     private func perform(_ request: URLRequest) async throws -> (Data, Int) {
         do {
             let (data, response) = try await session.data(for: request)

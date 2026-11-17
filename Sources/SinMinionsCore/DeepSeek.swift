@@ -46,6 +46,17 @@ public enum DeepSeekAPI {
         return request
     }
 
+    /// «110.00 CNY» (несколько валют — через запятую); nil — ответ не разобрать.
+    public static func balanceSummary(_ data: Data) -> String? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let infos = json["balance_infos"] as? [[String: Any]] else { return nil }
+        let amounts = infos.compactMap { info -> String? in
+            guard let total = info["total_balance"] as? String, let currency = info["currency"] as? String else { return nil }
+            return "\(total) \(currency)"
+        }
+        return amounts.isEmpty ? nil : amounts.joined(separator: ", ")
+    }
+
     /// «баланс 110.00 CNY» (несколько валют — через запятую); nil — ответ не разобрать.
     public static func parseBalance(_ data: Data) -> String? {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

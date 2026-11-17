@@ -37,6 +37,24 @@ public enum LLMError: LocalizedError, Equatable, Sendable {
         return detail.map { "\(base) — \($0)" } ?? base
     }
 
+    /// Короткое пояснение для узких мест интерфейса (строки лимитов на мониторе).
+    public var shortDescription: String {
+        switch self {
+        case .noCredentials: return "нет ключа"
+        case let .http(status, _, _):
+            switch status {
+            case 401: return "ключ не принят"
+            case 402: return "нет средств"
+            case 403: return "лимит недоступен"
+            case 429: return "много запросов"
+            case 500...599: return "сервис недоступен"
+            default: return "ошибка \(status)"
+            }
+        case .network: return "нет связи"
+        case .invalidResponse, .emptyAnswer: return "нет данных"
+        }
+    }
+
     public var errorDescription: String? {
         switch self {
         case .noCredentials:
@@ -105,6 +123,37 @@ public enum GigaChatAPI {
         if text.lowercased().hasPrefix("basic ") { text = String(text.dropFirst(6)) }
         text = text.filter { !$0.isWhitespace }
         return text.isEmpty ? nil : text
+    }
+
+    public static let balanceURL = URL(string: "https://api.giga.chat/v1/balance")!
+
+    /// Остаток токенов. Метод есть только у тех, кто купил пакеты токенов (в том числе бесплатные);
+    /// при оплате по факту сервер отвечает 403.
+    public static func balanceRequest(token: String) -> URLRequest {
+        var request = URLRequest(url: balanceURL)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 30
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("SinMinions", forHTTPHeaderField: "User-Agent")
+        return request
+    }
+
+    /// Остаток для модели подключения: «100,5 ТЫС». Если среди записей нет такой модели, а записей несколько,
+    /// показываются первые две с названиями; nil — ответ не разобрать или в нём нет записей.
+    public static func parseBalance(_ data: Data, model: String) -> String? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let items = json["balance"] as? [[String: Any]] else { return nil }
+        let entries = items.compactMap { item -> (usage: String, value: Int)? in
+            guard let usage = item["usage"] as? String, let value = (item["value"] as? NSNumber)?.intValue else { return nil }
+            return (usage, value)
+        }
+        guard !entries.isEmpty else { return nil }
+        if let match = entries.first(where: { $0.usage.lowercased() == model.lowercased() }) {
+            return TokenFormat.short(match.value)
+        }
+        if entries.count == 1 { return TokenFormat.short(entries[0].value) }
+        return entries.prefix(2).map { "\($0.usage) \(TokenFormat.short($0.value))" }.joined(separator: " · ")
     }
 
     public static func tokenRequest(
@@ -195,5 +244,19 @@ public enum ChatHistory {
         while dialog.count > 1, size() > maxCharacters { dialog.removeFirst() }
         while dialog.count > 1, dialog.first?.role == .assistant { dialog.removeFirst() }
         return system + dialog
+    }
+}
+
+/// Число токенов коротко: «100,5 ТЫС», «12,3 МЛН», «999».
+public enum TokenFormat {
+    public static func short(_ value: Int) -> String {
+        func trimmed(_ number: Double) -> String {
+            let text = String(format: "%.1f", number).replacingOccurrences(of: ".", with: ",")
+            return text.hasSuffix(",0") ? String(text.dropLast(2)) : text
+        }
+        let v = Double(value)
+        if value >= 1_000_000 { return trimmed(v / 1_000_000) + " МЛН" }
+        if value >= 1_000 { return trimmed(v / 1_000) + " ТЫС" }
+        return String(value)
     }
 }

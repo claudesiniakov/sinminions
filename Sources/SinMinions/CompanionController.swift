@@ -159,10 +159,20 @@ final class CompanionController: NSObject {
         let list = prefs.connections
         console.model.llmName = list.active?.name
         console.model.llmModelName = list.active?.model
+        console.model.llmConnections = list.items.map { LLMConnectionRow(connection: $0, isActive: $0.id == list.active?.id) }
         console.model.llmCanStepUp = list.active.map { $0.provider.step(model: $0.model, by: 1) != nil } ?? false
         console.model.llmCanStepDown = list.active.map { $0.provider.step(model: $0.model, by: -1) != nil } ?? false
         console.model.llmCount = list.items.count
         console.model.llmPosition = list.activePosition.map { "\($0)/\(list.items.count)" } ?? ""
+    }
+
+    private func refreshLimits() {
+        console.model.limits.refresh(prefs.connections.items)
+    }
+
+    /// Как узнавать лимит подключения (остаток токенов или средств) — для блока на мониторе.
+    func attachLimits(fetch: @escaping @MainActor (LLMConnection, String) async throws -> String?) {
+        console.model.limits.fetch = fetch
     }
 
     /// «▲» и «▼» на мониторе: модель выше или ниже в списке провайдера. Меняется модель самого подключения.
@@ -190,6 +200,7 @@ final class CompanionController: NSObject {
 
     func prefsChanged() {
         refreshLLM()
+        if console.isOpen { refreshLimits() }
         if view.scale != CGFloat(prefs.scale) { rebuildView() }
         applyCollectionBehavior()
         engine.reconfigure(prefs.behaviorConfig(lowPower: lowPower), now: now)
@@ -334,6 +345,7 @@ final class CompanionController: NSObject {
 
     private func openConsole() {
         refreshLLM()
+        refreshLimits()
         let mothSize = view.mothFrame.size
         let terminalSize = ConsoleController.terminalSize
         let monitorSize = CGSize(

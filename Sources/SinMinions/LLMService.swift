@@ -15,6 +15,16 @@ final class LLMService: Sendable {
         }
     }
 
+    /// Остаток токенов или средств на счёте для строки лимитов; nil — данных нет.
+    func limits(connection: LLMConnection, key: String) async throws -> String? {
+        switch connection.provider {
+        case .gigachat:
+            return try await gigaChat.limits(key: key, scope: connection.scope, model: connection.model)
+        case .deepseek:
+            return try await deepSeek.limits(key: key)
+        }
+    }
+
     /// Проверка подключения. Строка — что показать рядом с «работает» (например, баланс).
     func check(connection: LLMConnection, key: String) async throws -> String? {
         switch connection.provider {

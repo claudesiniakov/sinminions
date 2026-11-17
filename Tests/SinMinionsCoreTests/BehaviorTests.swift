@@ -643,6 +643,56 @@ final class NewBehaviorsTests: XCTestCase {
     }
 }
 
+final class LimitsTests: XCTestCase {
+    func testTokenFormat() {
+        XCTAssertEqual(TokenFormat.short(999), "999")
+        XCTAssertEqual(TokenFormat.short(1_000), "1 ТЫС")
+        XCTAssertEqual(TokenFormat.short(100_500), "100,5 ТЫС")
+        XCTAssertEqual(TokenFormat.short(1_000_000), "1 МЛН")
+        XCTAssertEqual(TokenFormat.short(12_345_678), "12,3 МЛН")
+        XCTAssertEqual(TokenFormat.short(250_000_000), "250 МЛН")
+        XCTAssertEqual(TokenFormat.short(0), "0")
+    }
+
+    func testGigaChatBalanceRequest() {
+        let request = GigaChatAPI.balanceRequest(token: "tok")
+        XCTAssertEqual(request.url?.absoluteString, "https://api.giga.chat/v1/balance")
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer tok")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), "SinMinions")
+    }
+
+    func testGigaChatBalanceParsing() {
+        let two = Data(#"{"balance":[{"usage":"GigaChat","value":100500},{"usage":"embeddings","value":3000000}]}"#.utf8)
+        // Есть запись для модели подключения — показывается только она, без совпадения — первые две.
+        XCTAssertEqual(GigaChatAPI.parseBalance(two, model: "gigachat"), "100,5 ТЫС")
+        XCTAssertEqual(GigaChatAPI.parseBalance(two, model: "GigaChat-2-Pro"), "GigaChat 100,5 ТЫС · embeddings 3 МЛН")
+        let one = Data(#"{"balance":[{"usage":"GigaChat-Pro","value":2500000}]}"#.utf8)
+        XCTAssertEqual(GigaChatAPI.parseBalance(one, model: "GigaChat-2-Max"), "2,5 МЛН")
+        XCTAssertNil(GigaChatAPI.parseBalance(Data(#"{"balance":[]}"#.utf8), model: "GigaChat"))
+        XCTAssertNil(GigaChatAPI.parseBalance(Data("не json".utf8), model: "GigaChat"))
+        XCTAssertNil(GigaChatAPI.parseBalance(Data(#"{"balance":[{"usage":"x"}]}"#.utf8), model: "GigaChat"))
+    }
+
+    func testDeepSeekSummary() {
+        let two = Data(#"{"is_available":true,"balance_infos":[{"currency":"CNY","total_balance":"110.00"},{"currency":"USD","total_balance":"5.00"}]}"#.utf8)
+        XCTAssertEqual(DeepSeekAPI.balanceSummary(two), "110.00 CNY, 5.00 USD")
+        XCTAssertNil(DeepSeekAPI.balanceSummary(Data(#"{"balance_infos":[]}"#.utf8)))
+    }
+
+    func testShortErrorDescriptions() {
+        XCTAssertEqual(LLMError.http(403, nil, .chat).shortDescription, "лимит недоступен")
+        XCTAssertEqual(LLMError.http(401, nil, .direct).shortDescription, "ключ не принят")
+        XCTAssertEqual(LLMError.http(402, nil, .direct).shortDescription, "нет средств")
+        XCTAssertEqual(LLMError.http(503, nil, .direct).shortDescription, "сервис недоступен")
+        XCTAssertEqual(LLMError.network("x").shortDescription, "нет связи")
+        XCTAssertEqual(LLMError.noCredentials.shortDescription, "нет ключа")
+        for text in [LLMError.http(418, nil, .chat), .network("n"), .invalidResponse].map(\.shortDescription) {
+            XCTAssertLessThanOrEqual(text.count, 20, text)
+        }
+    }
+}
+
 final class ModelStepTests: XCTestCase {
     func testStepsAlongTheListAndStopsAtEnds() {
         let provider = LLMProvider.gigachat
