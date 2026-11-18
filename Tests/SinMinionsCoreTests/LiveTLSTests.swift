@@ -60,6 +60,34 @@ final class LiveTLSTests: XCTestCase {
         XCTAssertNotNil(LLMResponse.errorDetail(chatData))
     }
 
+    /// Claude, GPT, Grok и Gemini: с неверным ключом сервер должен ответить отказом авторизации
+    /// (а не ошибкой адреса или соединения) — значит, адреса и заголовки верны.
+    func testOtherProvidersRejectAFakeKey() async throws {
+        guard ProcessInfo.processInfo.environment["SINMINIONS_LIVE_TLS"] != nil else { throw XCTSkip("только в CI") }
+        let session = URLSession(configuration: .ephemeral)
+        let fake = "sk-0000000000000000000000000000000f"
+        let messages = [ChatMessage(.user, "привет")]
+        var requests: [(String, URLRequest)] = [
+            ("Claude chat", AnthropicAPI.chatRequest(key: fake, model: "claude-haiku-5-5", messages: messages)),
+            ("Claude models", AnthropicAPI.modelsRequest(key: fake)),
+        ]
+        for provider in [LLMProvider.gpt, .grok, .gemini] {
+            requests.append(("\(provider.title) chat", OpenAICompatibleAPI.chatRequest(provider: provider, key: fake, model: provider.defaultModel, messages: messages)!))
+            requests.append(("\(provider.title) models", OpenAICompatibleAPI.modelsRequest(provider: provider, key: fake)!))
+        }
+        for (label, request) in requests {
+            do {
+                let (data, response) = try await session.data(for: request)
+                let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+                print("LIVE \(label): HTTP \(code) \(String(data: data.prefix(140), encoding: .utf8) ?? "") | detail: \(LLMResponse.errorDetail(data) ?? "-")")
+                XCTAssertTrue([400, 401, 403].contains(code), "\(label): ожидали 400, 401 или 403, получили \(code)")
+            } catch {
+                print("LIVE \(label): ошибка \(error)")
+                XCTFail("\(label): \(error)")
+            }
+        }
+    }
+
     func testChatHost() async throws {
         guard ProcessInfo.processInfo.environment["SINMINIONS_LIVE_TLS"] != nil else { throw XCTSkip("только в CI") }
         let request = GigaChatAPI.chatRequest(token: "x", model: "GigaChat", messages: [ChatMessage(.user, "привет")])
