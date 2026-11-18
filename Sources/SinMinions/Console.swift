@@ -303,6 +303,8 @@ final class ConsoleModel {
     var llmCount = 0
     /// Настройка «Запрашивать и показывать лимиты».
     var showLimits = true
+    /// Выбранная буква S.P.E.C.I.A.L. в мониторе: её уровень меняют большие «−» и «+».
+    var selectedStat: SpecialStat = .intelligence
     var llmConnections: [LLMConnectionRow] = []
     let limits = LimitsStore()
     /// Окна разблокированы: их можно двигать и менять их размер.
@@ -727,75 +729,84 @@ struct MonitorView: View {
         }
     }
 
-    /// Призрак вместо человечка Pip-Boy и переключатель «интеллекта»: «−» и «+» меняют подключение.
-    /// Порядок подключений и модель задаются в настройках.
-    /// S.P.E.C.I.A.L. над призраком: буква, уровень и под ними «−» и «+» для рабочих характеристик.
-    private var specialStrip: some View {
+    /// Значение, уровень и число уровней по буквам; nil — характеристика пока без назначения.
+    private func specialInfo(_ stat: SpecialStat) -> (value: String, level: Int, levels: Int, label: String)? {
         let state = model.special
-        let position = model.llmPosition.split(separator: "/").first.map(String.init) ?? "–"
-        // Значение и число уровней по буквам; нет записи — характеристика пока без назначения.
-        let info: [SpecialStat: (value: String, level: Int, levels: Int)] = [
-            .strength: ("\(state.scaleLevel)", state.scaleLevel, Prefs.scales.count),
-            .endurance: ("\(state.enduranceLevel)", state.enduranceLevel, Endurance.levels),
-            .charisma: ("\(state.charismaLevel)", state.charismaLevel, Charisma.levels),
-            .intelligence: (position, model.llmCount > 1 ? 1 : 0, model.llmCount > 1 ? 3 : 1),
-            .agility: ("\(state.agilityLevel)", state.agilityLevel, Agility.levels),
-        ]
-        return HStack(spacing: 0) {
+        switch stat {
+        case .strength: return ("\(state.scaleLevel)", state.scaleLevel, Prefs.scales.count, state.scaleLabel)
+        case .endurance: return ("\(state.enduranceLevel)", state.enduranceLevel, Endurance.levels, state.enduranceLabel)
+        case .charisma: return ("\(state.charismaLevel)", state.charismaLevel, Charisma.levels, state.charismaLabel)
+        case .agility: return ("\(state.agilityLevel)", state.agilityLevel, Agility.levels, state.agilityLabel)
+        case .intelligence:
+            return (model.llmPosition.split(separator: "/").first.map(String.init) ?? "–", 0, 0, "")
+        default: return nil
+        }
+    }
+
+    /// S.P.E.C.I.A.L. над призраком: буква и уровень. Щелчок выбирает характеристику, и большие «−» и «+»
+    /// под призраком меняют её уровень (у I — подключение к нейросети).
+    private var specialStrip: some View {
+        HStack(spacing: 0) {
             ForEach(SpecialStat.allCases) { stat in
+                let selected = model.selectedStat == stat
                 VStack(spacing: 2) {
                     Text(stat.letter).font(.system(size: 15, weight: .bold, design: .monospaced))
-                    Text(info[stat]?.value ?? "–").font(Term.small)
-                    if let item = info[stat] {
-                        HStack(spacing: 1) {
-                            specialButton("−", enabled: item.level > 0) { model.adjustSpecial(stat, -1) }
-                            specialButton("+", enabled: item.level < item.levels - 1) { model.adjustSpecial(stat, 1) }
-                        }
-                    } else {
-                        Color.clear.frame(width: 29, height: 15)
-                    }
+                    Text(specialInfo(stat)?.value ?? "–").font(Term.small)
                 }
-                .foregroundStyle(stat.isActive ? Term.green : Term.dim)
+                .padding(.vertical, 3)
                 .frame(maxWidth: .infinity)
+                .background(selected ? Term.green.opacity(0.18) : Color.clear)
+                .overlay(Rectangle().strokeBorder(selected ? Term.green : Color.clear, lineWidth: 1))
+                .foregroundStyle(stat.isActive ? Term.green : Term.dim)
+                .contentShape(Rectangle())
+                .onTapGesture { if stat.isActive { model.selectedStat = stat } }
             }
         }
     }
 
-    private func specialButton(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Text(symbol)
-            .font(.system(size: 10, design: .monospaced))
-            .frame(width: 14, height: 15)
-            .overlay(Rectangle().strokeBorder(enabled ? Term.green : Term.dark, lineWidth: 1))
-            .opacity(enabled ? 1 : 0.4)
-            .contentShape(Rectangle())
-            .onTapGesture { if enabled { action() } }
-    }
-
+    /// Подпись и «−» с «+» под призраком: для I — подключение, для остальных букв — уровень выбранной характеристики.
     private var intelligence: some View {
-        VStack(spacing: 6) {
+        let stat = model.selectedStat
+        let info = specialInfo(stat)
+        let isIntelligence = stat == .intelligence
+        let level = info?.level ?? 0
+        let levels = info?.levels ?? 0
+        return VStack(spacing: 6) {
             specialStrip
             GhostFigure()
                 .frame(width: 72, height: 84)
-            Text("ИНТЕЛЛЕКТ")
+            Text(stat.title)
                 .foregroundStyle(Term.dim)
             HStack(spacing: 10) {
-                stepButton("−", enabled: model.llmCount > 1) { model.switchConnection(-1) }
+                stepButton("−", enabled: isIntelligence ? model.llmCount > 1 : level > 0) {
+                    if isIntelligence { model.switchConnection(-1) } else { model.adjustSpecial(stat, -1) }
+                }
                 VStack(spacing: 1) {
-                    Text((model.llmName ?? "НЕТ ПОДКЛЮЧЕНИЙ").uppercased())
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    if let modelName = model.llmModelName {
-                        Text(modelName.uppercased())
-                            .foregroundStyle(Term.dim)
+                    if isIntelligence {
+                        Text((model.llmName ?? "НЕТ ПОДКЛЮЧЕНИЙ").uppercased())
                             .lineLimit(1)
                             .truncationMode(.tail)
-                    }
-                    if !model.llmPosition.isEmpty {
-                        Text(model.llmPosition).foregroundStyle(Term.dim)
+                        if let modelName = model.llmModelName {
+                            Text(modelName.uppercased())
+                                .foregroundStyle(Term.dim)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
+                        if !model.llmPosition.isEmpty {
+                            Text(model.llmPosition).foregroundStyle(Term.dim)
+                        }
+                    } else {
+                        Text(info?.label ?? "")
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.8)
+                        Text("УРОВЕНЬ \(level) ИЗ \(max(levels - 1, 0))").foregroundStyle(Term.dim)
                     }
                 }
                 .frame(maxWidth: .infinity)
-                stepButton("+", enabled: model.llmCount > 1) { model.switchConnection(1) }
+                stepButton("+", enabled: isIntelligence ? model.llmCount > 1 : level < levels - 1) {
+                    if isIntelligence { model.switchConnection(1) } else { model.adjustSpecial(stat, 1) }
+                }
             }
         }
         .frame(maxWidth: .infinity)
