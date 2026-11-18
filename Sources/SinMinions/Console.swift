@@ -254,7 +254,11 @@ final class ChatSession {
 final class ConsoleModel {
     enum Screen { case menu, chat }
 
-    var screen = Screen.menu
+    var screen = Screen.menu {
+        didSet { if screen != oldValue { onScreenChange() } }
+    }
+    /// Экран сменился: строка ввода новая, фокус надо поставить заново.
+    @ObservationIgnored var onScreenChange: () -> Void = {}
     let chat = ChatSession()
     var selected = 0
     /// Строка ввода меню (команды со «/») и журнал ответов.
@@ -947,10 +951,12 @@ final class ConsoleController: NSObject, NSWindowDelegate {
             case .menu: self.model.shellInput += line
             }
             self.model.focusTick += 1
+            self.focusInput()
         }
         model.run = { [weak self] command in self?.onCommand(command) }
         model.slashAction = { [weak self] command in self?.onSlash(command) }
         model.layoutEvent = { [weak self] window, event in self?.handleLayout(window, event) }
+        model.onScreenChange = { [weak self] in self?.scheduleFocus() }
     }
 
     func setCollectionBehavior(_ behavior: NSWindow.CollectionBehavior) {
@@ -988,6 +994,33 @@ final class ConsoleController: NSObject, NSWindowDelegate {
         // клавиатура идёт только в ключевое окно.
         terminal.makeKeyAndOrderFront(nil)
         model.focusTick += 1
+        scheduleFocus()
+    }
+
+    /// Первая редактируемая строка ввода в окне терминала.
+    private static func firstTextField(in view: NSView) -> NSTextField? {
+        if let field = view as? NSTextField, field.isEditable { return field }
+        for subview in view.subviews {
+            if let found = firstTextField(in: subview) { return found }
+        }
+        return nil
+    }
+
+    /// Ставит курсор в строку ввода средствами AppKit: фокус SwiftUI в окне без рамки ненадёжен —
+    /// окно оказывалось ключевым, а печатать было некуда.
+    func focusInput() {
+        guard isOpen, let content = terminal.contentView,
+              let field = Self.firstTextField(in: content) else { return }
+        terminal.makeFirstResponder(field)
+    }
+
+    /// SwiftUI строит экран не мгновенно, поэтому фокус ставим дважды: сразу после и чуть позже.
+    private func scheduleFocus() {
+        for delay in [0.05, 0.3] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                MainActor.assumeIsolated { self?.focusInput() }
+            }
+        }
     }
 
     /// Для CI: состояние фокуса окна терминала.
