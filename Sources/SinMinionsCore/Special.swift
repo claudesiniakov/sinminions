@@ -23,16 +23,19 @@ public enum Agility {
     }
 }
 
-/// Выносливость (E): 0 — призрак спит, 1 — засыпает при бездействии, 2 — не засыпает.
+/// Выносливость (E): 0 — призрак спит, 1 — засыпает при бездействии, 2 — не засыпает, 3 — «кофе»: не засыпает
+/// и не даёт уснуть ноутбуку (у призрака чашка). Режим «кофе» включается только с уровня 2, шаг вниз его выключает.
 public enum Endurance {
-    public static let levels = 3
+    public static let levels = 4
+    public static let coffeeLevel = 3
     /// На уровне 1 призрак засыпает через столько минут.
     public static let defaultMinutes = 5
 
     public static func clamp(_ level: Int) -> Int { min(max(level, 0), levels - 1) }
 
-    public static func level(alwaysAsleep: Bool, sleepMinutes: Int) -> Int {
-        alwaysAsleep ? 0 : (sleepMinutes <= 0 ? 2 : 1)
+    public static func level(alwaysAsleep: Bool, sleepMinutes: Int, coffee: Bool = false) -> Int {
+        if coffee { return coffeeLevel }
+        return alwaysAsleep ? 0 : (sleepMinutes <= 0 ? 2 : 1)
     }
 
     /// Какие настройки соответствуют уровню. На уровне 0 время засыпания не меняется.
@@ -48,6 +51,7 @@ public enum Endurance {
         switch clamp(level) {
         case 0: return "СПИТ"
         case 1: return "ЗАСЫПАЕТ ЧЕРЕЗ \(sleepMinutes > 0 ? sleepMinutes : defaultMinutes) МИН"
+        case coffeeLevel: return "КОФЕ: НЕ ДАЁТ НОУТБУКУ УСНУТЬ"
         default: return "НЕ ЗАСЫПАЕТ"
         }
     }
@@ -94,26 +98,5 @@ public enum GhostStyle: Int, CaseIterable, Sendable {
         case .terminal: return 0.8
         case .radiation: return 1.7
         }
-    }
-}
-
-/// Восприятие (P): уровни 0…4 — облик призрака, уровень 5 — «кофе»: облик остаётся, у призрака в руках
-/// чашка, а ноутбук не засыпает от бездействия. До уровня 5 доходят с последнего облика, так что
-/// шаг вниз возвращает тот же облик.
-public enum Perception {
-    public static let coffeeLevel = GhostStyle.levels
-    public static let levels = GhostStyle.levels + 1
-
-    public static func level(style: GhostStyle, coffee: Bool) -> Int { coffee ? coffeeLevel : style.rawValue }
-
-    /// Стиль и кофе после перехода на уровень; на уровне «кофе» стиль не меняется.
-    public static func apply(level: Int, current: GhostStyle) -> (style: GhostStyle, coffee: Bool) {
-        let clamped = min(max(level, 0), levels - 1)
-        if clamped == coffeeLevel { return (current, true) }
-        return (GhostStyle.clamp(clamped), false)
-    }
-
-    public static func title(style: GhostStyle, coffee: Bool) -> String {
-        coffee ? "КОФЕ: НЕ ДАЁТ НОУТБУКУ УСНУТЬ" : "ОБЛИК: " + style.title
     }
 }

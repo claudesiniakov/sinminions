@@ -66,7 +66,7 @@ final class Prefs {
     /// Облик призрака (P в S.P.E.C.I.A.L.): номер стиля отрисовки.
     var ghostStyleLevel: Int { didSet { store(ghostStyleLevel, "ghostStyle") } }
     var ghostStyle: GhostStyle { GhostStyle.clamp(ghostStyleLevel) }
-    /// Режим «кофе» (уровень P): ноутбук не засыпает. После перезапуска выключен, чтобы не разряжать батарею втихую.
+    /// Режим «кофе» (уровень 3 буквы E): ноутбук не засыпает. После перезапуска выключен, чтобы не разряжать батарею втихую.
     var coffee = false { didSet { onChange() } }
     var alwaysAsleep: Bool { didSet { store(alwaysAsleep, "alwaysAsleep") } }
     var hideSeekEnabled: Bool { didSet { store(hideSeekEnabled, "hideSeekEnabled") } }
@@ -125,11 +125,12 @@ final class Prefs {
 
     /// Выносливость (E в S.P.E.C.I.A.L.): 0 — спит, 1 — засыпает через 5 минут, 2 — не засыпает.
     var endurance: Int {
-        get { Endurance.level(alwaysAsleep: alwaysAsleep, sleepMinutes: sleepMinutes) }
+        get { Endurance.level(alwaysAsleep: alwaysAsleep, sleepMinutes: sleepMinutes, coffee: coffee) }
         set {
             let applied = Endurance.apply(level: newValue, sleepMinutes: sleepMinutes)
             alwaysAsleep = applied.alwaysAsleep
             sleepMinutes = applied.sleepMinutes
+            coffee = Endurance.clamp(newValue) == Endurance.coffeeLevel
         }
     }
 

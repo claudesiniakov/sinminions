@@ -1050,17 +1050,12 @@ final class NewBehaviorsTests: XCTestCase {
         XCTAssertEqual(engine.tick(now: 95, idleSeconds: 1), [.startWander])
     }
 
-    func testPerceptionCoffeeLevelKeepsStyle() {
-        XCTAssertEqual(Perception.levels, 6)
-        XCTAssertEqual(Perception.level(style: .radiation, coffee: true), 5)
-        XCTAssertEqual(Perception.level(style: .warden, coffee: false), 2)
-        let up = Perception.apply(level: 5, current: .radiation)
-        XCTAssertEqual(up.style, .radiation)
-        XCTAssertTrue(up.coffee)
-        let down = Perception.apply(level: 4, current: .radiation)
-        XCTAssertEqual(down.style, .radiation)
-        XCTAssertFalse(down.coffee)
-        XCTAssertEqual(Perception.apply(level: 99, current: .classic).coffee, true)
+    func testEnduranceCoffeeLevel() {
+        XCTAssertEqual(Endurance.levels, 4)
+        XCTAssertEqual(Endurance.level(alwaysAsleep: false, sleepMinutes: 0, coffee: true), 3)
+        XCTAssertEqual(Endurance.level(alwaysAsleep: false, sleepMinutes: 0, coffee: false), 2)
+        XCTAssertTrue(Endurance.apply(level: 3, sleepMinutes: 5) == (false, 0))
+        XCTAssertEqual(Endurance.title(level: 3, sleepMinutes: 0), "КОФЕ: НЕ ДАЁТ НОУТБУКУ УСНУТЬ")
     }
 
     func testShooOffDoesNothing() {

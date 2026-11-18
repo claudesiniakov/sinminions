@@ -180,8 +180,8 @@ final class CompanionController: NSObject {
         console.model.special = SpecialState(
             scaleLevel: scales.firstIndex(of: prefs.scale) ?? 1,
             scaleLabel: "РАЗМЕР " + scaleText,
-            perceptionLevel: Perception.level(style: prefs.ghostStyle, coffee: prefs.coffee),
-            perceptionLabel: Perception.title(style: prefs.ghostStyle, coffee: prefs.coffee),
+            perceptionLevel: prefs.ghostStyle.rawValue,
+            perceptionLabel: "ОБЛИК: " + prefs.ghostStyle.title,
             agilityLevel: prefs.agility,
             agilityLabel: "СКОРОСТЬ ПОЛЁТА: " + Agility.title(level: prefs.agility),
             enduranceLevel: prefs.endurance,
@@ -203,12 +203,7 @@ final class CompanionController: NSObject {
         case .agility:
             prefs.agility = Agility.clamp(prefs.agility + delta)
         case .perception:
-            let next = Perception.apply(
-                level: Perception.level(style: prefs.ghostStyle, coffee: prefs.coffee) + delta,
-                current: prefs.ghostStyle
-            )
-            prefs.ghostStyleLevel = next.style.rawValue
-            prefs.coffee = next.coffee
+            prefs.ghostStyleLevel = GhostStyle.clamp(prefs.ghostStyleLevel + delta).rawValue
         case .charisma:
             prefs.charisma = Charisma.clamp(prefs.charisma + delta)
         case .endurance:
@@ -547,10 +542,14 @@ final class CompanionController: NSObject {
     }
 
     /// Для снимков в CI: смена облика призрака.
+    /// Для демо: режим «кофе» (уровень 3 выносливости) или обычный.
+    func setCoffeeForDemo(_ on: Bool) {
+        prefs.endurance = on ? Endurance.coffeeLevel : 2
+        prefsChanged()
+    }
+
     func setGhostStyleForDemo(_ level: Int) {
-        let next = Perception.apply(level: level, current: prefs.ghostStyle)
-        prefs.ghostStyleLevel = next.style.rawValue
-        prefs.coffee = next.coffee
+        prefs.ghostStyleLevel = GhostStyle.clamp(level).rawValue
         prefsChanged()
     }
 

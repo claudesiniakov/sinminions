@@ -764,7 +764,7 @@ struct MonitorView: View {
         let state = model.special
         switch stat {
         case .strength: return ("\(state.scaleLevel)", state.scaleLevel, Prefs.scales.count, state.scaleLabel)
-        case .perception: return ("\(state.perceptionLevel)", state.perceptionLevel, Perception.levels, state.perceptionLabel)
+        case .perception: return ("\(state.perceptionLevel)", state.perceptionLevel, GhostStyle.levels, state.perceptionLabel)
         case .endurance: return ("\(state.enduranceLevel)", state.enduranceLevel, Endurance.levels, state.enduranceLabel)
         case .charisma: return ("\(state.charismaLevel)", state.charismaLevel, Charisma.levels, state.charismaLabel)
         case .agility: return ("\(state.agilityLevel)", state.agilityLevel, Agility.levels, state.agilityLabel)
