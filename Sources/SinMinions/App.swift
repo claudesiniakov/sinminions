@@ -134,6 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             controller.setCoffeeForDemo(true)
             await wait(2.5)
             demoMark("coffee")
+            await wait(3)
             controller.setCoffeeForDemo(false)
             controller.closeConsoleForDemo()
             await wait(1)
