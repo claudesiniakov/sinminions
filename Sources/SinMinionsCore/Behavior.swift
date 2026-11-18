@@ -2,7 +2,7 @@ import Foundation
 
 /// Повод для реплики.
 public enum PhraseKind: String, Sendable, CaseIterable {
-    case ambient, click, charging, lowBattery, wake, updateAvailable, needAccess, spotlightOff, teleport, scared, curious, boo
+    case ambient, click, charging, lowBattery, wake, updateAvailable, needAccess, spotlightOff, teleport, scared, curious, boo, shooed
 }
 
 public struct BehaviorConfig: Equatable, Sendable {
@@ -39,6 +39,8 @@ public struct BehaviorConfig: Equatable, Sendable {
     public var hideDuration: ClosedRange<Double> = 15...40
     /// Танец: призрак кружится от радости (например, когда подключили зарядку).
     public var celebrateEnabled = false
+    /// «Кыш»: правый щелчок по призраку отгоняет его к краю экрана.
+    public var shooEnabled = false
 
     public init() {}
 }
@@ -64,6 +66,8 @@ public enum Effect: Equatable, Sendable {
     case startTeleport, stopTeleport
     case shake, startChase
     case fadeOut, fadeIn, spin
+    /// Быстро отлететь к краю экрана, подальше от курсора.
+    case startShoo
 }
 
 public enum Event: Equatable, Sendable {
@@ -89,6 +93,8 @@ public enum Event: Equatable, Sendable {
     case scare
     /// Курсор подошёл к спрятавшемуся призраку.
     case reveal
+    /// Пользователь отогнал призрака в сторону (правый щелчок).
+    case shoo
     /// Повод для радости; фраза — из этого набора.
     case celebrate(PhraseKind)
 }
@@ -105,6 +111,9 @@ public struct BehaviorEngine {
     public private(set) var napUntil: Double?
     private var modeEndsAt: Double = 0
     private var scareCooldownUntil: Double = 0
+    private var calmUntil: Double = 0
+    /// После «кыш» призрак не перелетает и не телепортируется столько секунд.
+    public static let shooCalm: Double = 90
     /// После испуга призрак не пугается заново столько секунд.
     public static let scareCooldown: Double = 20
     private let random: (ClosedRange<Double>) -> Double
@@ -227,7 +236,7 @@ public struct BehaviorEngine {
         case .arrived:
             guard mode == .wandering else { return [] }
             mode = .idle
-            nextWanderAt = now + random(config.wanderInterval)
+            nextWanderAt = max(now + random(config.wanderInterval), calmUntil)
             nextTalkAt = max(nextTalkAt, now + Self.quietAfterInteraction)
             return []
 
@@ -279,6 +288,17 @@ public struct BehaviorEngine {
             modeEndsAt = now + config.talkDuration
             postpone(now: now + config.talkDuration)
             return effects + [.spin, .say(kind)]
+
+        case .shoo:
+            guard config.shooEnabled, mode != .dragged, mode != .console, mode != .teleporting else { return [] }
+            let effects = interrupt()
+            mode = .wandering
+            calmUntil = now + Self.shooCalm
+            nextWanderAt = max(nextWanderAt, calmUntil)
+            nextTeleportAt = max(nextTeleportAt, calmUntil)
+            nextHideAt = max(nextHideAt, calmUntil)
+            postpone(now: now)
+            return effects + [.startShoo]
 
         case .scare:
             guard config.scareEnabled, now >= scareCooldownUntil,

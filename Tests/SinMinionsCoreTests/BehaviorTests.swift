@@ -1036,6 +1036,25 @@ final class NewBehaviorsTests: XCTestCase {
         return BehaviorEngine(config: config, now: 0, random: { $0.lowerBound })
     }
 
+    func testShooFliesAwayAndStaysCalm() {
+        var config = BehaviorConfig()
+        config.shooEnabled = true
+        config.sleepAfter = nil
+        config.talkEnabled = false
+        var engine = BehaviorEngine(config: config, now: 0, random: { $0.lowerBound })
+        XCTAssertEqual(engine.handle(.shoo, now: 1), [.startShoo])
+        XCTAssertEqual(engine.mode, .wandering)
+        _ = engine.handle(.arrived, now: 2)
+        XCTAssertEqual(engine.mode, .idle)
+        XCTAssertEqual(engine.tick(now: 60, idleSeconds: 1), [])
+        XCTAssertEqual(engine.tick(now: 95, idleSeconds: 1), [.startWander])
+    }
+
+    func testShooOffDoesNothing() {
+        var engine = makeEngine()
+        XCTAssertEqual(engine.handle(.shoo, now: 1), [])
+    }
+
     func testScareShakesAndSpeaks() {
         var engine = makeEngine()
         XCTAssertEqual(engine.handle(.scare, now: 1), [.shake, .say(.scared)])

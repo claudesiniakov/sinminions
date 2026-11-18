@@ -68,6 +68,7 @@ final class Prefs {
     var ghostStyle: GhostStyle { GhostStyle.clamp(ghostStyleLevel) }
     var alwaysAsleep: Bool { didSet { store(alwaysAsleep, "alwaysAsleep") } }
     var hideSeekEnabled: Bool { didSet { store(hideSeekEnabled, "hideSeekEnabled") } }
+    var shooEnabled: Bool { didSet { store(shooEnabled, "shooEnabled") } }
     var celebrateEnabled: Bool { didSet { store(celebrateEnabled, "celebrateEnabled") } }
     var wanderFrequency: Frequency { didSet { store(wanderFrequency.rawValue, "wanderFrequency") } }
     var talkEnabled: Bool { didSet { store(talkEnabled, "talkEnabled") } }
@@ -90,6 +91,7 @@ final class Prefs {
         scareEnabled = d.object(forKey: "scareEnabled") as? Bool ?? true
         chaseEnabled = d.object(forKey: "chaseEnabled") as? Bool ?? true
         hideSeekEnabled = d.object(forKey: "hideSeekEnabled") as? Bool ?? true
+        shooEnabled = d.object(forKey: "shooEnabled") as? Bool ?? true
         ghostStyleLevel = GhostStyle.clamp(d.object(forKey: "ghostStyle") as? Int ?? 0).rawValue
         agility = Agility.clamp(d.object(forKey: "agility") as? Int ?? Agility.defaultLevel)
         alwaysAsleep = d.object(forKey: "alwaysAsleep") as? Bool ?? false
@@ -169,6 +171,7 @@ final class Prefs {
         config.scareEnabled = scareEnabled
         config.chaseEnabled = chaseEnabled
         config.hideSeekEnabled = hideSeekEnabled
+        config.shooEnabled = shooEnabled
         config.celebrateEnabled = celebrateEnabled
         config.talkEnabled = talkEnabled
         config.talkInterval = talkFrequency.talkInterval

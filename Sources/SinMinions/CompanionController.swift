@@ -51,6 +51,8 @@ final class CompanionController: NSObject {
         let wander: Bool
         /// Перелёт к курсору: на месте призрак говорит реплику.
         var chase = false
+        /// Отгон: на месте призрак говорит реплику.
+        var shoo = false
     }
 
     private struct PowerState: Equatable {
@@ -541,6 +543,10 @@ final class CompanionController: NSObject {
             guard let self else { return }
             self.apply(self.engine.handle(.doubleClick, now: self.now))
         }
+        view.onShoo = { [weak self] in
+            guard let self else { return }
+            self.apply(self.engine.handle(.shoo, now: self.now))
+        }
         view.onDragBegan = { [weak self] in
             guard let self else { return }
             self.stopFlight(snap: false)
@@ -718,6 +724,7 @@ final class CompanionController: NSObject {
                 panel.animator().alphaValue = 1
                 NSAnimationContext.endGrouping()
             case .startChase: startChase()
+            case .startShoo: startShoo()
             case .stopTeleport: stopTeleport()
             }
         }
@@ -813,12 +820,27 @@ final class CompanionController: NSObject {
         startFlight(to: clamped(origin, size: panel.frame.size), chase: true)
     }
 
+    /// Отгон: быстрый отлёт к краю экрана, который дальше от курсора.
+    private func startShoo() {
+        let mouse = NSEvent.mouseLocation
+        let size = panel.frame.size
+        let from = panel.frame.origin
+        let awayRight = mouse.x < area.midX
+        let margin: CGFloat = 8
+        let x = awayRight ? area.maxX - size.width - margin : area.minX + margin
+        let target = clamped(CGPoint(x: x, y: from.y), size: size)
+        let distance = Double(hypot(target.x - from.x, target.y - from.y))
+        flight = Flight(from: from, to: target, start: now, duration: max(distance / 900, 0.25), wander: true, shoo: true)
+        startFlightTimer()
+    }
+
     private func finishFlight() {
         let finished = flight
         stopFlight()
         guard finished?.wander ?? true else { return }
         apply(engine.handle(.arrived, now: now))
         if finished?.chase == true { announce(.curious) }
+        if finished?.shoo == true { announce(.shooed) }
     }
 
     /// `snap` — прерванное перемещение к терминалу или обратно сразу довести до цели

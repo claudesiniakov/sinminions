@@ -64,6 +64,7 @@ private struct GeneralSettings: View {
                 Toggle("Подлетает к курсору (в составе перелётов)", isOn: $prefs.chaseEnabled)
                     .disabled(!prefs.wanderEnabled)
                 Toggle("Пугается быстрого курсора", isOn: $prefs.scareEnabled)
+                Toggle("Отлетает в сторону, если щёлкнуть правой кнопкой", isOn: $prefs.shooEnabled)
                 Toggle("Играет в прятки: тает и выскакивает с «бу!»", isOn: $prefs.hideSeekEnabled)
                 Toggle("Танцует, когда подключили зарядку", isOn: $prefs.celebrateEnabled)
                 Picker("Частота перелётов и телепортов", selection: $prefs.wanderFrequency) {

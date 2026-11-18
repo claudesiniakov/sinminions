@@ -76,6 +76,7 @@ final class CompanionView: NSView {
 
     var onClick: () -> Void = {}
     var onDoubleClick: () -> Void = {}
+    var onShoo: () -> Void = {}
     var onDragBegan: () -> Void = {}
     var onDragMoved: (CGPoint) -> Void = { _ in }
     var onDragEnded: () -> Void = {}
@@ -344,6 +345,12 @@ final class CompanionView: NSView {
         downMouse = NSEvent.mouseLocation
         downOrigin = window?.frame.origin ?? .zero
         isDragging = false
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        pendingClick?.cancel()
+        pendingClick = nil
+        onShoo()
     }
 
     override func mouseDragged(with event: NSEvent) {
