@@ -313,6 +313,8 @@ final class ConsoleModel {
     var llmModelName: String?
     var llmPosition = ""
     var llmCount = 0
+    /// Настройка «Запрашивать и показывать лимиты».
+    var showLimits = true
     var llmConnections: [LLMConnectionRow] = []
     let limits = LimitsStore()
     /// Окна разблокированы: их можно двигать и менять их размер.
@@ -573,6 +575,22 @@ private struct ShellScreen: View {
                 .onChange(of: model.shellLog.count) { proxy.scrollTo("end", anchor: .bottom) }
             }
             Rectangle().fill(Term.dark).frame(height: 1)
+            // Подсказки команд по вводу: Tab дописывает, щелчок подставляет.
+            let hints = SlashParser.hints(for: model.shellInput)
+            if !hints.isEmpty {
+                VStack(alignment: .leading, spacing: 1) {
+                    ForEach(hints.prefix(6), id: \.name) { hint in
+                        HStack(spacing: 8) {
+                            Text(hint.name)
+                            Text(hint.summary).foregroundStyle(Term.dim)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture { model.shellInput = hint.name; model.focusTick += 1 }
+                    }
+                }
+                .font(Term.small)
+                .foregroundStyle(Term.green)
+            }
             HStack(spacing: 6) {
                 Text(">")
                 TextField("", text: $model.shellInput)
@@ -582,6 +600,11 @@ private struct ShellScreen: View {
                     // Стрелки выбирают пункт меню, а не двигают курсор в строке.
                     .onKeyPress(.upArrow) { model.move(-1); return .handled }
                     .onKeyPress(.downArrow) { model.move(1); return .handled }
+                    .onKeyPress(.tab) {
+                        guard let done = SlashParser.completion(for: model.shellInput) else { return .handled }
+                        model.shellInput = done
+                        return .handled
+                    }
                     // «+» и «−» в пустой строке переключают подключение к нейросети.
                     .onKeyPress(characters: CharacterSet(charactersIn: "+-=")) { press in
                         guard model.shellInput.isEmpty else { return .ignored }
@@ -591,7 +614,7 @@ private struct ShellScreen: View {
             }
             .font(Term.small)
             .foregroundStyle(Term.green)
-            Text("↑↓ ВЫБОР · ENTER · /HELP · ESC ВЫХОД")
+            Text("↑↓ ВЫБОР · TAB ДОПИСАТЬ · /HELP · ESC ВЫХОД")
                 .font(Term.small)
                 .foregroundStyle(Term.dim)
         }
@@ -940,8 +963,10 @@ struct MonitorView: View {
                 line("СЕТЬ ↑", MetricFormat.rate(s.netUp))
                 line("НАГРЕВ", thermal)
                 line("В РАБОТЕ", MetricFormat.uptime(s.uptime))
-                Rectangle().fill(Term.dark).frame(height: 1)
-                limitsBlock
+                if model.showLimits {
+                    Rectangle().fill(Term.dark).frame(height: 1)
+                    limitsBlock
+                }
             }
             .font(Term.small)
             .foregroundStyle(Term.green)

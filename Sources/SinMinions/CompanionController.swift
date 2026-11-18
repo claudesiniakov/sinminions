@@ -215,6 +215,8 @@ final class CompanionController: NSObject {
     }
 
     private func refreshLimits() {
+        console.model.showLimits = prefs.showLimits
+        guard prefs.showLimits else { return }
         console.model.limits.refresh(prefs.connections.items)
     }
 

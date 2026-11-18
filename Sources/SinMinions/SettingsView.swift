@@ -89,7 +89,6 @@ private struct GeneralSettings: View {
             }
 
             Section("Spotlight") {
-                Toggle("Двойной щелчок открывает Spotlight", isOn: $prefs.spotlightEnabled)
                 LabeledContent("Универсальный доступ") {
                     if hasAccess {
                         Text("разрешён").foregroundStyle(.secondary)
@@ -185,13 +184,14 @@ private struct LLMSettings: View {
                     row(connection, index: index)
                 }
                 Button("Добавить подключение…") { editing = .new }
-                    .disabled(prefs.connections.isFull)
             } header: {
-                Text("Подключения (\(prefs.connections.items.count) из \(LLMConnections.limit))")
+                Text("Подключения (\(prefs.connections.items.count))")
+            }
+
+            Section {
+                Toggle("Запрашивать и показывать лимиты", isOn: $prefs.showLimits)
             } footer: {
-                if prefs.connections.isFull {
-                    Text("Достигнут предел: \(LLMConnections.limit) подключений. Удалите ненужное, чтобы добавить новое.")
-                }
+                Text("Блок «Лимиты» на мониторе призрака. Если выключено, остатки не запрашиваются и блок скрыт.")
             }
 
             Section {
@@ -427,9 +427,8 @@ private struct ConnectionEditor: View {
         }
         if existing != nil {
             prefs.connections.update(connection)
-        } else if !prefs.connections.add(connection) {
-            error = "Достигнут предел: \(LLMConnections.limit) подключений."
-            return
+        } else {
+            prefs.connections.add(connection)
         }
         close()
     }

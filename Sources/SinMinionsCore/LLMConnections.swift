@@ -70,15 +70,13 @@ public struct LLMConnection: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
-/// Список подключений (не больше десяти) и выбранное из них — «интеллект» компаньона.
+/// Список подключений (без ограничения по числу) и выбранное из них — «интеллект» компаньона.
 public struct LLMConnections: Codable, Equatable, Sendable {
-    public static let limit = 10
-
     public private(set) var items: [LLMConnection]
     public private(set) var activeID: UUID?
 
     public init(items: [LLMConnection] = [], activeID: UUID? = nil) {
-        self.items = Array(items.prefix(Self.limit))
+        self.items = items
         self.activeID = activeID
         normalize()
     }
@@ -94,15 +92,9 @@ public struct LLMConnections: Codable, Equatable, Sendable {
         return index + 1
     }
 
-    public var isFull: Bool { items.count >= Self.limit }
-
-    /// false — список уже полон.
-    @discardableResult
-    public mutating func add(_ connection: LLMConnection) -> Bool {
-        guard !isFull else { return false }
+    public mutating func add(_ connection: LLMConnection) {
         items.append(connection)
         if activeID == nil { activeID = connection.id }
-        return true
     }
 
     public mutating func update(_ connection: LLMConnection) {

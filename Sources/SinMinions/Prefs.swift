@@ -70,7 +70,7 @@ final class Prefs {
     var talkEnabled: Bool { didSet { store(talkEnabled, "talkEnabled") } }
     var talkFrequency: Frequency { didSet { store(talkFrequency.rawValue, "talkFrequency") } }
     var sleepMinutes: Int { didSet { store(sleepMinutes, "sleepMinutes") } }
-    var spotlightEnabled: Bool { didSet { store(spotlightEnabled, "spotlightEnabled") } }
+    var showLimits: Bool { didSet { store(showLimits, "showLimits") } }
     var hideInFullScreen: Bool { didSet { store(hideInFullScreen, "hideInFullScreen") } }
 
     /// Вызывается после любого изменения.
@@ -96,7 +96,7 @@ final class Prefs {
         talkFrequency = Frequency(rawValue: d.string(forKey: "talkFrequency") ?? "") ?? .normal
         let savedSleep = d.object(forKey: "sleepMinutes") as? Int ?? 5
         sleepMinutes = Self.sleepOptions.contains(savedSleep) ? savedSleep : 5
-        spotlightEnabled = d.object(forKey: "spotlightEnabled") as? Bool ?? true
+        showLimits = d.object(forKey: "showLimits") as? Bool ?? true
         hideInFullScreen = d.object(forKey: "hideInFullScreen") as? Bool ?? true
     }
 
@@ -172,7 +172,6 @@ final class Prefs {
         config.talkInterval = talkFrequency.talkInterval
         config.sleepAfter = sleepMinutes > 0 ? Double(sleepMinutes) * 60 : nil
         config.sleepsAlways = alwaysAsleep
-        config.spotlightEnabled = spotlightEnabled
         config.consoleEnabled = mode == .medium
         return config
     }

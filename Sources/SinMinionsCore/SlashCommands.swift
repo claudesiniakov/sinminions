@@ -41,6 +41,49 @@ public enum SlashParser {
         return .unknown(word)
     }
 
+    /// Краткие описания для подсказок при вводе.
+    static let summaries: [SlashCommand: String] = [
+        .help: "справка по командам", .nap: "усыпить на час", .hide: "скрыть призрака",
+        .corner: "вернуть в угол", .unlock: "разблокировать окна", .lock: "заблокировать окна",
+        .resetLayout: "сбросить раскладку", .settings: "открыть настройки", .clear: "очистить чат",
+        .next: "следующее подключение", .previous: "предыдущее подключение", .special: "S.P.E.C.I.A.L.",
+    ]
+
+    public struct Hint: Equatable, Sendable {
+        public let name: String
+        public let summary: String
+    }
+
+    /// Подсказки по началу ввода: команды, чьё название начинается с введённого. Название берётся в той же
+    /// раскладке, что набрана (русское, если ввод начат по-русски). Пустой результат — не команда или нет совпадений.
+    public static func hints(for input: String) -> [Hint] {
+        let text = input.trimmingCharacters(in: .whitespaces).lowercased()
+        guard text.hasPrefix("/"), !text.contains(" ") else { return [] }
+        var result: [Hint] = []
+        for command in SlashCommand.allCases {
+            guard let variants = names[command] else { continue }
+            let matching = variants.filter { $0.hasPrefix(text) && $0 != "/?" }
+            guard let name = matching.first else { continue }
+            if !result.contains(where: { $0.name == name }) {
+                result.append(Hint(name: name, summary: summaries[command] ?? ""))
+            }
+        }
+        return result
+    }
+
+    /// Дописывает ввод по Tab: единственная подсказка — целиком, несколько — общее начало. nil — нечего дописывать.
+    public static func completion(for input: String) -> String? {
+        let found = hints(for: input)
+        guard let first = found.first else { return nil }
+        var prefix = first.name
+        for hint in found.dropFirst() {
+            while !hint.name.hasPrefix(prefix) { prefix.removeLast() }
+        }
+        let typed = input.trimmingCharacters(in: .whitespaces).lowercased()
+        if found.count == 1 { return first.name == typed ? nil : first.name }
+        return prefix.count > typed.count ? prefix : nil
+    }
+
     /// Справка для строки «/help»: по строке на команду и подсказка про русские названия.
     public static let helpLines: [String] = [
         "/help — ЭТА СПРАВКА",

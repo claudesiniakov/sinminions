@@ -465,6 +465,26 @@ final class SpecialStatsTests: XCTestCase {
         XCTAssertEqual(engine.tick(now: 20, idleSeconds: 0.5), [.wakeUp])
     }
 
+    func testSlashHints() {
+        XCTAssertEqual(SlashParser.hints(for: "/").count, SlashCommand.allCases.count)
+        XCTAssertTrue(SlashParser.hints(for: "привет").isEmpty)
+        XCTAssertTrue(SlashParser.hints(for: "/zzz").isEmpty)
+        XCTAssertEqual(SlashParser.hints(for: "/he").map(\.name), ["/help"])
+        XCTAssertEqual(SlashParser.hints(for: "/СП").map(\.name), ["/спать"])
+        XCTAssertEqual(SlashParser.hints(for: "/сон").map(\.name), ["/сон"])
+        XCTAssertTrue(SlashParser.hints(for: "/help лишнее").isEmpty, "после пробела подсказок нет")
+    }
+
+    func testSlashCompletion() {
+        XCTAssertEqual(SlashParser.completion(for: "/he"), "/help")
+        XCTAssertNil(SlashParser.completion(for: "/help"), "уже полностью")
+        XCTAssertNil(SlashParser.completion(for: "привет"))
+        // Несколько совпадений: дописывается общее начало (/s — sleep, settings, special: общего больше нет).
+        XCTAssertNil(SlashParser.completion(for: "/s"))
+        XCTAssertEqual(SlashParser.completion(for: "/se"), "/settings")
+        XCTAssertEqual(SlashParser.completion(for: "/sl"), "/sleep")
+    }
+
     func testSpecialSlashCommand() {
         XCTAssertEqual(SlashParser.parse("/special"), .command(.special))
         XCTAssertEqual(SlashParser.parse("/статы"), .command(.special))
@@ -860,12 +880,12 @@ final class LLMConnectionsTests: XCTestCase {
         return list
     }
 
-    func testLimitIsTen() {
+    func testNoLimitOnConnections() {
         var list = make(10)
-        XCTAssertEqual(list.items.count, 10)
-        XCTAssertTrue(list.isFull)
-        XCTAssertFalse(list.add(LLMConnection(name: "лишнее")))
-        XCTAssertEqual(list.items.count, 10)
+        list.add(LLMConnection(name: "одиннадцатое"))
+        XCTAssertEqual(list.items.count, 11)
+        let many = LLMConnections(items: (1...25).map { LLMConnection(name: "№\($0)") })
+        XCTAssertEqual(many.items.count, 25)
     }
 
     func testFirstAddedBecomesActive() {
