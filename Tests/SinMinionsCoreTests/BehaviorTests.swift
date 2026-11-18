@@ -299,6 +299,108 @@ final class MoreProvidersTests: XCTestCase {
     }
 }
 
+final class PortalAndNewBehaviorsTests: XCTestCase {
+    private let area = CGRect(x: 0, y: 0, width: 1000, height: 800)
+    private let portal = CGSize(width: 54, height: 105)
+
+    func testPortalStandsBesideTheGhostNotOnIt() {
+        let ghost = CGRect(x: 400, y: 300, width: 72, height: 84)
+        let right = Layout.portalCenter(beside: ghost, portal: portal, preferring: 1, in: area)
+        XCTAssertEqual(right, CGPoint(x: 513, y: 342))
+        let left = Layout.portalCenter(beside: ghost, portal: portal, preferring: -1, in: area)
+        XCTAssertEqual(left, CGPoint(x: 359, y: 342))
+        for center in [right, left] {
+            let rect = CGRect(x: center.x - 27, y: center.y - 52.5, width: 54, height: 105)
+            XCTAssertFalse(Layout.overlaps(rect, ghost, gap: 10))
+        }
+    }
+
+    func testPortalFlipsSideNearTheEdgeAndFallsBackBelow() {
+        let nearRight = CGRect(x: 920, y: 300, width: 72, height: 84)
+        let flipped = Layout.portalCenter(beside: nearRight, portal: portal, preferring: 1, in: area)
+        XCTAssertLessThan(flipped.x, nearRight.minX, "справа места нет — портал слева")
+        // Узкая область: ни справа, ни слева — под призраком.
+        let narrow = CGRect(x: 380, y: 0, width: 110, height: 800)
+        let ghost = CGRect(x: 400, y: 300, width: 72, height: 84)
+        let below = Layout.portalCenter(beside: ghost, portal: portal, preferring: 1, in: narrow)
+        XCTAssertEqual(below.x, ghost.midX)
+        XCTAssertLessThan(below.y + 52.5, ghost.minY, "портал под призраком, а не на нём")
+    }
+
+    func testHideAndSeekCycle() {
+        var config = BehaviorConfig()
+        config.hideSeekEnabled = true
+        config.wanderEnabled = false
+        config.sleepAfter = nil
+        config.talkEnabled = false
+        var engine = BehaviorEngine(config: config, now: 0, random: { $0.lowerBound })
+        XCTAssertEqual(engine.tick(now: 239, idleSeconds: 1), [])
+        XCTAssertEqual(engine.tick(now: 240, idleSeconds: 1), [.fadeOut])
+        XCTAssertEqual(engine.mode, .hiding)
+        // Прячется 15 секунд (нижняя граница), потом выскакивает с «бу!».
+        XCTAssertEqual(engine.tick(now: 254, idleSeconds: 1), [])
+        XCTAssertEqual(engine.tick(now: 255, idleSeconds: 1), [.fadeIn, .say(.boo)])
+        XCTAssertEqual(engine.mode, .talking)
+    }
+
+    func testRevealWhenTheCursorComesClose() {
+        var config = BehaviorConfig()
+        config.hideSeekEnabled = true
+        config.wanderEnabled = false
+        config.sleepAfter = nil
+        config.talkEnabled = false
+        var engine = BehaviorEngine(config: config, now: 0, random: { $0.lowerBound })
+        XCTAssertEqual(engine.handle(.reveal, now: 5), [], "когда не прячется — ничего")
+        _ = engine.tick(now: 240, idleSeconds: 1)
+        XCTAssertEqual(engine.handle(.reveal, now: 245), [.fadeIn, .shake, .say(.boo)])
+        XCTAssertEqual(engine.mode, .reacting)
+    }
+
+    func testHidingIsInterruptedByDragClickAndSuspend() {
+        var config = BehaviorConfig()
+        config.hideSeekEnabled = true
+        config.wanderEnabled = false
+        config.sleepAfter = nil
+        config.talkEnabled = false
+        func hiding() -> BehaviorEngine {
+            var engine = BehaviorEngine(config: config, now: 0, random: { $0.lowerBound })
+            _ = engine.tick(now: 240, idleSeconds: 1)
+            return engine
+        }
+        var drag = hiding()
+        XCTAssertEqual(drag.handle(.dragBegan, now: 241), [.fadeIn])
+        var click = hiding()
+        XCTAssertEqual(click.handle(.click, now: 241), [.fadeIn, .hop, .say(.click)])
+        var suspended = hiding()
+        XCTAssertEqual(suspended.handle(.suspended, now: 241), [.fadeIn])
+        XCTAssertEqual(suspended.mode, .idle)
+    }
+
+    func testCelebrateOnlyWhenEnabledAndFree() {
+        var config = BehaviorConfig()
+        config.celebrateEnabled = true
+        config.sleepAfter = nil
+        var engine = BehaviorEngine(config: config, now: 0, random: { $0.lowerBound })
+        XCTAssertEqual(engine.handle(.celebrate(.charging), now: 1), [.spin, .say(.charging)])
+        XCTAssertEqual(engine.mode, .reacting)
+        // Занят (реакция идёт) — не танцует поверх.
+        XCTAssertEqual(engine.handle(.celebrate(.charging), now: 2), [])
+
+        var disabled = BehaviorEngine(config: BehaviorConfig(), now: 0, random: { $0.lowerBound })
+        XCTAssertEqual(disabled.handle(.celebrate(.charging), now: 1), [])
+
+        var sleeping = BehaviorEngine(config: config, now: 0, random: { $0.lowerBound })
+        _ = sleeping.handle(.nap(100), now: 1)
+        XCTAssertEqual(sleeping.handle(.celebrate(.charging), now: 2), [])
+    }
+
+    func testNewDefaultsAreOffInCore() {
+        XCTAssertFalse(BehaviorConfig().hideSeekEnabled)
+        XCTAssertFalse(BehaviorConfig().celebrateEnabled)
+        XCTAssertFalse(PhraseBook.pool(.boo, hour: 12).isEmpty)
+    }
+}
+
 final class SlashCommandTests: XCTestCase {
     func testParsesLatinAndRussianNames() {
         XCTAssertEqual(SlashParser.parse("/help"), .command(.help))

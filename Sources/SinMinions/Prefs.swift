@@ -62,6 +62,8 @@ final class Prefs {
     var teleportEnabled: Bool { didSet { store(teleportEnabled, "teleportEnabled") } }
     var scareEnabled: Bool { didSet { store(scareEnabled, "scareEnabled") } }
     var chaseEnabled: Bool { didSet { store(chaseEnabled, "chaseEnabled") } }
+    var hideSeekEnabled: Bool { didSet { store(hideSeekEnabled, "hideSeekEnabled") } }
+    var celebrateEnabled: Bool { didSet { store(celebrateEnabled, "celebrateEnabled") } }
     var wanderFrequency: Frequency { didSet { store(wanderFrequency.rawValue, "wanderFrequency") } }
     var talkEnabled: Bool { didSet { store(talkEnabled, "talkEnabled") } }
     var talkFrequency: Frequency { didSet { store(talkFrequency.rawValue, "talkFrequency") } }
@@ -83,6 +85,8 @@ final class Prefs {
         teleportEnabled = d.object(forKey: "teleportEnabled") as? Bool ?? true
         scareEnabled = d.object(forKey: "scareEnabled") as? Bool ?? true
         chaseEnabled = d.object(forKey: "chaseEnabled") as? Bool ?? true
+        hideSeekEnabled = d.object(forKey: "hideSeekEnabled") as? Bool ?? true
+        celebrateEnabled = d.object(forKey: "celebrateEnabled") as? Bool ?? true
         wanderFrequency = Frequency(rawValue: d.string(forKey: "wanderFrequency") ?? "") ?? .normal
         talkEnabled = d.object(forKey: "talkEnabled") as? Bool ?? true
         talkFrequency = Frequency(rawValue: d.string(forKey: "talkFrequency") ?? "") ?? .normal
@@ -123,6 +127,8 @@ final class Prefs {
         config.teleportInterval = wanderFrequency.wanderInterval
         config.scareEnabled = scareEnabled
         config.chaseEnabled = chaseEnabled
+        config.hideSeekEnabled = hideSeekEnabled
+        config.celebrateEnabled = celebrateEnabled
         config.talkEnabled = talkEnabled
         config.talkInterval = talkFrequency.talkInterval
         config.sleepAfter = sleepMinutes > 0 ? Double(sleepMinutes) * 60 : nil

@@ -95,6 +95,30 @@ public enum Layout {
         )
     }
 
+    /// Центр портала рядом с призраком: сбоку (со стороны `side`: +1 справа, −1 слева), а если не помещается —
+    /// с другой стороны, под призраком или над ним. Портал никогда не накрывает призрака.
+    public static func portalCenter(
+        beside ghost: CGRect, portal: CGSize, preferring side: CGFloat, in area: CGRect,
+        gap: CGFloat = 14, margin: CGFloat = 8
+    ) -> CGPoint {
+        let inner = area.insetBy(dx: margin, dy: margin)
+        func rect(_ center: CGPoint) -> CGRect {
+            CGRect(x: center.x - portal.width / 2, y: center.y - portal.height / 2, width: portal.width, height: portal.height)
+        }
+        let preferred: CGFloat = side >= 0 ? 1 : -1
+        let dx = ghost.width / 2 + gap + portal.width / 2
+        let candidates = [
+            CGPoint(x: ghost.midX + preferred * dx, y: ghost.midY),
+            CGPoint(x: ghost.midX - preferred * dx, y: ghost.midY),
+            CGPoint(x: ghost.midX, y: ghost.minY - gap - portal.height / 2),
+            CGPoint(x: ghost.midX, y: ghost.maxY + gap + portal.height / 2),
+        ]
+        for center in candidates where inner.contains(rect(center)) && !overlaps(rect(center), ghost) {
+            return center
+        }
+        return candidates[0]
+    }
+
     /// Ближе ли два прямоугольника друг к другу, чем на `gap`. Расстояние ровно `gap` допустимо.
     public static func overlaps(_ a: CGRect, _ b: CGRect, gap: CGFloat = 0) -> Bool {
         a.minX < b.maxX + gap && a.maxX > b.minX - gap && a.minY < b.maxY + gap && a.maxY > b.minY - gap

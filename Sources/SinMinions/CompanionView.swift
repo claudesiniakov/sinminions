@@ -239,6 +239,28 @@ final class CompanionView: NSView {
         body.add(flash, forKey: "flash")
     }
 
+    /// Танец: оборот вокруг оси с подскоком и вспышкой свечения.
+    func spin() {
+        let degree = CGFloat.pi / 180
+        let rotation = CABasicAnimation(keyPath: "transform.rotation.z")
+        rotation.fromValue = 0
+        rotation.toValue = 360 * degree
+        let jump = CAKeyframeAnimation(keyPath: "transform.translation.y")
+        jump.values = [0, 18 * scale, 0]
+        jump.keyTimes = [0, 0.5, 1]
+        for animation in [rotation, jump] {
+            animation.duration = 0.7
+            animation.isAdditive = true
+            animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        }
+        moth.add(rotation, forKey: "spinRotation")
+        moth.add(jump, forKey: "spinJump")
+        let flash = CAKeyframeAnimation(keyPath: "shadowOpacity")
+        flash.values = [0.8, 1, 0.8]
+        flash.duration = 0.7
+        body.add(flash, forKey: "spinFlash")
+    }
+
     /// Испуг: быстрая дрожь с наклоном и вспышкой свечения.
     func shake() {
         let degree = CGFloat.pi / 180

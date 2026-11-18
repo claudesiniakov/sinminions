@@ -245,11 +245,13 @@ final class CompanionController: NSObject {
         return !Task.isCancelled && token == teleportToken
     }
 
-    /// Синий портал открывается под призраком, он втягивается и выходит из оранжевого в другой точке.
+    /// Синий портал открывается рядом с призраком (сбоку, а если там нет места — под ним), призрак втягивается
+    /// в него и выходит из оранжевого, тоже стоящего рядом с новым местом. Порталы не рисуются на самом призраке.
     private func startTeleport() {
         teleportToken += 1
         let token = teleportToken
         let moth = view.mothFrame
+        let area = area
         let from = panel.frame.origin
         let target = Layout.randomTarget(size: panel.frame.size, in: area, from: from, minDistance: 240)
 
@@ -276,26 +278,37 @@ final class CompanionController: NSObject {
         }
 
         let portalSize = CGSize(width: moth.width * 0.75, height: moth.height * 1.25)
-        let source = CGPoint(x: from.x + moth.midX, y: from.y + moth.midY)
-        let destination = CGPoint(x: target.x + moth.midX, y: target.y + moth.midY)
+        let direction: CGFloat = target.x >= from.x ? 1 : -1
+        // Портал А — рядом с призраком, со стороны, куда он полетит. Портал Б — рядом с новым местом, с противоположной
+        // стороны: призрак выходит из него и отлетает вперёд.
+        let centerA = Layout.portalCenter(beside: moth.offsetBy(dx: from.x, dy: from.y), portal: portalSize, preferring: direction, in: area)
+        let centerB = Layout.portalCenter(beside: moth.offsetBy(dx: target.x, dy: target.y), portal: portalSize, preferring: -direction, in: area)
+        func origin(forGhostCenter center: CGPoint) -> CGPoint {
+            CGPoint(x: center.x - moth.midX, y: center.y - moth.midY)
+        }
         let hold = demo ? 4.0 : 0.0
         teleportTask = Task { @MainActor [weak self] in
             guard let self else { return }
             self.bubble.hide()
-            self.portalA.open(center: source, size: portalSize, duration: 0.3)
+            self.portalA.open(center: centerA, size: portalSize, duration: 0.3)
             guard await self.pause(0.3, token: token) else { return }
-            self.view.vanish(duration: 0.3)
-            guard await self.pause(0.3, token: token) else { return }
+            // Призрак втягивается в портал А: летит к нему, сжимаясь и кружась.
+            self.view.vanish(duration: 0.35)
+            self.glide(to: origin(forGhostCenter: centerA), duration: 0.35)
+            guard await self.pause(0.4, token: token) else { return }
+            if !self.demo { self.portalA.close(duration: 0.25) }
             self.panel.alphaValue = 0
-            self.panel.setFrameOrigin(target)
-            self.portalB.open(center: destination, size: portalSize, duration: 0.3)
+            self.panel.setFrameOrigin(origin(forGhostCenter: centerB))
+            self.portalB.open(center: centerB, size: portalSize, duration: 0.3)
             guard await self.pause(0.3, token: token) else { return }
+            // Выходит из портала Б и отлетает на своё новое место рядом с ним.
             self.panel.alphaValue = 1
-            self.view.appear(duration: 0.3)
-            guard await self.pause(0.3 + (self.demo ? 1.0 : 0.0), token: token) else { return }
+            self.view.appear(duration: 0.4)
+            self.glide(to: target, duration: 0.45)
+            guard await self.pause(0.5 + (self.demo ? 1.0 : 0.0), token: token) else { return }
             if self.demo { self.captureDemoShot() }
             guard await self.pause(hold, token: token) else { return }
-            self.portalA.close(duration: 0.3)
+            self.portalA.close(duration: 0.25)
             self.portalB.close(duration: 0.3)
             guard await self.pause(0.3, token: token) else { return }
             self.finishTeleport()
@@ -321,6 +334,7 @@ final class CompanionController: NSObject {
         teleportToken += 1
         teleportTask?.cancel()
         teleportTask = nil
+        stopFlight(snap: false)
         portalA.hide()
         portalB.hide()
         view.clearPortalEffect()
@@ -585,6 +599,11 @@ final class CompanionController: NSObject {
                 if speed > 1500, near.contains(mouse) { apply(engine.handle(.scare, now: time)) }
             }
         }
+        // Прятки: курсор подошёл к почти невидимому призраку — он выскакивает.
+        if engine.mode == .hiding, !view.isDragging {
+            let near = view.mothFrame.offsetBy(dx: panel.frame.minX, dy: panel.frame.minY).insetBy(dx: -90, dy: -90)
+            if near.contains(mouse) { apply(engine.handle(.reveal, now: time)) }
+        }
         lastMouse = mouse
         lastMouseTime = time
         if !isSleeping {
@@ -623,6 +642,17 @@ final class CompanionController: NSObject {
             case .closeConsole: closeConsole(returnHome: !view.isDragging)
             case .startTeleport: startTeleport()
             case .shake: view.shake()
+            case .spin: view.spin()
+            case .fadeOut:
+                NSAnimationContext.beginGrouping()
+                NSAnimationContext.current.duration = 0.6
+                panel.animator().alphaValue = 0.1
+                NSAnimationContext.endGrouping()
+            case .fadeIn:
+                NSAnimationContext.beginGrouping()
+                NSAnimationContext.current.duration = 0.3
+                panel.animator().alphaValue = 1
+                NSAnimationContext.endGrouping()
             case .startChase: startChase()
             case .stopTeleport: stopTeleport()
             }
@@ -761,7 +791,9 @@ final class CompanionController: NSObject {
         defer { power = fresh }
         guard let old = power, let fresh else { return }
         if fresh.onAC, !old.onAC {
-            announce(.charging)
+            // Радуется, если танец включён; иначе просто говорит.
+            let effects = engine.handle(.celebrate(.charging), now: now)
+            if effects.isEmpty { announce(.charging) } else { apply(effects) }
         } else if !fresh.onAC, fresh.percent < 20, old.percent >= 20 {
             announce(.lowBattery)
         }
