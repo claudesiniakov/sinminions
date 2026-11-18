@@ -1,5 +1,6 @@
 import AppKit
 import IOKit.ps
+import IOKit.pwr_mgt
 import SinMinionsCore
 
 /// Связывает автомат поведения с окном персонажа, пузырём, таймерами и событиями системы.
@@ -75,7 +76,7 @@ final class CompanionController: NSObject {
             config: prefs.behaviorConfig(lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled),
             now: Date().timeIntervalSinceReferenceDate
         )
-        let view = CompanionView(scale: prefs.scale, style: prefs.ghostStyle)
+        let view = CompanionView(scale: prefs.scale, style: prefs.ghostStyle, coffee: prefs.coffee)
         self.view = view
         panel = NSPanel(
             contentRect: CGRect(origin: .zero, size: view.frame.size),
@@ -175,11 +176,12 @@ final class CompanionController: NSObject {
         let scales = Prefs.scales
         let scaleText = prefs.scale == 1.5 ? "1,5×" : "\(Int(prefs.scale))×"
         console.model.ghostStyle = prefs.ghostStyle
+        console.model.coffee = prefs.coffee
         console.model.special = SpecialState(
             scaleLevel: scales.firstIndex(of: prefs.scale) ?? 1,
             scaleLabel: "РАЗМЕР " + scaleText,
-            perceptionLevel: prefs.ghostStyle.rawValue,
-            perceptionLabel: "ОБЛИК: " + prefs.ghostStyle.title,
+            perceptionLevel: Perception.level(style: prefs.ghostStyle, coffee: prefs.coffee),
+            perceptionLabel: Perception.title(style: prefs.ghostStyle, coffee: prefs.coffee),
             agilityLevel: prefs.agility,
             agilityLabel: "СКОРОСТЬ ПОЛЁТА: " + Agility.title(level: prefs.agility),
             enduranceLevel: prefs.endurance,
@@ -201,7 +203,12 @@ final class CompanionController: NSObject {
         case .agility:
             prefs.agility = Agility.clamp(prefs.agility + delta)
         case .perception:
-            prefs.ghostStyleLevel = GhostStyle.clamp(prefs.ghostStyleLevel + delta).rawValue
+            let next = Perception.apply(
+                level: Perception.level(style: prefs.ghostStyle, coffee: prefs.coffee) + delta,
+                current: prefs.ghostStyle
+            )
+            prefs.ghostStyleLevel = next.style.rawValue
+            prefs.coffee = next.coffee
         case .charisma:
             prefs.charisma = Charisma.clamp(prefs.charisma + delta)
         case .endurance:
@@ -216,6 +223,23 @@ final class CompanionController: NSObject {
             break
         }
         refreshSpecial()
+    }
+
+    private var caffeineAssertions: [IOPMAssertionID] = []
+
+    /// Режим «кофе»: пока он включён, система и экран не засыпают от бездействия.
+    private func updateCaffeine() {
+        if prefs.coffee, caffeineAssertions.isEmpty {
+            for type in [kIOPMAssertionTypePreventUserIdleSystemSleep, kIOPMAssertionTypePreventUserIdleDisplaySleep] {
+                var id = IOPMAssertionID(0)
+                let result = IOPMAssertionCreateWithName(type as CFString, IOPMAssertionLevel(kIOPMAssertionLevelOn),
+                                                         "SinMinions: кофе" as CFString, &id)
+                if result == kIOReturnSuccess { caffeineAssertions.append(id) }
+            }
+        } else if !prefs.coffee, !caffeineAssertions.isEmpty {
+            caffeineAssertions.forEach { IOPMAssertionRelease($0) }
+            caffeineAssertions = []
+        }
     }
 
     private func refreshLimits() {
@@ -242,7 +266,8 @@ final class CompanionController: NSObject {
         refreshLLM()
         refreshSpecial()
         if console.isOpen { refreshLimits() }
-        if view.scale != CGFloat(prefs.scale) || view.style != prefs.ghostStyle { rebuildView() }
+        updateCaffeine()
+        if view.scale != CGFloat(prefs.scale) || view.style != prefs.ghostStyle || view.coffee != prefs.coffee { rebuildView() }
         applyCollectionBehavior()
         engine.reconfigure(prefs.behaviorConfig(lowPower: lowPower), now: now)
     }
@@ -523,7 +548,9 @@ final class CompanionController: NSObject {
 
     /// Для снимков в CI: смена облика призрака.
     func setGhostStyleForDemo(_ level: Int) {
-        prefs.ghostStyleLevel = GhostStyle.clamp(level).rawValue
+        let next = Perception.apply(level: level, current: prefs.ghostStyle)
+        prefs.ghostStyleLevel = next.style.rawValue
+        prefs.coffee = next.coffee
         prefsChanged()
     }
 
@@ -570,7 +597,7 @@ final class CompanionController: NSObject {
     private func rebuildView() {
         let wasSleeping = isSleeping
         let old = panel.frame
-        view = CompanionView(scale: prefs.scale, style: prefs.ghostStyle)
+        view = CompanionView(scale: prefs.scale, style: prefs.ghostStyle, coffee: prefs.coffee)
         wire(view)
         // Низ и середина по горизонтали остаются на месте.
         let size = view.frame.size

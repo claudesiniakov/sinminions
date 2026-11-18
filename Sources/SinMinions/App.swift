@@ -123,10 +123,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             demoMark("unlock")
             await wait(4)
             // Все облики призрака: снимок на каждый (окна терминала и монитора остаются открытыми).
-            for level in 1...4 {
+            for level in 1...5 {
                 controller.setGhostStyleForDemo(level)
                 await wait(2.5)
-                demoMark("style\(level)")
+                demoMark(level == 5 ? "coffee" : "style\(level)")
                 await wait(3)
             }
             controller.setGhostStyleForDemo(0)

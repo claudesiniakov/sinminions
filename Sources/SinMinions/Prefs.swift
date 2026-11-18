@@ -66,6 +66,8 @@ final class Prefs {
     /// Облик призрака (P в S.P.E.C.I.A.L.): номер стиля отрисовки.
     var ghostStyleLevel: Int { didSet { store(ghostStyleLevel, "ghostStyle") } }
     var ghostStyle: GhostStyle { GhostStyle.clamp(ghostStyleLevel) }
+    /// Режим «кофе» (уровень P): ноутбук не засыпает. После перезапуска выключен, чтобы не разряжать батарею втихую.
+    var coffee = false { didSet { onChange() } }
     var alwaysAsleep: Bool { didSet { store(alwaysAsleep, "alwaysAsleep") } }
     var hideSeekEnabled: Bool { didSet { store(hideSeekEnabled, "hideSeekEnabled") } }
     var shooEnabled: Bool { didSet { store(shooEnabled, "shooEnabled") } }

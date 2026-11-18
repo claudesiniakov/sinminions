@@ -307,6 +307,7 @@ final class ConsoleModel {
     var showLimits = true
     /// Облик призрака в мониторе.
     var ghostStyle: GhostStyle = .classic
+    var coffee = false
     /// Выбранная буква S.P.E.C.I.A.L. в мониторе: её уровень меняют большие «−» и «+».
     var selectedStat: SpecialStat = .intelligence
     var llmConnections: [LLMConnectionRow] = []
@@ -698,18 +699,21 @@ private struct ChatScreen: View {
 /// Призрак Moth для монитора: тот же контур, что и у персонажа на экране.
 private struct GhostFigure: NSViewRepresentable {
     let style: GhostStyle
+    let coffee: Bool
 
-    func makeNSView(context: Context) -> GhostFigureHost { GhostFigureHost(style: style) }
+    func makeNSView(context: Context) -> GhostFigureHost { GhostFigureHost(style: style, coffee: coffee) }
 
-    func updateNSView(_ view: GhostFigureHost, context: Context) { view.show(style) }
+    func updateNSView(_ view: GhostFigureHost, context: Context) { view.show(style, coffee: coffee) }
 }
 
 /// Призрак для монитора: те же слои, что у призрака на экране, размером 72×84.
 final class GhostFigureHost: NSView {
     private var style: GhostStyle
+    private var coffee: Bool
 
-    init(style: GhostStyle) {
+    init(style: GhostStyle, coffee: Bool) {
         self.style = style
+        self.coffee = coffee
         super.init(frame: NSRect(x: 0, y: 0, width: 72, height: 84))
         wantsLayer = true
         layer?.masksToBounds = false
@@ -721,15 +725,16 @@ final class GhostFigureHost: NSView {
 
     override var intrinsicContentSize: NSSize { NSSize(width: 72, height: 84) }
 
-    func show(_ style: GhostStyle) {
-        guard style != self.style else { return }
+    func show(_ style: GhostStyle, coffee: Bool) {
+        guard style != self.style || coffee != self.coffee else { return }
         self.style = style
+        self.coffee = coffee
         rebuild()
     }
 
     private func rebuild() {
         layer?.sublayers?.forEach { $0.removeFromSuperlayer() }
-        let art = GhostArt(style: style, scale: 1.5)
+        let art = GhostArt(style: style, scale: 1.5, coffee: coffee)
         art.root.frame = CGRect(x: 0, y: 0, width: 72, height: 84)
         art.body.shadowRadius = 6 * art.glowScale
         art.body.shadowOpacity = 0.6
@@ -759,7 +764,7 @@ struct MonitorView: View {
         let state = model.special
         switch stat {
         case .strength: return ("\(state.scaleLevel)", state.scaleLevel, Prefs.scales.count, state.scaleLabel)
-        case .perception: return ("\(state.perceptionLevel)", state.perceptionLevel, GhostStyle.levels, state.perceptionLabel)
+        case .perception: return ("\(state.perceptionLevel)", state.perceptionLevel, Perception.levels, state.perceptionLabel)
         case .endurance: return ("\(state.enduranceLevel)", state.enduranceLevel, Endurance.levels, state.enduranceLabel)
         case .charisma: return ("\(state.charismaLevel)", state.charismaLevel, Charisma.levels, state.charismaLabel)
         case .agility: return ("\(state.agilityLevel)", state.agilityLevel, Agility.levels, state.agilityLabel)
@@ -802,7 +807,7 @@ struct MonitorView: View {
         let levels = info?.levels ?? 0
         return VStack(spacing: 6) {
             specialStrip
-            GhostFigure(style: model.ghostStyle)
+            GhostFigure(style: model.ghostStyle, coffee: model.coffee)
                 .frame(width: 72, height: 84)
             Text(stat.title)
                 .foregroundStyle(Term.dim)

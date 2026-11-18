@@ -42,8 +42,11 @@ final class GhostArt {
         static let tint = CompanionView.Palette.rgb(0x0d2a08)
     }
 
-    init(style: GhostStyle, scale: CGFloat) {
+    private let coffee: Bool
+
+    init(style: GhostStyle, scale: CGFloat, coffee: Bool = false) {
         self.style = style
+        self.coffee = coffee
         self.scale = scale
         size = CGSize(width: MothShape.size.width * scale, height: MothShape.size.height * scale)
         // SVG → слой: масштаб и переворот оси y.
@@ -176,6 +179,7 @@ final class GhostArt {
 
     private func finish() {
         root.addSublayer(eyes)
+        if coffee { addCup() }
         for layer in flickerLayers {
             let flicker = CAKeyframeAnimation(keyPath: "opacity")
             flicker.values = [1, 1, 0.55, 0.95, 0.8, 1, 1]
@@ -184,6 +188,53 @@ final class GhostArt {
             flicker.repeatCount = .infinity
             layer.add(flicker, forKey: "flicker")
         }
+    }
+
+    // MARK: - Кофе
+
+    /// Чашка у нижнего правого края и пар над ней (режим «кофе»).
+    private func addCup() {
+        let cup = CALayer()
+        cup.frame = root.bounds
+        let porcelain = CompanionView.Palette.rgb(0xf3efe6)
+        let coffeeColor = CompanionView.Palette.rgb(0x5a3a22)
+        // Ручка, чашка, кофе в ней и блюдце.
+        cup.addSublayer(shape(svg { $0.addArc(center: CGPoint(x: 44.6, y: 43.6), radius: 2.6, startAngle: -.pi / 2, endAngle: .pi / 2, clockwise: false) },
+                              stroke: porcelain, width: 1.6))
+        cup.addSublayer(shape(svg { path in
+            path.move(to: CGPoint(x: 34, y: 39))
+            path.addLine(to: CGPoint(x: 44, y: 39))
+            path.addLine(to: CGPoint(x: 43, y: 47))
+            path.addQuadCurve(to: CGPoint(x: 35, y: 47), control: CGPoint(x: 39, y: 50))
+            path.closeSubpath()
+        }, fill: porcelain, stroke: Color.ink, width: 0.8))
+        cup.addSublayer(shape(ellipse(39, 39.4, 5, 1.3), fill: coffeeColor))
+        cup.addSublayer(shape(svg { path in
+            path.move(to: CGPoint(x: 32, y: 49.6))
+            path.addLine(to: CGPoint(x: 46, y: 49.6))
+        }, stroke: porcelain, width: 1.4))
+        // Пар: две волнистые струйки, которые поднимаются и тают.
+        for (index, x) in [37.0, 41.0].enumerated() {
+            let steam = shape(svg { path in
+                path.move(to: CGPoint(x: x, y: 37))
+                path.addQuadCurve(to: CGPoint(x: x, y: 31), control: CGPoint(x: x + 2.4, y: 34))
+                path.addQuadCurve(to: CGPoint(x: x, y: 25), control: CGPoint(x: x - 2.4, y: 28))
+            }, stroke: Color.pale, width: 1, opacity: 0.0)
+            let rise = CAKeyframeAnimation(keyPath: "opacity")
+            rise.values = [0, 0.7, 0.7, 0]
+            rise.keyTimes = [0, 0.3, 0.7, 1]
+            let drift = CABasicAnimation(keyPath: "transform.translation.y")
+            drift.fromValue = 0
+            drift.toValue = 4 * scale
+            let group = CAAnimationGroup()
+            group.animations = [rise, drift]
+            group.duration = 2.2
+            group.beginTime = CACurrentMediaTime() + Double(index) * 1.1
+            group.repeatCount = .infinity
+            steam.add(group, forKey: "steam")
+            cup.addSublayer(steam)
+        }
+        root.addSublayer(cup)
     }
 
     // MARK: - Классический

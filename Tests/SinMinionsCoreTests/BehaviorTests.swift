@@ -1050,6 +1050,19 @@ final class NewBehaviorsTests: XCTestCase {
         XCTAssertEqual(engine.tick(now: 95, idleSeconds: 1), [.startWander])
     }
 
+    func testPerceptionCoffeeLevelKeepsStyle() {
+        XCTAssertEqual(Perception.levels, 6)
+        XCTAssertEqual(Perception.level(style: .radiation, coffee: true), 5)
+        XCTAssertEqual(Perception.level(style: .warden, coffee: false), 2)
+        let up = Perception.apply(level: 5, current: .radiation)
+        XCTAssertEqual(up.style, .radiation)
+        XCTAssertTrue(up.coffee)
+        let down = Perception.apply(level: 4, current: .radiation)
+        XCTAssertEqual(down.style, .radiation)
+        XCTAssertFalse(down.coffee)
+        XCTAssertEqual(Perception.apply(level: 99, current: .classic).coffee, true)
+    }
+
     func testShooOffDoesNothing() {
         var engine = makeEngine()
         XCTAssertEqual(engine.handle(.shoo, now: 1), [])

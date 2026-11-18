@@ -65,6 +65,7 @@ final class CompanionView: NSView {
 
     let scale: CGFloat
     let style: GhostStyle
+    let coffee: Bool
     private let art: GhostArt
     private let moth: CALayer
     private let body: CAShapeLayer
@@ -86,10 +87,11 @@ final class CompanionView: NSView {
     private var downOrigin = CGPoint.zero
     private var pendingClick: Task<Void, Never>?
 
-    init(scale: CGFloat, style: GhostStyle = .classic) {
+    init(scale: CGFloat, style: GhostStyle = .classic, coffee: Bool = false) {
         self.scale = scale
         self.style = style
-        art = GhostArt(style: style, scale: scale)
+        self.coffee = coffee
+        art = GhostArt(style: style, scale: scale, coffee: coffee)
         moth = art.root
         body = art.body
         eyes = art.eyes
