@@ -138,6 +138,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             controller.setCoffeeForDemo(false)
             controller.closeConsoleForDemo()
             await wait(1)
+            // Поиск и находка (водяной чип и т. п.).
+            controller.searchForDemo()
+            await wait(3)
+            demoMark("search")
+            await wait(3)
+            await wait(10)
+            demoMark("find")
+            await wait(3)
             controller.teleportForDemo()
         }
     }

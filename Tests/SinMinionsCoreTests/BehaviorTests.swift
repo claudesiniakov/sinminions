@@ -1059,6 +1059,41 @@ final class NewBehaviorsTests: XCTestCase {
         XCTAssertEqual(Endurance.title(level: 3, sleepMinutes: 0), "КОФЕ: НЕ ДАЁТ НОУТБУКУ УСНУТЬ")
     }
 
+    func testSearchFindsAndCalmsDown() {
+        var config = BehaviorConfig()
+        config.searchEnabled = true
+        config.sleepAfter = nil
+        config.talkEnabled = false
+        config.wanderEnabled = false
+        var engine = BehaviorEngine(config: config, now: 0, random: { $0.lowerBound })
+        XCTAssertEqual(engine.tick(now: 299, idleSeconds: 1), [])
+        XCTAssertEqual(engine.tick(now: 300, idleSeconds: 1), [.startSearch])
+        XCTAssertEqual(engine.mode, .searching)
+        XCTAssertEqual(engine.tick(now: 305, idleSeconds: 1), [])
+        XCTAssertEqual(engine.tick(now: 308, idleSeconds: 1), [.stopSearch, .hop, .showFind])
+        XCTAssertEqual(engine.mode, .reacting)
+        XCTAssertEqual(engine.tick(now: 316, idleSeconds: 1), [.hideBubble])
+        XCTAssertEqual(engine.mode, .idle)
+    }
+
+    func testSearchInterruptedByClick() {
+        var engine = makeEngine()
+        XCTAssertEqual(engine.handle(.searchNow, now: 1), [])
+        var config = BehaviorConfig()
+        config.searchEnabled = true
+        config.sleepAfter = nil
+        engine = BehaviorEngine(config: config, now: 0, random: { $0.lowerBound })
+        XCTAssertEqual(engine.handle(.searchNow, now: 1), [.startSearch])
+        XCTAssertEqual(engine.handle(.click, now: 2), [.stopSearch, .hop, .say(.click)])
+    }
+
+    func testSearchFindsHavePhrasesAndWaterChipIsMostLikely() {
+        for find in SearchFind.allCases { XCTAssertFalse(find.phrases.isEmpty) }
+        XCTAssertEqual(SearchFind.pick { _ in 0.1 }, .waterChip)
+        XCTAssertEqual(SearchFind.pick { _ in 0.6 }, .holotape)
+        XCTAssertEqual(SearchFind.pick { _ in 0.99 }, .stimpak)
+    }
+
     func testShooOffDoesNothing() {
         var engine = makeEngine()
         XCTAssertEqual(engine.handle(.shoo, now: 1), [])

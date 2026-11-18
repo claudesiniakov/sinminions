@@ -12,6 +12,8 @@ final class CompanionController: NSObject {
     private let panel: NSPanel
     private var view: CompanionView
     private let bubble = BubblePanel()
+    private let findPanel = FindPanel()
+    private var searchTask: Task<Void, Never>?
     private let console = ConsoleController()
     private let portalA = PortalWindow(color: PortalWindow.blue)
     private let portalB = PortalWindow(color: PortalWindow.orange)
@@ -621,6 +623,7 @@ final class CompanionController: NSObject {
         if !prefs.hideInFullScreen { behavior.insert(.fullScreenAuxiliary) }
         panel.collectionBehavior = behavior
         bubble.setCollectionBehavior(behavior)
+        findPanel.setCollectionBehavior(behavior)
         console.setCollectionBehavior(behavior)
         portalA.setCollectionBehavior(behavior)
         portalB.setCollectionBehavior(behavior)
@@ -730,7 +733,12 @@ final class CompanionController: NSObject {
             case .startWander: startFlight()
             case .stopWander: stopFlight()
             case let .say(kind): say(kind)
-            case .hideBubble: bubble.hide()
+            case .hideBubble:
+                bubble.hide()
+                findPanel.hide()
+            case .startSearch: startSearch()
+            case .stopSearch: stopSearch()
+            case .showFind: showFind()
             case .fallAsleep:
                 bubble.hide()
                 view.setSleeping(true)
@@ -765,6 +773,44 @@ final class CompanionController: NSObject {
     }
 
     private var isSleepingShown = false
+
+    // MARK: - Поиск
+
+    /// Призрак ищет: каждые пару секунд перелетает в соседнюю точку и приговаривает.
+    private func startSearch() {
+        searchTask?.cancel()
+        findPanel.hide()
+        searchTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                guard let self, self.engine.mode == .searching else { return }
+                self.say(.searching)
+                let from = self.panel.frame.origin
+                let step = CGPoint(x: from.x + CGFloat.random(in: -140...140), y: from.y + CGFloat.random(in: -50...50))
+                self.glide(to: self.clamped(step, size: self.panel.frame.size), duration: 1.1)
+                try? await Task.sleep(for: .seconds(2.4))
+            }
+        }
+    }
+
+    private func stopSearch() {
+        searchTask?.cancel()
+        searchTask = nil
+        stopFlight()
+    }
+
+    /// Находка: предмет появляется рядом с призраком, он радуется и говорит про запас.
+    private func showFind() {
+        let find = SearchFind.pick()
+        let moth = view.mothFrame.offsetBy(dx: panel.frame.minX, dy: panel.frame.minY)
+        findPanel.show(find, beside: moth, in: area)
+        let text = find.phrases.randomElement() ?? find.title
+        let lifted = CGRect(x: moth.minX, y: moth.minY, width: moth.width, height: moth.height + 11 * view.scale)
+        bubble.show(text, over: lifted, in: area)
+    }
+
+    func searchForDemo() {
+        apply(engine.handle(.searchNow, now: now))
+    }
 
     private func say(_ kind: PhraseKind) {
         let hour = Calendar.current.component(.hour, from: Date())

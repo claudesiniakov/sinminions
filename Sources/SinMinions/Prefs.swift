@@ -70,6 +70,7 @@ final class Prefs {
     var coffee = false { didSet { onChange() } }
     var alwaysAsleep: Bool { didSet { store(alwaysAsleep, "alwaysAsleep") } }
     var hideSeekEnabled: Bool { didSet { store(hideSeekEnabled, "hideSeekEnabled") } }
+    var searchEnabled: Bool { didSet { store(searchEnabled, "searchEnabled") } }
     var shooEnabled: Bool { didSet { store(shooEnabled, "shooEnabled") } }
     var celebrateEnabled: Bool { didSet { store(celebrateEnabled, "celebrateEnabled") } }
     var wanderFrequency: Frequency { didSet { store(wanderFrequency.rawValue, "wanderFrequency") } }
@@ -84,7 +85,7 @@ final class Prefs {
 
     init() {
         let d = UserDefaults.standard
-        mode = CompanionMode(rawValue: d.string(forKey: "mode") ?? "") ?? .minimal
+        mode = CompanionMode(rawValue: d.string(forKey: "mode") ?? "") ?? .medium
         connections = LLMConnections.decode(d.data(forKey: "llmConnections")) ?? Self.legacyConnections(d)
         let savedScale = d.object(forKey: "scale") as? Double ?? 1.5
         scale = Self.scales.contains(savedScale) ? savedScale : 1.5
@@ -94,6 +95,7 @@ final class Prefs {
         chaseEnabled = d.object(forKey: "chaseEnabled") as? Bool ?? true
         hideSeekEnabled = d.object(forKey: "hideSeekEnabled") as? Bool ?? true
         shooEnabled = d.object(forKey: "shooEnabled") as? Bool ?? true
+        searchEnabled = d.object(forKey: "searchEnabled") as? Bool ?? true
         ghostStyleLevel = GhostStyle.clamp(d.object(forKey: "ghostStyle") as? Int ?? 0).rawValue
         agility = Agility.clamp(d.object(forKey: "agility") as? Int ?? Agility.defaultLevel)
         alwaysAsleep = d.object(forKey: "alwaysAsleep") as? Bool ?? false
@@ -175,6 +177,7 @@ final class Prefs {
         config.chaseEnabled = chaseEnabled
         config.hideSeekEnabled = hideSeekEnabled
         config.shooEnabled = shooEnabled
+        config.searchEnabled = searchEnabled
         config.celebrateEnabled = celebrateEnabled
         config.talkEnabled = talkEnabled
         config.talkInterval = talkFrequency.talkInterval
