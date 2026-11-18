@@ -316,7 +316,7 @@ public struct BehaviorEngine {
             return effects + [.spin, .say(kind)]
 
         case .searchNow:
-            guard mode == .idle else { return [] }
+            guard config.searchEnabled, mode == .idle else { return [] }
             return begin(search: now)
 
         case .shoo:
