@@ -831,8 +831,31 @@ struct MonitorView: View {
 
     /// Призрак вместо человечка Pip-Boy и переключатель «интеллекта»: «−» и «+» меняют подключение.
     /// Порядок подключений и модель задаются в настройках.
+    /// S.P.E.C.I.A.L. над призраком: буква и текущий уровень; щелчок открывает экран характеристик в терминале.
+    private var specialStrip: some View {
+        let state = model.special
+        let position = model.llmPosition.split(separator: "/").first.map(String.init) ?? "–"
+        let values: [String] = [
+            "\(state.scaleLevel)", "–", "\(state.enduranceLevel)", "\(state.charismaLevel)",
+            position, "\(state.agilityLevel)", "–",
+        ]
+        return HStack(spacing: 0) {
+            ForEach(SpecialStat.allCases) { stat in
+                VStack(spacing: 1) {
+                    Text(stat.letter).font(.system(size: 15, weight: .bold, design: .monospaced))
+                    Text(values[stat.rawValue]).font(Term.small)
+                }
+                .foregroundStyle(stat.isActive ? Term.green : Term.dim)
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { model.screen = .special }
+    }
+
     private var intelligence: some View {
         VStack(spacing: 6) {
+            specialStrip
             GhostFigure()
                 .frame(width: 72, height: 84)
             Text("ИНТЕЛЛЕКТ")
