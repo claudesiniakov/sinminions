@@ -20,6 +20,8 @@ public enum LLMError: LocalizedError, Equatable, Sendable {
     case network(String)
     case invalidResponse
     case emptyAnswer
+    /// Модель отказалась отвечать (Claude: stop_reason = refusal).
+    case refused
 
     private static func describeDirect(_ status: Int, _ detail: String?) -> String {
         let base: String
@@ -52,6 +54,7 @@ public enum LLMError: LocalizedError, Equatable, Sendable {
             }
         case .network: return "нет связи"
         case .invalidResponse, .emptyAnswer: return "нет данных"
+        case .refused: return "отказ"
         }
     }
 
@@ -81,6 +84,8 @@ public enum LLMError: LocalizedError, Equatable, Sendable {
             return "Сервер вернул неожиданный ответ"
         case .emptyAnswer:
             return "Модель вернула пустой ответ"
+        case .refused:
+            return "Модель отказалась отвечать на этот запрос"
         }
     }
 }
@@ -226,7 +231,9 @@ public enum LLMResponse {
 
     /// Пояснение из тела ошибки: `{"message": "..."}` или `{"error": {"message": "..."}}`.
     public static func errorDetail(_ data: Data) -> String? {
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        let any = try? JSONSerialization.jsonObject(with: data)
+        // Часть ошибок Gemini приходит массивом: [{"error": {...}}].
+        guard let json = (any as? [String: Any]) ?? (any as? [[String: Any]])?.first else { return nil }
         let message: String?
         if let top = json["message"] as? String {
             message = top

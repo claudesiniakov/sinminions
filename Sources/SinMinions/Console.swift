@@ -741,6 +741,7 @@ struct MonitorView: View {
         case let .value(value): text = value
         case let .failed(reason): text = reason; warning = true
         case .noKey: text = "нет ключа"; warning = true
+        case .unsupported: text = "—"
         }
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {

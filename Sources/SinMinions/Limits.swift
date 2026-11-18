@@ -12,6 +12,8 @@ final class LimitsStore {
         case value(String)
         case failed(String)
         case noKey
+        /// У провайдера нет способа узнать остаток по обычному ключу.
+        case unsupported
     }
 
     struct Entry: Equatable {
@@ -68,6 +70,10 @@ final class LimitsStore {
 
     private func load(_ connection: LLMConnection) async {
         let signature = Self.signature(connection)
+        guard connection.provider.supportsLimits else {
+            set(connection, signature, .unsupported)
+            return
+        }
         guard Keychain.exists(connection.keyAccount), let key = Keychain.read(connection.keyAccount) else {
             set(connection, signature, .noKey)
             return

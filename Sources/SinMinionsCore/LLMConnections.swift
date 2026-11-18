@@ -3,11 +3,19 @@ import Foundation
 public enum LLMProvider: String, Codable, CaseIterable, Sendable {
     case gigachat
     case deepseek
+    case claude
+    case gpt
+    case grok
+    case gemini
 
     public var title: String {
         switch self {
         case .gigachat: return "GigaChat"
         case .deepseek: return "DeepSeek"
+        case .claude: return "Claude"
+        case .gpt: return "GPT"
+        case .grok: return "Grok"
+        case .gemini: return "Gemini"
         }
     }
 
@@ -16,10 +24,17 @@ public enum LLMProvider: String, Codable, CaseIterable, Sendable {
         switch self {
         case .gigachat: return GigaChatAPI.models
         case .deepseek: return DeepSeekAPI.models
+        case .claude: return AnthropicAPI.models
+        case .gpt: return OpenAICompatibleAPI.gptModels
+        case .grok: return OpenAICompatibleAPI.grokModels
+        case .gemini: return OpenAICompatibleAPI.geminiModels
         }
     }
 
     public var defaultModel: String { models[0] }
+
+    /// Есть ли у провайдера способ узнать остаток по обычному ключу (у остальных такого нет).
+    public var supportsLimits: Bool { self == .gigachat || self == .deepseek }
 
     /// У GigaChat есть область доступа (физлица, ИП и юрлица); у DeepSeek её нет.
     public var usesScope: Bool { self == .gigachat }
@@ -27,7 +42,7 @@ public enum LLMProvider: String, Codable, CaseIterable, Sendable {
     public func normalizedKey(_ raw: String) -> String? {
         switch self {
         case .gigachat: return GigaChatAPI.normalizedKey(raw)
-        case .deepseek: return DeepSeekAPI.normalizedKey(raw)
+        case .deepseek, .claude, .gpt, .grok, .gemini: return DeepSeekAPI.normalizedKey(raw)
         }
     }
 }

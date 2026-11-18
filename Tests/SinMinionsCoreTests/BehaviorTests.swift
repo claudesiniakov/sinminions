@@ -224,6 +224,81 @@ final class ConsoleModeTests: XCTestCase {
     }
 }
 
+final class MoreProvidersTests: XCTestCase {
+    func testCatalogs() {
+        XCTAssertEqual(LLMProvider.claude.models.first, "claude-haiku-5-5")
+        XCTAssertEqual(LLMProvider.claude.models.last, "claude-fable-5-2")
+        XCTAssertEqual(LLMProvider.gpt.defaultModel, "gpt-6-luna")
+        XCTAssertEqual(LLMProvider.grok.models.last, "grok-4.7")
+        XCTAssertEqual(LLMProvider.gemini.models.last, "gemini-4-carbon")
+        for provider in LLMProvider.allCases {
+            XCTAssertFalse(provider.models.isEmpty, provider.title)
+            XCTAssertEqual(Set(provider.models).count, provider.models.count, provider.title)
+            XCTAssertEqual(LLMConnection(name: "x", provider: provider).model, provider.models[0])
+            XCTAssertEqual(provider.normalizedKey("  Bearer k-1\n"), provider == .gigachat ? "Bearerk-1" : "k-1")
+        }
+        XCTAssertFalse(LLMProvider.claude.usesScope)
+        XCTAssertEqual(LLMProvider.allCases.filter(\.supportsLimits), [.gigachat, .deepseek])
+    }
+
+    func testClaudeRequestShape() throws {
+        let messages = [ChatMessage(.system, "кратко"), ChatMessage(.user, "привет"), ChatMessage(.assistant, "здравствуй"), ChatMessage(.user, "как дела")]
+        let request = AnthropicAPI.chatRequest(key: "sk-ant-1", model: "claude-opus-5-5", messages: messages)
+        XCTAssertEqual(request.url?.absoluteString, "https://api.anthropic.com/v1/messages")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "x-api-key"), "sk-ant-1")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "anthropic-version"), "2023-06-01")
+        XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
+        XCTAssertEqual(body["model"] as? String, "claude-opus-5-5")
+        XCTAssertEqual(body["system"] as? String, "кратко")
+        XCTAssertNotNil(body["max_tokens"])
+        XCTAssertNil(body["temperature"], "новые модели Claude не принимают параметры выборки")
+        let sent = try XCTUnwrap(body["messages"] as? [[String: String]])
+        XCTAssertEqual(sent.map { $0["role"] }, ["user", "assistant", "user"], "системного сообщения среди messages нет")
+        let models = AnthropicAPI.modelsRequest(key: "k")
+        XCTAssertEqual(models.url?.absoluteString, "https://api.anthropic.com/v1/models")
+        XCTAssertEqual(models.value(forHTTPHeaderField: "x-api-key"), "k")
+    }
+
+    func testClaudeResponseParsing() throws {
+        let ok = #"{"content":[{"type":"thinking","thinking":""},{"type":"text","text":" первый "},{"type":"text","text":"второй"}],"stop_reason":"end_turn"}"#
+        XCTAssertEqual(try AnthropicAPI.parseMessage(Data(ok.utf8)), "первый \nвторой")
+        XCTAssertThrowsError(try AnthropicAPI.parseMessage(Data(#"{"content":[],"stop_reason":"refusal"}"#.utf8))) {
+            XCTAssertEqual($0 as? LLMError, .refused)
+        }
+        XCTAssertThrowsError(try AnthropicAPI.parseMessage(Data(#"{"content":[{"type":"thinking","thinking":"x"}],"stop_reason":"max_tokens"}"#.utf8))) {
+            XCTAssertEqual($0 as? LLMError, .emptyAnswer)
+        }
+        XCTAssertThrowsError(try AnthropicAPI.parseMessage(Data("не json".utf8)))
+        // Ошибка Anthropic: {"type":"error","error":{"message":...}}.
+        XCTAssertEqual(LLMResponse.errorDetail(Data(#"{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}"#.utf8)), "invalid x-api-key")
+        XCTAssertEqual(LLMError.refused.shortDescription, "отказ")
+    }
+
+    func testOpenAICompatibleEndpointsAndRequests() throws {
+        XCTAssertEqual(OpenAICompatibleAPI.endpoints(for: .gpt)?.chat.absoluteString, "https://api.openai.com/v1/chat/completions")
+        XCTAssertEqual(OpenAICompatibleAPI.endpoints(for: .grok)?.models.absoluteString, "https://api.x.ai/v1/models")
+        XCTAssertEqual(OpenAICompatibleAPI.endpoints(for: .gemini)?.chat.absoluteString, "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions")
+        XCTAssertNil(OpenAICompatibleAPI.endpoints(for: .claude))
+        XCTAssertNil(OpenAICompatibleAPI.chatRequest(provider: .deepseek, key: "k", model: "m", messages: []))
+        let messages = [ChatMessage(.system, "кратко"), ChatMessage(.user, "привет")]
+        for provider in [LLMProvider.gpt, .grok, .gemini] {
+            let request = try XCTUnwrap(OpenAICompatibleAPI.chatRequest(provider: provider, key: "k-1", model: provider.defaultModel, messages: messages))
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer k-1")
+            let body = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
+            XCTAssertEqual(body["model"] as? String, provider.defaultModel)
+            XCTAssertEqual(body["stream"] as? Bool, false)
+            let sent = try XCTUnwrap(body["messages"] as? [[String: String]])
+            // У OpenAI системное сообщение называется developer, у остальных — system.
+            XCTAssertEqual(sent[0]["role"], provider == .gpt ? "developer" : "system")
+            XCTAssertEqual(sent[1]["role"], "user")
+            XCTAssertNil(body["temperature"])
+            let models = try XCTUnwrap(OpenAICompatibleAPI.modelsRequest(provider: provider, key: "k-1"))
+            XCTAssertEqual(models.httpMethod, "GET")
+        }
+    }
+}
+
 final class SlashCommandTests: XCTestCase {
     func testParsesLatinAndRussianNames() {
         XCTAssertEqual(SlashParser.parse("/help"), .command(.help))
@@ -920,7 +995,7 @@ final class DeepSeekAPITests: XCTestCase {
     }
 
     func testProviderCatalog() {
-        XCTAssertEqual(LLMProvider.allCases, [.gigachat, .deepseek])
+        XCTAssertEqual(LLMProvider.allCases, [.gigachat, .deepseek, .claude, .gpt, .grok, .gemini])
         XCTAssertEqual(LLMProvider.deepseek.defaultModel, "deepseek-flash")
         XCTAssertFalse(LLMProvider.deepseek.usesScope)
         XCTAssertTrue(LLMProvider.gigachat.usesScope)
