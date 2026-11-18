@@ -401,6 +401,69 @@ final class PortalAndNewBehaviorsTests: XCTestCase {
     }
 }
 
+final class SpecialStatsTests: XCTestCase {
+    func testAgilityLevels() {
+        XCTAssertEqual(Agility.levels, 4)
+        XCTAssertEqual(Agility.speedRange(level: Agility.defaultLevel), 40...80, "обычная скорость — прежняя")
+        XCTAssertEqual(Agility.speedRange(level: 0), 20...35)
+        XCTAssertEqual(Agility.speedRange(level: 3), 240...360)
+        // Скорость растёт с уровнем; выход за границы ужимается.
+        let uppers = (0..<Agility.levels).map { Agility.speedRange(level: $0).upperBound }
+        XCTAssertEqual(uppers, uppers.sorted())
+        XCTAssertEqual(Agility.speedRange(level: -5), Agility.speedRange(level: 0))
+        XCTAssertEqual(Agility.speedRange(level: 99), Agility.speedRange(level: 3))
+        XCTAssertEqual(Agility.title(level: 1), "ОБЫЧНО")
+    }
+
+    func testEnduranceMapping() {
+        XCTAssertEqual(Endurance.level(alwaysAsleep: true, sleepMinutes: 5), 0)
+        XCTAssertEqual(Endurance.level(alwaysAsleep: false, sleepMinutes: 5), 1)
+        XCTAssertEqual(Endurance.level(alwaysAsleep: false, sleepMinutes: 15), 1)
+        XCTAssertEqual(Endurance.level(alwaysAsleep: false, sleepMinutes: 0), 2)
+        // 1 — заснуть через 5 минут, 2 — не засыпать, 0 — спит (время засыпания не трогаем).
+        XCTAssertTrue(Endurance.apply(level: 0, sleepMinutes: 15) == (true, 15))
+        XCTAssertTrue(Endurance.apply(level: 1, sleepMinutes: 0) == (false, 5))
+        XCTAssertTrue(Endurance.apply(level: 2, sleepMinutes: 5) == (false, 0))
+        XCTAssertTrue(Endurance.apply(level: 9, sleepMinutes: 5) == (false, 0))
+        XCTAssertEqual(Endurance.title(level: 0, sleepMinutes: 5), "СПИТ")
+        XCTAssertEqual(Endurance.title(level: 1, sleepMinutes: 5), "ЗАСЫПАЕТ ЧЕРЕЗ 5 МИН")
+        XCTAssertEqual(Endurance.title(level: 1, sleepMinutes: 15), "ЗАСЫПАЕТ ЧЕРЕЗ 15 МИН")
+        XCTAssertEqual(Endurance.title(level: 2, sleepMinutes: 0), "НЕ ЗАСЫПАЕТ")
+    }
+
+    func testSleepsAlways() {
+        var config = BehaviorConfig()
+        config.sleepsAlways = true
+        config.sleepAfter = nil
+        config.wanderEnabled = false
+        config.talkEnabled = false
+        var engine = BehaviorEngine(config: config, now: 0, random: { $0.lowerBound })
+        XCTAssertEqual(engine.tick(now: 1, idleSeconds: 0), [.fallAsleep], "засыпает сразу, даже при вводе")
+        XCTAssertEqual(engine.mode, .sleeping)
+        // Ввод его не будит.
+        XCTAssertEqual(engine.tick(now: 50, idleSeconds: 0), [])
+        XCTAssertEqual(engine.mode, .sleeping)
+        // Щелчок будит, но потревоженный призрак засыпает снова.
+        XCTAssertEqual(engine.handle(.click, now: 60), [.wakeUp, .hop, .say(.click)])
+        XCTAssertEqual(engine.tick(now: 65, idleSeconds: 0), [.hideBubble])
+        XCTAssertEqual(engine.tick(now: 66, idleSeconds: 0), [.fallAsleep])
+    }
+
+    func testNormalSleepStillWakesOnInput() {
+        var config = BehaviorConfig()
+        config.sleepAfter = 300
+        var engine = BehaviorEngine(config: config, now: 0, random: { $0.lowerBound })
+        XCTAssertEqual(engine.tick(now: 10, idleSeconds: 300), [.fallAsleep])
+        XCTAssertEqual(engine.tick(now: 20, idleSeconds: 0.5), [.wakeUp])
+    }
+
+    func testSpecialSlashCommand() {
+        XCTAssertEqual(SlashParser.parse("/special"), .command(.special))
+        XCTAssertEqual(SlashParser.parse("/статы"), .command(.special))
+        XCTAssertTrue(SlashParser.helpLines.joined().contains("/special"))
+    }
+}
+
 final class SlashCommandTests: XCTestCase {
     func testParsesLatinAndRussianNames() {
         XCTAssertEqual(SlashParser.parse("/help"), .command(.help))

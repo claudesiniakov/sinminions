@@ -85,6 +85,7 @@ private struct GeneralSettings: View {
                     Text("через 15 мин").tag(15)
                     Text("никогда").tag(0)
                 }
+                .disabled(prefs.alwaysAsleep)
             }
 
             Section("Spotlight") {

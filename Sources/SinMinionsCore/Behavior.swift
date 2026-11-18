@@ -31,6 +31,8 @@ public struct BehaviorConfig: Equatable, Sendable {
     public var chaseEnabled = false
     /// Доля перелётов, которые превращаются в подлёт к курсору.
     public var chaseShare: Double = 0.3
+    /// Выносливость 0: призрак всегда спит; потревоженный (щелчок, перетаскивание) засыпает снова.
+    public var sleepsAlways = false
     /// Прятки: призрак тает на месте и выскакивает с «бу!».
     public var hideSeekEnabled = false
     public var hideInterval: ClosedRange<Double> = 240...600
@@ -151,12 +153,17 @@ public struct BehaviorEngine {
             if let nap = napUntil {
                 return now >= nap ? wake(now: now) : []
             }
+            if config.sleepsAlways { return [] }
             return idleSeconds < Self.wakeThreshold ? wake(now: now) : []
         case .talking, .reacting:
             guard now >= modeEndsAt else { return [] }
             mode = .idle
             return [.hideBubble]
         case .idle:
+            if config.sleepsAlways {
+                mode = .sleeping
+                return [.fallAsleep]
+            }
             if let limit = config.sleepAfter, idleSeconds >= limit {
                 mode = .sleeping
                 return [.fallAsleep]

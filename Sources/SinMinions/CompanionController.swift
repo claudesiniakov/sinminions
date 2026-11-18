@@ -101,6 +101,7 @@ final class CompanionController: NSObject {
         console.onCommand = { [weak self] command in self?.run(command) }
         console.model.switchConnection = { [weak self] delta in self?.switchConnection(delta) }
         console.onSlash = { [weak self] command in self?.perform(command) }
+        console.onAdjustSpecial = { [weak self] stat, delta in self?.adjustSpecial(stat, delta) }
         power = Self.readPower()
 
         let workspace = NSWorkspace.shared.notificationCenter
@@ -164,6 +165,51 @@ final class CompanionController: NSObject {
         console.model.llmPosition = list.activePosition.map { "\($0)/\(list.items.count)" } ?? ""
     }
 
+    /// Значения для экрана S.P.E.C.I.A.L. из настроек.
+    private func refreshSpecial() {
+        let scales = Prefs.scales
+        let scaleText = prefs.scale == 1.5 ? "1,5×" : "\(Int(prefs.scale))×"
+        console.model.special = SpecialState(
+            scaleLevel: scales.firstIndex(of: prefs.scale) ?? 1,
+            scaleLabel: "РАЗМЕР " + scaleText,
+            agilityLevel: prefs.agility,
+            agilityLabel: "СКОРОСТЬ ПОЛЁТА: " + Agility.title(level: prefs.agility),
+            enduranceLevel: prefs.endurance,
+            enduranceLabel: Endurance.title(level: prefs.endurance, sleepMinutes: prefs.sleepMinutes),
+            intelligenceLabel: prefs.connections.active.map { "ПОДКЛЮЧЕНИЕ: " + $0.name.uppercased() } ?? "НЕТ ПОДКЛЮЧЕНИЙ",
+            intelligenceCount: prefs.connections.items.count
+        )
+    }
+
+    /// «+» и «−» у характеристики: S — размер, E — сон, I — подключение к нейросети, A — скорость полёта.
+    private func adjustSpecial(_ stat: SpecialStat, _ delta: Int) {
+        switch stat {
+        case .strength:
+            let scales = Prefs.scales
+            let index = scales.firstIndex(of: prefs.scale) ?? 1
+            prefs.scale = scales[min(max(index + delta, 0), scales.count - 1)]
+        case .agility:
+            prefs.agility = Agility.clamp(prefs.agility + delta)
+        case .endurance:
+            prefs.endurance = Endurance.clamp(prefs.endurance + delta)
+            // Из сна «пока не потревожат» выходим сразу, как только он отменён.
+            if prefs.endurance != 0, isSleeping, !engine.isNapping {
+                apply(engine.handle(.wake, now: now))
+            }
+        case .intelligence:
+            switchConnection(delta, announce: false)
+        case .perception, .charisma, .luck:
+            break
+        }
+        refreshSpecial()
+    }
+
+    /// Для снимка в CI: открыт экран S.P.E.C.I.A.L.
+    func showSpecialDemo() {
+        console.model.specialRow = 0
+        console.model.screen = .special
+    }
+
     private func refreshLimits() {
         console.model.limits.refresh(prefs.connections.items)
     }
@@ -186,6 +232,7 @@ final class CompanionController: NSObject {
 
     func prefsChanged() {
         refreshLLM()
+        refreshSpecial()
         if console.isOpen { refreshLimits() }
         if view.scale != CGFloat(prefs.scale) { rebuildView() }
         applyCollectionBehavior()
@@ -346,6 +393,7 @@ final class CompanionController: NSObject {
 
     private func openConsole() {
         refreshLLM()
+        refreshSpecial()
         refreshLimits()
         let mothSize = view.mothFrame.size
         let area = area
@@ -398,6 +446,8 @@ final class CompanionController: NSObject {
         case .chat:
             console.model.screen = .chat
             console.activateForTyping()
+        case .special:
+            console.model.screen = .special
         }
     }
 
@@ -433,6 +483,9 @@ final class CompanionController: NSObject {
             switchConnection(command == .next ? 1 : -1, announce: false)
             guard let active = prefs.connections.active else { return "ПОДКЛЮЧЕНИЙ НЕТ" }
             return "ПОДКЛЮЧЕНИЕ: " + active.name.uppercased() + " · " + active.model.uppercased()
+        case .special:
+            console.model.screen = .special
+            return nil
         case .help, .clear:
             return nil
         }
@@ -514,6 +567,10 @@ final class CompanionController: NSObject {
         view.setSleeping(wasSleeping)
         bubble.hide(animated: false)
         savePosition()
+        // Призрак другого размера занимает другое место: окна не должны наезжать на него.
+        if console.isOpen {
+            console.ghostRect = view.mothFrame.offsetBy(dx: panel.frame.minX, dy: panel.frame.minY).insetBy(dx: -10, dy: -12)
+        }
     }
 
     private func applyCollectionBehavior() {
@@ -706,7 +763,7 @@ final class CompanionController: NSObject {
             })
             return
         }
-        let speed = Double.random(in: 40...80)
+        let speed = Double.random(in: prefs.flightSpeedRange)
         let distance = Double(hypot(to.x - from.x, to.y - from.y))
         flight = Flight(from: from, to: to, start: now, duration: max(distance / speed, 0.5), wander: true, chase: chase)
         startFlightTimer()

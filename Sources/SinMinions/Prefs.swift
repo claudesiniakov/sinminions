@@ -62,6 +62,8 @@ final class Prefs {
     var teleportEnabled: Bool { didSet { store(teleportEnabled, "teleportEnabled") } }
     var scareEnabled: Bool { didSet { store(scareEnabled, "scareEnabled") } }
     var chaseEnabled: Bool { didSet { store(chaseEnabled, "chaseEnabled") } }
+    var agility: Int { didSet { store(agility, "agility") } }
+    var alwaysAsleep: Bool { didSet { store(alwaysAsleep, "alwaysAsleep") } }
     var hideSeekEnabled: Bool { didSet { store(hideSeekEnabled, "hideSeekEnabled") } }
     var celebrateEnabled: Bool { didSet { store(celebrateEnabled, "celebrateEnabled") } }
     var wanderFrequency: Frequency { didSet { store(wanderFrequency.rawValue, "wanderFrequency") } }
@@ -86,6 +88,8 @@ final class Prefs {
         scareEnabled = d.object(forKey: "scareEnabled") as? Bool ?? true
         chaseEnabled = d.object(forKey: "chaseEnabled") as? Bool ?? true
         hideSeekEnabled = d.object(forKey: "hideSeekEnabled") as? Bool ?? true
+        agility = Agility.clamp(d.object(forKey: "agility") as? Int ?? Agility.defaultLevel)
+        alwaysAsleep = d.object(forKey: "alwaysAsleep") as? Bool ?? false
         celebrateEnabled = d.object(forKey: "celebrateEnabled") as? Bool ?? true
         wanderFrequency = Frequency(rawValue: d.string(forKey: "wanderFrequency") ?? "") ?? .normal
         talkEnabled = d.object(forKey: "talkEnabled") as? Bool ?? true
@@ -113,6 +117,19 @@ final class Prefs {
         return list
     }
 
+    /// Выносливость (E в S.P.E.C.I.A.L.): 0 — спит, 1 — засыпает через 5 минут, 2 — не засыпает.
+    var endurance: Int {
+        get { Endurance.level(alwaysAsleep: alwaysAsleep, sleepMinutes: sleepMinutes) }
+        set {
+            let applied = Endurance.apply(level: newValue, sleepMinutes: sleepMinutes)
+            alwaysAsleep = applied.alwaysAsleep
+            sleepMinutes = applied.sleepMinutes
+        }
+    }
+
+    /// Ловкость (A): скорость случайных перелётов.
+    var flightSpeedRange: ClosedRange<Double> { Agility.speedRange(level: agility) }
+
     private func store(_ value: Any, _ key: String) {
         defaults.set(value, forKey: key)
         onChange()
@@ -132,6 +149,7 @@ final class Prefs {
         config.talkEnabled = talkEnabled
         config.talkInterval = talkFrequency.talkInterval
         config.sleepAfter = sleepMinutes > 0 ? Double(sleepMinutes) * 60 : nil
+        config.sleepsAlways = alwaysAsleep
         config.spotlightEnabled = spotlightEnabled
         config.consoleEnabled = mode == .medium
         return config

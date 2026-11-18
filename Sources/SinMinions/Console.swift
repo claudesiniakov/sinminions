@@ -6,13 +6,14 @@ import SinMinionsCore
 
 /// Пункты меню терминала. Остальные команды вводятся со «/» (см. `SlashCommand`, «/help»).
 enum ConsoleCommand: Int, CaseIterable, Identifiable {
-    case spotlight, chat
+    case spotlight, chat, special
     var id: Int { rawValue }
 
     var title: String {
         switch self {
         case .spotlight: return "ПОИСК SPOTLIGHT"
         case .chat: return "ЧАТ С ИИ"
+        case .special: return "S.P.E.C.I.A.L."
         }
     }
 }
@@ -144,6 +145,30 @@ enum LayoutEvent {
     case resize(GesturePhase)
 }
 
+/// Характеристики призрака, как в Fallout. Работают S (размер), E (сон), I (подключение к нейросети) и
+/// A (скорость полёта); остальные пока без назначения.
+enum SpecialStat: Int, CaseIterable, Identifiable {
+    case strength, perception, endurance, charisma, intelligence, agility, luck
+    var id: Int { rawValue }
+    var letter: String { ["S", "P", "E", "C", "I", "A", "L"][rawValue] }
+    var title: String {
+        ["СИЛА", "ВОСПРИЯТИЕ", "ВЫНОСЛИВОСТЬ", "ХАРИЗМА", "ИНТЕЛЛЕКТ", "ЛОВКОСТЬ", "УДАЧА"][rawValue]
+    }
+    var isActive: Bool { self == .strength || self == .endurance || self == .intelligence || self == .agility }
+}
+
+/// Значения характеристик для экрана S.P.E.C.I.A.L.
+struct SpecialState: Equatable {
+    var scaleLevel = 1
+    var scaleLabel = "РАЗМЕР 1,5×"
+    var agilityLevel = Agility.defaultLevel
+    var agilityLabel = "ОБЫЧНО"
+    var enduranceLevel = 1
+    var enduranceLabel = "ЗАСЫПАЕТ ЧЕРЕЗ 5 МИН"
+    var intelligenceLabel = "—"
+    var intelligenceCount = 0
+}
+
 enum ChatEntryKind { case user, assistant, error, info }
 
 struct ChatEntry: Identifiable, Equatable {
@@ -252,7 +277,7 @@ final class ChatSession {
 @MainActor
 @Observable
 final class ConsoleModel {
-    enum Screen { case menu, chat }
+    enum Screen { case menu, chat, special }
 
     var screen = Screen.menu {
         didSet { if screen != oldValue { onScreenChange() } }
@@ -264,6 +289,21 @@ final class ConsoleModel {
     /// Строка ввода меню (команды со «/») и журнал ответов.
     var shellInput = ""
     var shellLog: [String] = []
+    /// Экран S.P.E.C.I.A.L.: значения и выбранная строка.
+    var special = SpecialState()
+    var specialRow = 0
+    @ObservationIgnored var adjustSpecial: (SpecialStat, Int) -> Void = { _, _ in }
+
+    func moveSpecial(_ delta: Int) {
+        let count = SpecialStat.allCases.count
+        specialRow = (specialRow + delta + count) % count
+    }
+
+    /// «+» и «−» (и стрелки влево и вправо) меняют выбранную характеристику, если она рабочая.
+    func adjustSelectedSpecial(_ delta: Int) {
+        guard let stat = SpecialStat(rawValue: specialRow), stat.isActive else { return }
+        adjustSpecial(stat, delta)
+    }
     /// Растёт, когда нужно вернуть фокус в строку ввода.
     var focusTick = 0
     /// Выбранное подключение к нейросети («интеллект») — для монитора и заголовка чата.
@@ -467,6 +507,10 @@ struct TerminalView: View {
         switch model.screen {
         case .menu: menu
         case .chat: ChatScreen(model: model)
+        case .special:
+            TerminalFrame(title: "MOTH-OS // S.P.E.C.I.A.L.", window: .terminal, model: model) {
+                SpecialScreen(model: model)
+            }
         }
     }
 
@@ -552,6 +596,91 @@ private struct ShellScreen: View {
         .tint(Term.green)
         .onAppear { focused = true }
         .onChange(of: model.focusTick) { focused = true }
+    }
+}
+
+/// Экран S.P.E.C.I.A.L.: семь строк с «−» и «+». Выбор — стрелки вверх и вниз или щелчок, значение — стрелки
+/// влево и вправо, «+» и «−» или кнопки.
+private struct SpecialScreen: View {
+    var model: ConsoleModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(SpecialStat.allCases) { stat in row(stat) }
+                }
+            }
+            Text("↑↓ СТРОКА · ←→ ИЛИ +/− ЗНАЧЕНИЕ · ESC НАЗАД")
+                .font(Term.small)
+                .foregroundStyle(Term.dim)
+        }
+    }
+
+    /// Уровень, число уровней и подпись; nil — характеристика пока без назначения.
+    private func detail(_ stat: SpecialStat) -> (level: Int, levels: Int, label: String)? {
+        let state = model.special
+        switch stat {
+        case .strength: return (state.scaleLevel, Prefs.scales.count, state.scaleLabel)
+        case .endurance: return (state.enduranceLevel, Endurance.levels, state.enduranceLabel)
+        case .agility: return (state.agilityLevel, Agility.levels, state.agilityLabel)
+        case .intelligence: return (-1, 0, state.intelligenceLabel)
+        default: return nil
+        }
+    }
+
+    private func bar(_ level: Int, _ levels: Int) -> String {
+        guard level >= 0 else { return "" }
+        return String(repeating: "█", count: level + 1) + String(repeating: "░", count: max(levels - level - 1, 0))
+    }
+
+    private func button(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Text(symbol)
+            .frame(width: 26, height: 26)
+            .overlay(Rectangle().strokeBorder(enabled ? Term.green : Term.dark, lineWidth: 1))
+            .opacity(enabled ? 1 : 0.45)
+            .contentShape(Rectangle())
+            .onTapGesture { if enabled { action() } }
+    }
+
+    private func row(_ stat: SpecialStat) -> some View {
+        let selected = model.specialRow == stat.rawValue
+        let info = detail(stat)
+        let canAdjust = stat.isActive && (stat != .intelligence || model.special.intelligenceCount > 1)
+        return HStack(spacing: 10) {
+            Text(stat.letter)
+                .font(.system(size: 22, weight: .bold, design: .monospaced))
+                .frame(width: 26)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(stat.title)
+                Text(info?.label ?? "НЕ ЗАДАНО")
+                    .font(.system(size: 9.5, design: .monospaced))
+                    .foregroundStyle(Term.dim)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 4)
+            if let info, info.level >= 0 {
+                Text(bar(info.level, info.levels))
+            }
+            if stat.isActive {
+                button("−", enabled: canAdjust) {
+                    model.specialRow = stat.rawValue
+                    model.adjustSpecial(stat, -1)
+                }
+                button("+", enabled: canAdjust) {
+                    model.specialRow = stat.rawValue
+                    model.adjustSpecial(stat, 1)
+                }
+            }
+        }
+        .font(Term.small)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(selected ? Term.green.opacity(0.16) : Color.clear)
+        .overlay(Rectangle().strokeBorder(selected ? Term.green : Color.clear, lineWidth: 1))
+        .foregroundStyle(stat.isActive ? Term.green : Term.dim)
+        .contentShape(Rectangle())
+        .onTapGesture { model.specialRow = stat.rawValue }
     }
 }
 
@@ -904,6 +1033,8 @@ final class ConsoleController: NSObject, NSWindowDelegate {
     var onCommand: (ConsoleCommand) -> Void = { _ in }
     /// Команды со «/»: возвращает подтверждение для журнала.
     var onSlash: (SlashCommand) -> String? = { _ in nil }
+    /// «+» и «−» на экране S.P.E.C.I.A.L.
+    var onAdjustSpecial: (SpecialStat, Int) -> Void = { _, _ in }
     /// Область экрана, в которой можно двигать окна.
     var areaProvider: () -> CGRect = { .zero }
     /// Занятое призраком место (с запасом на парение и свечение): окна на него не наезжают.
@@ -950,6 +1081,7 @@ final class ConsoleController: NSObject, NSWindowDelegate {
             switch self.model.screen {
             case .chat: self.model.chat.input += line
             case .menu: self.model.shellInput += line
+            case .special: break
             }
             self.model.focusTick += 1
             self.focusInput()
@@ -957,6 +1089,7 @@ final class ConsoleController: NSObject, NSWindowDelegate {
         model.run = { [weak self] command in self?.onCommand(command) }
         model.slashAction = { [weak self] command in self?.onSlash(command) }
         model.layoutEvent = { [weak self] window, event in self?.handleLayout(window, event) }
+        model.adjustSpecial = { [weak self] stat, delta in self?.onAdjustSpecial(stat, delta) }
         model.onScreenChange = { [weak self] in self?.scheduleFocus() }
     }
 
@@ -1155,6 +1288,18 @@ final class ConsoleController: NSObject, NSWindowDelegate {
 
     private func handleKey(_ code: UInt16) -> Bool {
         guard isOpen else { return false }
+        // На экране S.P.E.C.I.A.L. строки ввода нет: стрелки выбирают строку, ←→ и +/− меняют значение.
+        if model.screen == .special {
+            switch code {
+            case 53: model.screen = .menu
+            case 126: model.moveSpecial(-1)
+            case 125: model.moveSpecial(1)
+            case 123, 27, 78: model.adjustSelectedSpecial(-1)
+            case 124, 24, 69: model.adjustSelectedSpecial(1)
+            default: return false
+            }
+            return true
+        }
         // В чате клавиатуру получает строка ввода; Esc возвращает в меню.
         if model.screen == .chat {
             guard code == 53 else { return false }

@@ -2,7 +2,7 @@ import Foundation
 
 /// Команды терминала, которые вводятся со «/».
 public enum SlashCommand: Equatable, Sendable, CaseIterable {
-    case help, nap, hide, corner, unlock, lock, resetLayout, settings, clear, next, previous
+    case help, nap, hide, corner, unlock, lock, resetLayout, settings, clear, next, previous, special
 }
 
 public enum SlashParseResult: Equatable, Sendable {
@@ -26,6 +26,7 @@ public enum SlashParser {
         .clear: ["/clear", "/очистить"],
         .next: ["/next", "/след"],
         .previous: ["/prev", "/пред"],
+        .special: ["/special", "/stats", "/статы"],
     ]
 
     public static func parse(_ text: String) -> SlashParseResult {
@@ -51,6 +52,7 @@ public enum SlashParser {
         "/settings — ОТКРЫТЬ НАСТРОЙКИ",
         "/clear — ОЧИСТИТЬ ЧАТ",
         "/next, /prev — СЛЕДУЮЩЕЕ И ПРЕДЫДУЩЕЕ ПОДКЛЮЧЕНИЕ",
-        "РУССКИЕ НАЗВАНИЯ: /помощь /сон /скрыть /угол /разблокировать /заблокировать /сброс /настройки /очистить /след /пред",
+        "/special — S.P.E.C.I.A.L.: РАЗМЕР, СКОРОСТЬ, СОН",
+        "РУССКИЕ НАЗВАНИЯ: /помощь /сон /скрыть /угол /разблокировать /заблокировать /сброс /настройки /очистить /след /пред /статы",
     ]
 }
