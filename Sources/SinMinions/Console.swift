@@ -828,7 +828,7 @@ struct MonitorView: View {
     /// Выбранное подключение подсвечено; длинный список прокручивается.
     private var limitsBlock: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("ЛИМИТЫ").foregroundStyle(Term.dim)
+            Text("ЛИМИТЫ").foregroundStyle(Term.green).bold()
             if model.llmConnections.isEmpty {
                 Text("ПОДКЛЮЧЕНИЙ НЕТ").foregroundStyle(Term.dim)
             } else {
