@@ -743,25 +743,33 @@ struct MonitorView: View {
         }
     }
 
-    /// S.P.E.C.I.A.L. над призраком: буква и уровень. Щелчок выбирает характеристику, и большие «−» и «+»
-    /// под призраком меняют её уровень (у I — подключение к нейросети).
+    /// S.P.E.C.I.A.L. над призраком, как в Fallout: буквы в квадратиках, разделённые точками. Выбранная буква
+    /// светится ярче остальных (рамка и заливка у всех одинаковые). Щелчок выбирает характеристику, и большие
+    /// «−» и «+» под призраком меняют её уровень (у I — подключение к нейросети).
     private var specialStrip: some View {
-        HStack(spacing: 0) {
+        HStack(alignment: .bottom, spacing: 0) {
             ForEach(SpecialStat.allCases) { stat in
                 let selected = model.selectedStat == stat
-                VStack(spacing: 2) {
-                    Text(stat.letter).font(.system(size: 15, weight: .bold, design: .monospaced))
-                    Text(specialInfo(stat)?.value ?? "–").font(Term.small)
-                }
-                .padding(.vertical, 3)
-                .frame(maxWidth: .infinity)
-                .background(selected ? Term.green.opacity(0.18) : Color.clear)
-                .overlay(Rectangle().strokeBorder(selected ? Term.green : Color.clear, lineWidth: 1))
-                .foregroundStyle(stat.isActive ? Term.green : Term.dim)
-                .contentShape(Rectangle())
-                .onTapGesture { if stat.isActive { model.selectedStat = stat } }
+                let strength: Double = selected ? 1 : (stat.isActive ? 0.5 : 0.28)
+                Text(stat.letter)
+                    .font(.system(size: 16, weight: .bold, design: .monospaced))
+                    .frame(maxWidth: 30)
+                    .frame(height: 30)
+                    .overlay(Rectangle().strokeBorder(Term.green, lineWidth: 1))
+                    .foregroundStyle(Term.green)
+                    .opacity(strength)
+                    .shadow(color: Term.green.opacity(selected ? 0.9 : 0), radius: selected ? 5 : 0)
+                    .contentShape(Rectangle())
+                    .onTapGesture { if stat.isActive { model.selectedStat = stat } }
+                Text(".")
+                    .font(.system(size: 16, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Term.green)
+                    .opacity(0.6)
+                    .frame(width: 8)
+                    .padding(.bottom, 1)
             }
         }
+        .frame(maxWidth: .infinity)
     }
 
     /// Подпись и «−» с «+» под призраком: для I — подключение, для остальных букв — уровень выбранной характеристики.
