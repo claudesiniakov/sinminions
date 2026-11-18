@@ -56,10 +56,15 @@ public struct LLMConnection: Codable, Equatable, Identifiable, Sendable {
     public var scope: String
     public var model: String
     public var keyAccount: String
+    /// Запрашивать остаток и показывать его в блоке «Лимиты» на мониторе.
+    public var showLimits: Bool
+    /// Участвует ли подключение в чате: выбирается «интеллектом» и переключается кнопками «+» и «−».
+    public var useInChat: Bool
 
     public init(
         id: UUID = UUID(), name: String, provider: LLMProvider = .gigachat,
-        scope: String = GigaChatAPI.scopes[0], model: String? = nil, keyAccount: String? = nil
+        scope: String = GigaChatAPI.scopes[0], model: String? = nil, keyAccount: String? = nil,
+        showLimits: Bool = true, useInChat: Bool = true
     ) {
         self.id = id
         self.name = name
@@ -67,6 +72,21 @@ public struct LLMConnection: Codable, Equatable, Identifiable, Sendable {
         self.scope = scope
         self.model = model ?? provider.defaultModel
         self.keyAccount = keyAccount ?? "llm-" + id.uuidString.lowercased()
+        self.showLimits = showLimits
+        self.useInChat = useInChat
+    }
+
+    /// Старые сохранённые подключения без новых полей читаются с включёнными переключателями.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        provider = try c.decode(LLMProvider.self, forKey: .provider)
+        scope = try c.decode(String.self, forKey: .scope)
+        model = try c.decode(String.self, forKey: .model)
+        keyAccount = try c.decode(String.self, forKey: .keyAccount)
+        showLimits = try c.decodeIfPresent(Bool.self, forKey: .showLimits) ?? true
+        useInChat = try c.decodeIfPresent(Bool.self, forKey: .useInChat) ?? true
     }
 }
 
@@ -81,25 +101,30 @@ public struct LLMConnections: Codable, Equatable, Sendable {
         normalize()
     }
 
-    /// Выбранное подключение; если выбранного нет в списке — первое.
+    /// Подключения, которые участвуют в чате (переключатель «Использовать в чате»), в порядке списка.
+    public var chatItems: [LLMConnection] { items.filter(\.useInChat) }
+
+    /// Выбранное подключение для чата; если выбранное не в чате — первое из чата; nil — в чате никого нет.
     public var active: LLMConnection? {
-        items.first { $0.id == activeID } ?? items.first
+        let chat = chatItems
+        return chat.first { $0.id == activeID } ?? chat.first
     }
 
-    /// Номер выбранного подключения в списке, с единицы.
+    /// Номер выбранного подключения среди участвующих в чате, с единицы.
     public var activePosition: Int? {
-        guard let active, let index = items.firstIndex(where: { $0.id == active.id }) else { return nil }
+        guard let active, let index = chatItems.firstIndex(where: { $0.id == active.id }) else { return nil }
         return index + 1
     }
 
     public mutating func add(_ connection: LLMConnection) {
         items.append(connection)
-        if activeID == nil { activeID = connection.id }
+        normalize()
     }
 
     public mutating func update(_ connection: LLMConnection) {
         guard let index = items.firstIndex(where: { $0.id == connection.id }) else { return }
         items[index] = connection
+        normalize()
     }
 
     @discardableResult
@@ -120,23 +145,24 @@ public struct LLMConnections: Codable, Equatable, Sendable {
     }
 
     public mutating func setActive(_ id: UUID) {
-        guard items.contains(where: { $0.id == id }) else { return }
+        guard items.contains(where: { $0.id == id && $0.useInChat }) else { return }
         activeID = id
     }
 
     /// Переключает выбранное подключение на `delta` шагов по кругу; nil — список пуст.
     @discardableResult
     public mutating func cycle(by delta: Int) -> LLMConnection? {
-        guard !items.isEmpty else { return nil }
-        let current = items.firstIndex { $0.id == active?.id } ?? 0
-        let count = items.count
+        let chat = chatItems
+        guard !chat.isEmpty else { return nil }
+        let current = chat.firstIndex { $0.id == active?.id } ?? 0
+        let count = chat.count
         let next = ((current + delta) % count + count) % count
-        activeID = items[next].id
-        return items[next]
+        activeID = chat[next].id
+        return chat[next]
     }
 
     private mutating func normalize() {
-        if !items.contains(where: { $0.id == activeID }) { activeID = items.first?.id }
+        if !items.contains(where: { $0.id == activeID && $0.useInChat }) { activeID = chatItems.first?.id }
     }
 
     public func json() -> Data? {

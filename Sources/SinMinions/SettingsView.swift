@@ -189,12 +189,6 @@ private struct LLMSettings: View {
             }
 
             Section {
-                Toggle("Запрашивать и показывать лимиты", isOn: $prefs.showLimits)
-            } footer: {
-                Text("Блок «Лимиты» на мониторе призрака. Если выключено, остатки не запрашиваются и блок скрыт.")
-            }
-
-            Section {
                 Text("Отмеченное подключение отвечает в чате терминала. В терминале и на мониторе призрака его можно переключать кнопками «+» и «−» (в терминале — клавишами + и −) — по порядку этого списка. Порядок меняется стрелками справа; тот же порядок у строк блока «Лимиты». В нейросеть уходит только текст, который вы вводите в чате; данные о Mac не передаются. Ключи хранятся в Связке ключей.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -226,10 +220,12 @@ private struct LLMSettings: View {
                 Image(systemName: isActive ? "largecircle.fill.circle" : "circle")
             }
             .buttonStyle(.plain)
-            .help("Сделать выбранным")
+            .disabled(!connection.useInChat)
+            .help(connection.useInChat ? "Сделать выбранным" : "Не используется в чате")
             VStack(alignment: .leading, spacing: 2) {
                 Text(connection.name)
-                Text("\(connection.provider.title) · \(connection.model) · " + (hasKey ? "ключ сохранён" : "ключ не задан"))
+                Text("\(connection.provider.title) · \(connection.model) · " + (hasKey ? "ключ сохранён" : "ключ не задан")
+                    + (connection.useInChat ? "" : " · не в чате") + (connection.showLimits ? "" : " · без лимитов"))
                     .font(.footnote)
                     .foregroundStyle(hasKey ? Color.secondary : Color.red)
             }
@@ -274,6 +270,8 @@ private struct ConnectionEditor: View {
     @State private var modelChoice: String
     @State private var customModel: String
     @State private var keyDraft = ""
+    @State private var showLimits: Bool
+    @State private var useInChat: Bool
     @State private var error: String?
     @State private var check: CheckState = .idle
 
@@ -286,6 +284,8 @@ private struct ConnectionEditor: View {
         let model = existing?.model ?? provider.defaultModel
         let isCustom = !provider.models.contains(model)
         _name = State(initialValue: existing?.name ?? provider.title)
+        _showLimits = State(initialValue: existing?.showLimits ?? true)
+        _useInChat = State(initialValue: existing?.useInChat ?? true)
         _provider = State(initialValue: provider)
         _scope = State(initialValue: existing?.scope ?? GigaChatAPI.scopes[0])
         _modelChoice = State(initialValue: isCustom ? Self.customTag : model)
@@ -334,6 +334,8 @@ private struct ConnectionEditor: View {
                     if modelChoice == Self.customTag {
                         TextField("Идентификатор модели", text: $customModel)
                     }
+                    Toggle("Использовать в чате", isOn: $useInChat)
+                    Toggle("Запрашивать и показывать лимиты", isOn: $showLimits)
                     LabeledContent("Проверка") {
                         HStack {
                             switch check {
@@ -396,7 +398,7 @@ private struct ConnectionEditor: View {
     private func draft() -> LLMConnection {
         LLMConnection(
             id: existing?.id ?? UUID(), name: name, provider: provider, scope: scope, model: model,
-            keyAccount: existing?.keyAccount
+            keyAccount: existing?.keyAccount, showLimits: showLimits, useInChat: useInChat
         )
     }
 

@@ -879,6 +879,35 @@ final class LLMConnectionsTests: XCTestCase {
         return list
     }
 
+    func testUseInChatSkipsConnections() {
+        var list = LLMConnections()
+        let a = LLMConnection(name: "A"), b = LLMConnection(name: "Б", useInChat: false), c = LLMConnection(name: "В")
+        list.add(a); list.add(b); list.add(c)
+        XCTAssertEqual(list.chatItems.map(\.name), ["A", "В"])
+        XCTAssertEqual(list.cycle(by: 1)?.name, "В", "Б пропускается")
+        XCTAssertEqual(list.activePosition, 2)
+        list.setActive(b.id)
+        XCTAssertEqual(list.active?.name, "В", "выбрать не участвующее в чате нельзя")
+        // Выключили чат у выбранного — выбранным становится другое; у всех выключили — нет выбранного.
+        var off = c; off.useInChat = false
+        list.update(off)
+        XCTAssertEqual(list.active?.name, "A")
+        var offA = a; offA.useInChat = false
+        list.update(offA)
+        XCTAssertNil(list.active)
+        XCTAssertNil(list.cycle(by: 1))
+    }
+
+    func testOldSavedConnectionsGetBothSwitchesOn() throws {
+        let id = UUID()
+        let raw = ["items": [["id": id.uuidString, "name": "Старое", "provider": "gigachat", "scope": "GIGACHAT_API_PERS", "model": "GigaChat", "keyAccount": "llm-x"]]]
+        let decoded = try XCTUnwrap(LLMConnections.decode(try JSONEncoder().encode(raw)))
+        XCTAssertTrue(decoded.items[0].showLimits)
+        XCTAssertTrue(decoded.items[0].useInChat)
+        let round = try XCTUnwrap(LLMConnections.decode(decoded.json()))
+        XCTAssertEqual(round, decoded)
+    }
+
     func testNoLimitOnConnections() {
         var list = make(10)
         list.add(LLMConnection(name: "одиннадцатое"))

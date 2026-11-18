@@ -160,9 +160,12 @@ final class CompanionController: NSObject {
         let list = prefs.connections
         console.model.llmName = list.active?.name
         console.model.llmModelName = list.active?.model
-        console.model.llmConnections = list.items.map { LLMConnectionRow(connection: $0, isActive: $0.id == list.active?.id) }
-        console.model.llmCount = list.items.count
-        console.model.llmPosition = list.activePosition.map { "\($0)/\(list.items.count)" } ?? ""
+        console.model.llmConnections = list.items.filter(\.showLimits)
+            .map { LLMConnectionRow(connection: $0, isActive: $0.id == list.active?.id) }
+        // Блок «Лимиты» скрыт, только если подключения есть, но ни у одного лимиты не включены.
+        console.model.showLimits = list.items.isEmpty || list.items.contains(where: \.showLimits)
+        console.model.llmCount = list.chatItems.count
+        console.model.llmPosition = list.activePosition.map { "\($0)/\(list.chatItems.count)" } ?? ""
     }
 
     /// Значения для экрана S.P.E.C.I.A.L. из настроек.
@@ -179,7 +182,7 @@ final class CompanionController: NSObject {
             charismaLevel: prefs.charisma,
             charismaLabel: "РЕПЛИКИ: " + Charisma.title(level: prefs.charisma),
             intelligenceLabel: prefs.connections.active.map { "ПОДКЛЮЧЕНИЕ: " + $0.name.uppercased() } ?? "НЕТ ПОДКЛЮЧЕНИЙ",
-            intelligenceCount: prefs.connections.items.count
+            intelligenceCount: prefs.connections.chatItems.count
         )
     }
 
@@ -209,9 +212,7 @@ final class CompanionController: NSObject {
     }
 
     private func refreshLimits() {
-        console.model.showLimits = prefs.showLimits
-        guard prefs.showLimits else { return }
-        console.model.limits.refresh(prefs.connections.items)
+        console.model.limits.refresh(prefs.connections.items.filter(\.showLimits))
     }
 
     /// Как узнавать лимит подключения (остаток токенов или средств) — для блока на мониторе.
