@@ -479,16 +479,15 @@ final class SpecialStatsTests: XCTestCase {
         XCTAssertEqual(SlashParser.completion(for: "/he"), "/help")
         XCTAssertNil(SlashParser.completion(for: "/help"), "уже полностью")
         XCTAssertNil(SlashParser.completion(for: "привет"))
-        // Несколько совпадений: дописывается общее начало (/s — sleep, settings, special: общего больше нет).
+        // Несколько совпадений: дописывается общее начало (/s — sleep, settings: общего больше нет).
         XCTAssertNil(SlashParser.completion(for: "/s"))
         XCTAssertEqual(SlashParser.completion(for: "/se"), "/settings")
         XCTAssertEqual(SlashParser.completion(for: "/sl"), "/sleep")
     }
 
-    func testSpecialSlashCommand() {
-        XCTAssertEqual(SlashParser.parse("/special"), .command(.special))
-        XCTAssertEqual(SlashParser.parse("/статы"), .command(.special))
-        XCTAssertTrue(SlashParser.helpLines.joined().contains("/special"))
+    func testSpecialIsNotASlashCommand() {
+        XCTAssertEqual(SlashParser.parse("/special"), .unknown("/special"))
+        XCTAssertFalse(SlashParser.helpLines.joined().contains("/special"))
     }
 }
 

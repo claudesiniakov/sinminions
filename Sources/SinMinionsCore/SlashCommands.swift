@@ -2,7 +2,7 @@ import Foundation
 
 /// Команды терминала, которые вводятся со «/».
 public enum SlashCommand: Equatable, Sendable, CaseIterable {
-    case help, nap, hide, corner, unlock, lock, resetLayout, settings, clear, next, previous, special
+    case help, nap, hide, corner, unlock, lock, resetLayout, settings, clear, next, previous
 }
 
 public enum SlashParseResult: Equatable, Sendable {
@@ -26,7 +26,6 @@ public enum SlashParser {
         .clear: ["/clear", "/очистить"],
         .next: ["/next", "/след"],
         .previous: ["/prev", "/пред"],
-        .special: ["/special", "/stats", "/статы"],
     ]
 
     public static func parse(_ text: String) -> SlashParseResult {
@@ -46,7 +45,7 @@ public enum SlashParser {
         .help: "справка по командам", .nap: "усыпить на час", .hide: "скрыть призрака",
         .corner: "вернуть в угол", .unlock: "разблокировать окна", .lock: "заблокировать окна",
         .resetLayout: "сбросить раскладку", .settings: "открыть настройки", .clear: "очистить чат",
-        .next: "следующее подключение", .previous: "предыдущее подключение", .special: "S.P.E.C.I.A.L.",
+        .next: "следующее подключение", .previous: "предыдущее подключение",
     ]
 
     public struct Hint: Equatable, Sendable {
@@ -95,7 +94,6 @@ public enum SlashParser {
         "/settings — ОТКРЫТЬ НАСТРОЙКИ",
         "/clear — ОЧИСТИТЬ ЧАТ",
         "/next, /prev — СЛЕДУЮЩЕЕ И ПРЕДЫДУЩЕЕ ПОДКЛЮЧЕНИЕ",
-        "/special — S.P.E.C.I.A.L.: РАЗМЕР, СКОРОСТЬ, СОН",
-        "РУССКИЕ НАЗВАНИЯ: /помощь /сон /скрыть /угол /разблокировать /заблокировать /сброс /настройки /очистить /след /пред /статы",
+        "РУССКИЕ НАЗВАНИЯ: /помощь /сон /скрыть /угол /разблокировать /заблокировать /сброс /настройки /очистить /след /пред",
     ]
 }

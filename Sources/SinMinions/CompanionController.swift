@@ -208,12 +208,6 @@ final class CompanionController: NSObject {
         refreshSpecial()
     }
 
-    /// Для снимка в CI: открыт экран S.P.E.C.I.A.L.
-    func showSpecialDemo() {
-        console.model.specialRow = 0
-        console.model.screen = .special
-    }
-
     private func refreshLimits() {
         console.model.showLimits = prefs.showLimits
         guard prefs.showLimits else { return }
@@ -452,8 +446,6 @@ final class CompanionController: NSObject {
         case .chat:
             console.model.screen = .chat
             console.activateForTyping()
-        case .special:
-            console.model.screen = .special
         }
     }
 
@@ -489,9 +481,6 @@ final class CompanionController: NSObject {
             switchConnection(command == .next ? 1 : -1, announce: false)
             guard let active = prefs.connections.active else { return "ПОДКЛЮЧЕНИЙ НЕТ" }
             return "ПОДКЛЮЧЕНИЕ: " + active.name.uppercased() + " · " + active.model.uppercased()
-        case .special:
-            console.model.screen = .special
-            return nil
         case .help, .clear:
             return nil
         }

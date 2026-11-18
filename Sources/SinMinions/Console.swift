@@ -6,14 +6,13 @@ import SinMinionsCore
 
 /// Пункты меню терминала. Остальные команды вводятся со «/» (см. `SlashCommand`, «/help»).
 enum ConsoleCommand: Int, CaseIterable, Identifiable {
-    case spotlight, chat, special
+    case spotlight, chat
     var id: Int { rawValue }
 
     var title: String {
         switch self {
         case .spotlight: return "ПОИСК SPOTLIGHT"
         case .chat: return "ЧАТ С ИИ"
-        case .special: return "S.P.E.C.I.A.L."
         }
     }
 }
@@ -279,7 +278,7 @@ final class ChatSession {
 @MainActor
 @Observable
 final class ConsoleModel {
-    enum Screen { case menu, chat, special }
+    enum Screen { case menu, chat }
 
     var screen = Screen.menu {
         didSet { if screen != oldValue { onScreenChange() } }
@@ -293,19 +292,8 @@ final class ConsoleModel {
     var shellLog: [String] = []
     /// Экран S.P.E.C.I.A.L.: значения и выбранная строка.
     var special = SpecialState()
-    var specialRow = 0
     @ObservationIgnored var adjustSpecial: (SpecialStat, Int) -> Void = { _, _ in }
 
-    func moveSpecial(_ delta: Int) {
-        let count = SpecialStat.allCases.count
-        specialRow = (specialRow + delta + count) % count
-    }
-
-    /// «+» и «−» (и стрелки влево и вправо) меняют выбранную характеристику, если она рабочая.
-    func adjustSelectedSpecial(_ delta: Int) {
-        guard let stat = SpecialStat(rawValue: specialRow), stat.isActive else { return }
-        adjustSpecial(stat, delta)
-    }
     /// Растёт, когда нужно вернуть фокус в строку ввода.
     var focusTick = 0
     /// Выбранное подключение к нейросети («интеллект») — для монитора и заголовка чата.
@@ -511,10 +499,6 @@ struct TerminalView: View {
         switch model.screen {
         case .menu: menu
         case .chat: ChatScreen(model: model)
-        case .special:
-            TerminalFrame(title: "MOTH-OS // S.P.E.C.I.A.L.", window: .terminal, model: model) {
-                SpecialScreen(model: model)
-            }
         }
     }
 
@@ -621,92 +605,6 @@ private struct ShellScreen: View {
         .tint(Term.green)
         .onAppear { focused = true }
         .onChange(of: model.focusTick) { focused = true }
-    }
-}
-
-/// Экран S.P.E.C.I.A.L.: семь строк с «−» и «+». Выбор — стрелки вверх и вниз или щелчок, значение — стрелки
-/// влево и вправо, «+» и «−» или кнопки.
-private struct SpecialScreen: View {
-    var model: ConsoleModel
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(SpecialStat.allCases) { stat in row(stat) }
-                }
-            }
-            Text("↑↓ СТРОКА · ←→ ИЛИ +/− ЗНАЧЕНИЕ · ESC НАЗАД")
-                .font(Term.small)
-                .foregroundStyle(Term.dim)
-        }
-    }
-
-    /// Уровень, число уровней и подпись; nil — характеристика пока без назначения.
-    private func detail(_ stat: SpecialStat) -> (level: Int, levels: Int, label: String)? {
-        let state = model.special
-        switch stat {
-        case .strength: return (state.scaleLevel, Prefs.scales.count, state.scaleLabel)
-        case .endurance: return (state.enduranceLevel, Endurance.levels, state.enduranceLabel)
-        case .agility: return (state.agilityLevel, Agility.levels, state.agilityLabel)
-        case .charisma: return (state.charismaLevel, Charisma.levels, state.charismaLabel)
-        case .intelligence: return (-1, 0, state.intelligenceLabel)
-        default: return nil
-        }
-    }
-
-    private func bar(_ level: Int, _ levels: Int) -> String {
-        guard level >= 0 else { return "" }
-        return String(repeating: "█", count: level + 1) + String(repeating: "░", count: max(levels - level - 1, 0))
-    }
-
-    private func button(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Text(symbol)
-            .frame(width: 26, height: 26)
-            .overlay(Rectangle().strokeBorder(enabled ? Term.green : Term.dark, lineWidth: 1))
-            .opacity(enabled ? 1 : 0.45)
-            .contentShape(Rectangle())
-            .onTapGesture { if enabled { action() } }
-    }
-
-    private func row(_ stat: SpecialStat) -> some View {
-        let selected = model.specialRow == stat.rawValue
-        let info = detail(stat)
-        let canAdjust = stat.isActive && (stat != .intelligence || model.special.intelligenceCount > 1)
-        return HStack(spacing: 10) {
-            Text(stat.letter)
-                .font(.system(size: 22, weight: .bold, design: .monospaced))
-                .frame(width: 26)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(stat.title)
-                Text(info?.label ?? "НЕ ЗАДАНО")
-                    .font(.system(size: 9.5, design: .monospaced))
-                    .foregroundStyle(Term.dim)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 4)
-            if let info, info.level >= 0 {
-                Text(bar(info.level, info.levels))
-            }
-            if stat.isActive {
-                button("−", enabled: canAdjust) {
-                    model.specialRow = stat.rawValue
-                    model.adjustSpecial(stat, -1)
-                }
-                button("+", enabled: canAdjust) {
-                    model.specialRow = stat.rawValue
-                    model.adjustSpecial(stat, 1)
-                }
-            }
-        }
-        .font(Term.small)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(selected ? Term.green.opacity(0.16) : Color.clear)
-        .overlay(Rectangle().strokeBorder(selected ? Term.green : Color.clear, lineWidth: 1))
-        .foregroundStyle(stat.isActive ? Term.green : Term.dim)
-        .contentShape(Rectangle())
-        .onTapGesture { model.specialRow = stat.rawValue }
     }
 }
 
@@ -831,26 +729,46 @@ struct MonitorView: View {
 
     /// Призрак вместо человечка Pip-Boy и переключатель «интеллекта»: «−» и «+» меняют подключение.
     /// Порядок подключений и модель задаются в настройках.
-    /// S.P.E.C.I.A.L. над призраком: буква и текущий уровень; щелчок открывает экран характеристик в терминале.
+    /// S.P.E.C.I.A.L. над призраком: буква, уровень и под ними «−» и «+» для рабочих характеристик.
     private var specialStrip: some View {
         let state = model.special
         let position = model.llmPosition.split(separator: "/").first.map(String.init) ?? "–"
-        let values: [String] = [
-            "\(state.scaleLevel)", "–", "\(state.enduranceLevel)", "\(state.charismaLevel)",
-            position, "\(state.agilityLevel)", "–",
+        // Значение и число уровней по буквам; нет записи — характеристика пока без назначения.
+        let info: [SpecialStat: (value: String, level: Int, levels: Int)] = [
+            .strength: ("\(state.scaleLevel)", state.scaleLevel, Prefs.scales.count),
+            .endurance: ("\(state.enduranceLevel)", state.enduranceLevel, Endurance.levels),
+            .charisma: ("\(state.charismaLevel)", state.charismaLevel, Charisma.levels),
+            .intelligence: (position, model.llmCount > 1 ? 1 : 0, model.llmCount > 1 ? 3 : 1),
+            .agility: ("\(state.agilityLevel)", state.agilityLevel, Agility.levels),
         ]
         return HStack(spacing: 0) {
             ForEach(SpecialStat.allCases) { stat in
-                VStack(spacing: 1) {
+                VStack(spacing: 2) {
                     Text(stat.letter).font(.system(size: 15, weight: .bold, design: .monospaced))
-                    Text(values[stat.rawValue]).font(Term.small)
+                    Text(info[stat]?.value ?? "–").font(Term.small)
+                    if let item = info[stat] {
+                        HStack(spacing: 1) {
+                            specialButton("−", enabled: item.level > 0) { model.adjustSpecial(stat, -1) }
+                            specialButton("+", enabled: item.level < item.levels - 1) { model.adjustSpecial(stat, 1) }
+                        }
+                    } else {
+                        Color.clear.frame(width: 29, height: 15)
+                    }
                 }
                 .foregroundStyle(stat.isActive ? Term.green : Term.dim)
                 .frame(maxWidth: .infinity)
             }
         }
-        .contentShape(Rectangle())
-        .onTapGesture { model.screen = .special }
+    }
+
+    private func specialButton(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Text(symbol)
+            .font(.system(size: 10, design: .monospaced))
+            .frame(width: 14, height: 15)
+            .overlay(Rectangle().strokeBorder(enabled ? Term.green : Term.dark, lineWidth: 1))
+            .opacity(enabled ? 1 : 0.4)
+            .contentShape(Rectangle())
+            .onTapGesture { if enabled { action() } }
     }
 
     private var intelligence: some View {
@@ -1132,7 +1050,6 @@ final class ConsoleController: NSObject, NSWindowDelegate {
             switch self.model.screen {
             case .chat: self.model.chat.input += line
             case .menu: self.model.shellInput += line
-            case .special: break
             }
             self.model.focusTick += 1
             self.focusInput()
@@ -1339,18 +1256,6 @@ final class ConsoleController: NSObject, NSWindowDelegate {
 
     private func handleKey(_ code: UInt16) -> Bool {
         guard isOpen else { return false }
-        // На экране S.P.E.C.I.A.L. строки ввода нет: стрелки выбирают строку, ←→ и +/− меняют значение.
-        if model.screen == .special {
-            switch code {
-            case 53: model.screen = .menu
-            case 126: model.moveSpecial(-1)
-            case 125: model.moveSpecial(1)
-            case 123, 27, 78: model.adjustSelectedSpecial(-1)
-            case 124, 24, 69: model.adjustSelectedSpecial(1)
-            default: return false
-            }
-            return true
-        }
         // В чате клавиатуру получает строка ввода; Esc возвращает в меню.
         if model.screen == .chat {
             guard code == 53 else { return false }
