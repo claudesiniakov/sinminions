@@ -63,9 +63,11 @@ final class CompanionView: NSView {
     }
 
     let scale: CGFloat
-    private let moth = CALayer()
-    private let body = CAShapeLayer()
-    private let eyes = CALayer()
+    let style: GhostStyle
+    private let art: GhostArt
+    private let moth: CALayer
+    private let body: CAShapeLayer
+    private let eyes: CALayer
     private let zzz = CATextLayer()
     private let bodyPath: CGPath
     private var sleeping = false
@@ -82,11 +84,14 @@ final class CompanionView: NSView {
     private var downOrigin = CGPoint.zero
     private var pendingClick: Task<Void, Never>?
 
-    init(scale: CGFloat) {
+    init(scale: CGFloat, style: GhostStyle = .classic) {
         self.scale = scale
-        // SVG → слой: масштаб и переворот оси y.
-        let transform = CGAffineTransform(a: scale, b: 0, c: 0, d: -scale, tx: 0, ty: MothShape.size.height * scale)
-        bodyPath = MothShape.body(transform)
+        self.style = style
+        art = GhostArt(style: style, scale: scale)
+        moth = art.root
+        body = art.body
+        eyes = art.eyes
+        bodyPath = art.bodyPath
         super.init(frame: CGRect(origin: .zero, size: Self.windowSize(scale: scale)))
         wantsLayer = true
         layer?.backgroundColor = .clear
@@ -95,36 +100,7 @@ final class CompanionView: NSView {
         let inset = Self.glowMargin * scale
         moth.frame = CGRect(origin: CGPoint(x: inset, y: inset), size: size)
 
-        body.path = bodyPath
-        body.fillColor = Palette.body.cgColor
-        body.strokeColor = Palette.bodyStroke.cgColor
-        body.lineWidth = 1.5 * scale
-        // Зелёное свечение; контур тени задан явно, чтобы система не считала её по пикселям.
-        body.shadowPath = bodyPath
-        body.shadowColor = Palette.green.cgColor
-        body.shadowOffset = .zero
-        body.shadowRadius = 3 * scale
-        body.shadowOpacity = 0.35
-        moth.addSublayer(body)
-
-        // Глаза — отдельный слой с опорной точкой на линии глаз: моргание сжимает их к этой линии.
-        eyesHome = CGPoint(x: size.width / 2, y: (MothShape.size.height - MothShape.eyeLineY) * scale)
-        eyes.bounds = CGRect(origin: .zero, size: size)
-        eyes.anchorPoint = CGPoint(x: 0.5, y: eyesHome.y / size.height)
-        eyes.position = eyesHome
-        for center in MothShape.eyeCenters {
-            let eye = CAShapeLayer()
-            eye.path = MothShape.ellipse(center: center, radii: MothShape.eyeRadii, transform)
-            eye.fillColor = Palette.green.cgColor
-            eyes.addSublayer(eye)
-        }
-        for center in MothShape.shineCenters {
-            let shine = CAShapeLayer()
-            shine.path = MothShape.ellipse(center: center, radii: CGSize(width: 1, height: 1), transform)
-            shine.fillColor = Palette.pupil.cgColor
-            eyes.addSublayer(shine)
-        }
-        moth.addSublayer(eyes)
+        eyesHome = art.eyesHome
         layer?.addSublayer(moth)
 
         // «z z z» над спящим.
@@ -174,8 +150,8 @@ final class CompanionView: NSView {
                 keyframes("opacity", [0.55, 0.7, 0.55], times),
             ]
             group.duration = 6
-            glowRadius.fromValue = 1.5 * scale
-            glowRadius.toValue = 2.5 * scale
+            glowRadius.fromValue = 1.5 * scale * art.glowScale
+            glowRadius.toValue = 2.5 * scale * art.glowScale
             glowOpacity.fromValue = 0.12
             glowOpacity.toValue = 0.2
         } else {
@@ -188,8 +164,8 @@ final class CompanionView: NSView {
                 keyframes("opacity", [0.82, 1, 0.9, 1, 0.82], times),
             ]
             group.duration = 5
-            glowRadius.fromValue = 3 * scale
-            glowRadius.toValue = 8 * scale
+            glowRadius.fromValue = 3 * scale * art.glowScale
+            glowRadius.toValue = 8 * scale * art.glowScale
             glowOpacity.fromValue = 0.35
             glowOpacity.toValue = 0.8
         }
@@ -230,7 +206,7 @@ final class CompanionView: NSView {
         moth.add(hop, forKey: "hop")
 
         let burst = CAKeyframeAnimation(keyPath: "shadowRadius")
-        burst.values = [8 * scale, 11 * scale, 8 * scale]
+        burst.values = [8, 11, 8].map { $0 * scale * art.glowScale }
         burst.duration = 0.5
         let flash = CAKeyframeAnimation(keyPath: "shadowOpacity")
         flash.values = [0.8, 1, 0.8]

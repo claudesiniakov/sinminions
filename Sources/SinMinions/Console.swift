@@ -144,8 +144,8 @@ enum LayoutEvent {
     case resize(GesturePhase)
 }
 
-/// Характеристики призрака, как в Fallout. Работают S (размер), C (частота реплик), E (сон), I (подключение
-/// к нейросети) и A (скорость полёта); P и L пока без назначения.
+/// Характеристики призрака, как в Fallout. Работают S (размер), P (облик), C (частота реплик), E (сон),
+/// I (подключение к нейросети) и A (скорость полёта); L пока без назначения.
 enum SpecialStat: Int, CaseIterable, Identifiable {
     case strength, perception, endurance, charisma, intelligence, agility, luck
     var id: Int { rawValue }
@@ -153,13 +153,15 @@ enum SpecialStat: Int, CaseIterable, Identifiable {
     var title: String {
         ["СИЛА", "ВОСПРИЯТИЕ", "ВЫНОСЛИВОСТЬ", "ХАРИЗМА", "ИНТЕЛЛЕКТ", "ЛОВКОСТЬ", "УДАЧА"][rawValue]
     }
-    var isActive: Bool { self == .strength || self == .endurance || self == .intelligence || self == .agility || self == .charisma }
+    var isActive: Bool { self == .strength || self == .perception || self == .endurance || self == .intelligence || self == .agility || self == .charisma }
 }
 
 /// Значения характеристик для экрана S.P.E.C.I.A.L.
 struct SpecialState: Equatable {
     var scaleLevel = 1
     var scaleLabel = "РАЗМЕР 1,5×"
+    var perceptionLevel = 0
+    var perceptionLabel = "ОБЛИК: КЛАССИЧЕСКИЙ"
     var agilityLevel = Agility.defaultLevel
     var agilityLabel = "ОБЫЧНО"
     var enduranceLevel = 1
@@ -303,6 +305,8 @@ final class ConsoleModel {
     var llmCount = 0
     /// Настройка «Запрашивать и показывать лимиты».
     var showLimits = true
+    /// Облик призрака в мониторе.
+    var ghostStyle: GhostStyle = .classic
     /// Выбранная буква S.P.E.C.I.A.L. в мониторе: её уровень меняют большие «−» и «+».
     var selectedStat: SpecialStat = .intelligence
     var llmConnections: [LLMConnectionRow] = []
@@ -692,23 +696,44 @@ private struct ChatScreen: View {
 }
 
 /// Призрак Moth для монитора: тот же контур, что и у персонажа на экране.
-private struct GhostFigure: View {
-    var body: some View {
-        Canvas { context, size in
-            let k = size.width / MothShape.size.width
-            let transform = CGAffineTransform(scaleX: k, y: k)
-            let body = Path(MothShape.body(transform))
-            context.fill(body, with: .color(Term.body))
-            context.stroke(body, with: .color(Term.bodyStroke), lineWidth: 1.5 * k)
-            for center in MothShape.eyeCenters {
-                context.fill(Path(MothShape.ellipse(center: center, radii: MothShape.eyeRadii, transform)), with: .color(Term.green))
-            }
-            for center in MothShape.shineCenters {
-                context.fill(Path(MothShape.ellipse(center: center, radii: CGSize(width: 1, height: 1), transform)), with: .color(Term.pupil))
-            }
-        }
-        .aspectRatio(MothShape.size.width / MothShape.size.height, contentMode: .fit)
-        .shadow(color: Term.green.opacity(0.6), radius: 8)
+private struct GhostFigure: NSViewRepresentable {
+    let style: GhostStyle
+
+    func makeNSView(context: Context) -> GhostFigureHost { GhostFigureHost(style: style) }
+
+    func updateNSView(_ view: GhostFigureHost, context: Context) { view.show(style) }
+}
+
+/// Призрак для монитора: те же слои, что у призрака на экране, размером 72×84.
+final class GhostFigureHost: NSView {
+    private var style: GhostStyle
+
+    init(style: GhostStyle) {
+        self.style = style
+        super.init(frame: NSRect(x: 0, y: 0, width: 72, height: 84))
+        wantsLayer = true
+        layer?.masksToBounds = false
+        rebuild()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) не используется") }
+
+    override var intrinsicContentSize: NSSize { NSSize(width: 72, height: 84) }
+
+    func show(_ style: GhostStyle) {
+        guard style != self.style else { return }
+        self.style = style
+        rebuild()
+    }
+
+    private func rebuild() {
+        layer?.sublayers?.forEach { $0.removeFromSuperlayer() }
+        let art = GhostArt(style: style, scale: 1.5)
+        art.root.frame = CGRect(x: 0, y: 0, width: 72, height: 84)
+        art.body.shadowRadius = 6 * art.glowScale
+        art.body.shadowOpacity = 0.6
+        layer?.addSublayer(art.root)
     }
 }
 
@@ -734,6 +759,7 @@ struct MonitorView: View {
         let state = model.special
         switch stat {
         case .strength: return ("\(state.scaleLevel)", state.scaleLevel, Prefs.scales.count, state.scaleLabel)
+        case .perception: return ("\(state.perceptionLevel)", state.perceptionLevel, GhostStyle.levels, state.perceptionLabel)
         case .endurance: return ("\(state.enduranceLevel)", state.enduranceLevel, Endurance.levels, state.enduranceLabel)
         case .charisma: return ("\(state.charismaLevel)", state.charismaLevel, Charisma.levels, state.charismaLabel)
         case .agility: return ("\(state.agilityLevel)", state.agilityLevel, Agility.levels, state.agilityLabel)
@@ -776,7 +802,7 @@ struct MonitorView: View {
         let levels = info?.levels ?? 0
         return VStack(spacing: 6) {
             specialStrip
-            GhostFigure()
+            GhostFigure(style: model.ghostStyle)
                 .frame(width: 72, height: 84)
             Text(stat.title)
                 .foregroundStyle(Term.dim)

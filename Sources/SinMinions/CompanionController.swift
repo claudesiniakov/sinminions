@@ -73,7 +73,7 @@ final class CompanionController: NSObject {
             config: prefs.behaviorConfig(lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled),
             now: Date().timeIntervalSinceReferenceDate
         )
-        let view = CompanionView(scale: prefs.scale)
+        let view = CompanionView(scale: prefs.scale, style: prefs.ghostStyle)
         self.view = view
         panel = NSPanel(
             contentRect: CGRect(origin: .zero, size: view.frame.size),
@@ -172,9 +172,12 @@ final class CompanionController: NSObject {
     private func refreshSpecial() {
         let scales = Prefs.scales
         let scaleText = prefs.scale == 1.5 ? "1,5×" : "\(Int(prefs.scale))×"
+        console.model.ghostStyle = prefs.ghostStyle
         console.model.special = SpecialState(
             scaleLevel: scales.firstIndex(of: prefs.scale) ?? 1,
             scaleLabel: "РАЗМЕР " + scaleText,
+            perceptionLevel: prefs.ghostStyle.rawValue,
+            perceptionLabel: "ОБЛИК: " + prefs.ghostStyle.title,
             agilityLevel: prefs.agility,
             agilityLabel: "СКОРОСТЬ ПОЛЁТА: " + Agility.title(level: prefs.agility),
             enduranceLevel: prefs.endurance,
@@ -186,7 +189,7 @@ final class CompanionController: NSObject {
         )
     }
 
-    /// «+» и «−» у характеристики: S — размер, C — реплики, E — сон, I — подключение к нейросети, A — скорость полёта.
+    /// «+» и «−» у характеристики: S — размер, P — облик, C — реплики, E — сон, I — подключение к нейросети, A — скорость полёта.
     private func adjustSpecial(_ stat: SpecialStat, _ delta: Int) {
         switch stat {
         case .strength:
@@ -195,6 +198,8 @@ final class CompanionController: NSObject {
             prefs.scale = scales[min(max(index + delta, 0), scales.count - 1)]
         case .agility:
             prefs.agility = Agility.clamp(prefs.agility + delta)
+        case .perception:
+            prefs.ghostStyleLevel = GhostStyle.clamp(prefs.ghostStyleLevel + delta).rawValue
         case .charisma:
             prefs.charisma = Charisma.clamp(prefs.charisma + delta)
         case .endurance:
@@ -205,7 +210,7 @@ final class CompanionController: NSObject {
             }
         case .intelligence:
             switchConnection(delta, announce: false)
-        case .perception, .luck:
+        case .luck:
             break
         }
         refreshSpecial()
@@ -235,7 +240,7 @@ final class CompanionController: NSObject {
         refreshLLM()
         refreshSpecial()
         if console.isOpen { refreshLimits() }
-        if view.scale != CGFloat(prefs.scale) { rebuildView() }
+        if view.scale != CGFloat(prefs.scale) || view.style != prefs.ghostStyle { rebuildView() }
         applyCollectionBehavior()
         engine.reconfigure(prefs.behaviorConfig(lowPower: lowPower), now: now)
     }
@@ -514,6 +519,12 @@ final class CompanionController: NSObject {
         console.model.runSlash("/help", output: .shell)
     }
 
+    /// Для снимков в CI: смена облика призрака.
+    func setGhostStyleForDemo(_ level: Int) {
+        prefs.ghostStyleLevel = GhostStyle.clamp(level).rawValue
+        prefsChanged()
+    }
+
     /// Для снимка в CI: окна разблокированы.
     func unlockConsoleForDemo() {
         console.setUnlocked(true)
@@ -553,7 +564,7 @@ final class CompanionController: NSObject {
     private func rebuildView() {
         let wasSleeping = isSleeping
         let old = panel.frame
-        view = CompanionView(scale: prefs.scale)
+        view = CompanionView(scale: prefs.scale, style: prefs.ghostStyle)
         wire(view)
         // Низ и середина по горизонтали остаются на месте.
         let size = view.frame.size

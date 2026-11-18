@@ -63,6 +63,9 @@ final class Prefs {
     var scareEnabled: Bool { didSet { store(scareEnabled, "scareEnabled") } }
     var chaseEnabled: Bool { didSet { store(chaseEnabled, "chaseEnabled") } }
     var agility: Int { didSet { store(agility, "agility") } }
+    /// Облик призрака (P в S.P.E.C.I.A.L.): номер стиля отрисовки.
+    var ghostStyleLevel: Int { didSet { store(ghostStyleLevel, "ghostStyle") } }
+    var ghostStyle: GhostStyle { GhostStyle.clamp(ghostStyleLevel) }
     var alwaysAsleep: Bool { didSet { store(alwaysAsleep, "alwaysAsleep") } }
     var hideSeekEnabled: Bool { didSet { store(hideSeekEnabled, "hideSeekEnabled") } }
     var celebrateEnabled: Bool { didSet { store(celebrateEnabled, "celebrateEnabled") } }
@@ -87,6 +90,7 @@ final class Prefs {
         scareEnabled = d.object(forKey: "scareEnabled") as? Bool ?? true
         chaseEnabled = d.object(forKey: "chaseEnabled") as? Bool ?? true
         hideSeekEnabled = d.object(forKey: "hideSeekEnabled") as? Bool ?? true
+        ghostStyleLevel = GhostStyle.clamp(d.object(forKey: "ghostStyle") as? Int ?? 0).rawValue
         agility = Agility.clamp(d.object(forKey: "agility") as? Int ?? Agility.defaultLevel)
         alwaysAsleep = d.object(forKey: "alwaysAsleep") as? Bool ?? false
         celebrateEnabled = d.object(forKey: "celebrateEnabled") as? Bool ?? true

@@ -439,6 +439,17 @@ final class SpecialStatsTests: XCTestCase {
         XCTAssertEqual(Charisma.title(level: Charisma.defaultLevel), "ОБЫЧНО (2–5 МИН)")
     }
 
+    func testGhostStyles() {
+        XCTAssertEqual(GhostStyle.levels, 5)
+        XCTAssertEqual(GhostStyle.defaultStyle, .classic)
+        XCTAssertEqual(GhostStyle.clamp(-3), .classic)
+        XCTAssertEqual(GhostStyle.clamp(99), .radiation)
+        XCTAssertEqual(GhostStyle.clamp(2), .warden)
+        XCTAssertEqual(GhostStyle.allCases.map(\.title), ["КЛАССИЧЕСКИЙ", "ДЕТАЛЬНЫЙ", "СМОТРИТЕЛЬ", "ТЕРМИНАЛ", "РАДИАЦИЯ"])
+        XCTAssertEqual(GhostStyle.classic.glowScale, 1)
+        XCTAssertGreaterThan(GhostStyle.radiation.glowScale, GhostStyle.detailed.glowScale)
+    }
+
     func testSleepsAlways() {
         var config = BehaviorConfig()
         config.sleepsAlways = true

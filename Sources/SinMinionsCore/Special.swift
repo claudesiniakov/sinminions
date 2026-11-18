@@ -64,3 +64,35 @@ public enum Charisma {
         ["МОЛЧИТ", "РЕДКО (5–15 МИН)", "ОБЫЧНО (2–5 МИН)", "ЧАСТО (8–14 С)"][clamp(level)]
     }
 }
+
+/// Облик призрака (P в S.P.E.C.I.A.L.): пять стилей отрисовки одного и того же силуэта.
+public enum GhostStyle: Int, CaseIterable, Sendable {
+    case classic, detailed, warden, terminal, radiation
+
+    public static let levels = allCases.count
+    public static let defaultStyle = GhostStyle.classic
+
+    public static func clamp(_ level: Int) -> GhostStyle {
+        GhostStyle(rawValue: min(max(level, 0), levels - 1)) ?? defaultStyle
+    }
+
+    public var title: String {
+        switch self {
+        case .classic: return "КЛАССИЧЕСКИЙ"
+        case .detailed: return "ДЕТАЛЬНЫЙ"
+        case .warden: return "СМОТРИТЕЛЬ"
+        case .terminal: return "ТЕРМИНАЛ"
+        case .radiation: return "РАДИАЦИЯ"
+        }
+    }
+
+    /// Во сколько раз свечение сильнее или слабее, чем у классического призрака.
+    public var glowScale: Double {
+        switch self {
+        case .classic, .warden: return 1
+        case .detailed: return 1.1
+        case .terminal: return 0.8
+        case .radiation: return 1.7
+        }
+    }
+}
