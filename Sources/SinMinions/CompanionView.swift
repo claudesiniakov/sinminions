@@ -1,5 +1,6 @@
 import AppKit
 import QuartzCore
+import SinMinionsCore
 
 /// Контуры призрака Moth из claudesiniakov/summary (SVG 48×56, ось y вниз).
 enum MothShape {
