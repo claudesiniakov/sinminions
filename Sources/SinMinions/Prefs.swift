@@ -66,7 +66,7 @@ final class Prefs {
     /// Облик призрака (P в S.P.E.C.I.A.L.): номер стиля отрисовки.
     var ghostStyleLevel: Int { didSet { store(ghostStyleLevel, "ghostStyle") } }
     var ghostStyle: GhostStyle { GhostStyle.clamp(ghostStyleLevel) }
-    /// Режим «кофе» (уровень 3 буквы E): ноутбук не засыпает. После перезапуска выключен, чтобы не разряжать батарею втихую.
+    /// Режим «кофе» (уровень 3 буквы E или команда /coffee): ноутбук не засыпает. После перезапуска выключен, чтобы не разряжать батарею втихую.
     var coffee = false { didSet { onChange() } }
     var alwaysAsleep: Bool { didSet { store(alwaysAsleep, "alwaysAsleep") } }
     var hideSeekEnabled: Bool { didSet { store(hideSeekEnabled, "hideSeekEnabled") } }
@@ -178,7 +178,7 @@ final class Prefs {
         config.celebrateEnabled = celebrateEnabled
         config.talkEnabled = talkEnabled
         config.talkInterval = talkFrequency.talkInterval
-        config.sleepAfter = sleepMinutes > 0 ? Double(sleepMinutes) * 60 : nil
+        config.sleepAfter = sleepMinutes > 0 && !coffee ? Double(sleepMinutes) * 60 : nil
         config.sleepsAlways = alwaysAsleep
         config.consoleEnabled = mode == .medium
         return config

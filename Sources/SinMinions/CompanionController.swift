@@ -483,6 +483,9 @@ final class CompanionController: NSObject {
         case .nap:
             nap(seconds: 3600)
             return "ПРИЗРАК УСНУЛ НА 1 ЧАС"
+        case .coffee:
+            prefs.coffee.toggle()
+            return prefs.coffee ? "КОФЕ: НОУТБУК НЕ ЗАСНЁТ, ПОКА ВКЛЮЧЕНО" : "КОФЕ ДОПИТ: НОУТБУК СНОВА МОЖЕТ ЗАСНУТЬ"
         case .hide:
             setHidden(true)
             return nil

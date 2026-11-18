@@ -2,7 +2,7 @@ import Foundation
 
 /// Команды терминала, которые вводятся со «/».
 public enum SlashCommand: Equatable, Sendable, CaseIterable {
-    case help, nap, hide, corner, unlock, lock, resetLayout, settings, clear, next, previous
+    case help, nap, coffee, hide, corner, unlock, lock, resetLayout, settings, clear, next, previous
 }
 
 public enum SlashParseResult: Equatable, Sendable {
@@ -17,6 +17,7 @@ public enum SlashParser {
     static let names: [SlashCommand: [String]] = [
         .help: ["/help", "/?", "/помощь", "/справка"],
         .nap: ["/sleep", "/nap", "/сон", "/спать"],
+        .coffee: ["/coffee", "/кофе"],
         .hide: ["/hide", "/скрыть"],
         .corner: ["/corner", "/угол"],
         .unlock: ["/unlock", "/разблокировать"],
@@ -42,7 +43,7 @@ public enum SlashParser {
 
     /// Краткие описания для подсказок при вводе.
     static let summaries: [SlashCommand: String] = [
-        .help: "справка по командам", .nap: "усыпить на час", .hide: "скрыть призрака",
+        .help: "справка по командам", .nap: "усыпить на час", .coffee: "не давать ноутбуку уснуть (вкл/выкл)", .hide: "скрыть призрака",
         .corner: "вернуть в угол", .unlock: "разблокировать окна", .lock: "заблокировать окна",
         .resetLayout: "сбросить раскладку", .settings: "открыть настройки", .clear: "очистить чат",
         .next: "следующее подключение", .previous: "предыдущее подключение",
@@ -87,6 +88,7 @@ public enum SlashParser {
     public static let helpLines: [String] = [
         "/help — ЭТА СПРАВКА",
         "/sleep — УСЫПИТЬ НА 1 ЧАС",
+        "/coffee — НЕ ДАВАТЬ НОУТБУКУ УСНУТЬ (ВКЛ/ВЫКЛ), У ПРИЗРАКА ЧАШКА КОФЕ",
         "/hide — СКРЫТЬ ПРИЗРАКА",
         "/corner — ВЕРНУТЬ В УГОЛ",
         "/unlock, /lock — РАЗБЛОКИРОВАТЬ И ЗАБЛОКИРОВАТЬ ОКНА",
@@ -94,6 +96,6 @@ public enum SlashParser {
         "/settings — ОТКРЫТЬ НАСТРОЙКИ",
         "/clear — ОЧИСТИТЬ ЧАТ",
         "/next, /prev — СЛЕДУЮЩЕЕ И ПРЕДЫДУЩЕЕ ПОДКЛЮЧЕНИЕ",
-        "РУССКИЕ НАЗВАНИЯ: /помощь /сон /скрыть /угол /разблокировать /заблокировать /сброс /настройки /очистить /след /пред",
+        "РУССКИЕ НАЗВАНИЯ: /помощь /сон /кофе /скрыть /угол /разблокировать /заблокировать /сброс /настройки /очистить /след /пред",
     ]
 }
