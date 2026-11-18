@@ -470,7 +470,7 @@ final class SpecialStatsTests: XCTestCase {
         XCTAssertTrue(SlashParser.hints(for: "привет").isEmpty)
         XCTAssertTrue(SlashParser.hints(for: "/zzz").isEmpty)
         XCTAssertEqual(SlashParser.hints(for: "/he").map(\.name), ["/help"])
-        XCTAssertEqual(SlashParser.hints(for: "/СП").map(\.name), ["/спать"])
+        XCTAssertEqual(SlashParser.hints(for: "/СП").map(\.name), ["/справка", "/спать"])
         XCTAssertEqual(SlashParser.hints(for: "/сон").map(\.name), ["/сон"])
         XCTAssertTrue(SlashParser.hints(for: "/help лишнее").isEmpty, "после пробела подсказок нет")
     }
@@ -975,14 +975,14 @@ final class LLMConnectionsTests: XCTestCase {
         XCTAssertNil(LLMConnections.decode(Data("не json".utf8)))
     }
 
-    func testDecodeTruncatesAndFixesActive() throws {
+    func testDecodeKeepsAllAndFixesActive() throws {
         let many = (1...12).map { LLMConnection(name: "n\($0)") }
         let raw = LLMConnections(items: many, activeID: UUID())
-        XCTAssertEqual(raw.items.count, 10)
+        XCTAssertEqual(raw.items.count, 12)
         XCTAssertEqual(raw.active?.name, "n1")
         let encoded = try JSONEncoder().encode(["items": many.map { ["id": $0.id.uuidString, "name": $0.name, "provider": "gigachat", "scope": "GIGACHAT_API_PERS", "model": "GigaChat", "keyAccount": $0.keyAccount] }])
         let decoded = try XCTUnwrap(LLMConnections.decode(encoded))
-        XCTAssertEqual(decoded.items.count, 10)
+        XCTAssertEqual(decoded.items.count, 12)
         XCTAssertEqual(decoded.active?.name, "n1")
     }
 }
