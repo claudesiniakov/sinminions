@@ -176,12 +176,14 @@ final class CompanionController: NSObject {
             agilityLabel: "СКОРОСТЬ ПОЛЁТА: " + Agility.title(level: prefs.agility),
             enduranceLevel: prefs.endurance,
             enduranceLabel: Endurance.title(level: prefs.endurance, sleepMinutes: prefs.sleepMinutes),
+            charismaLevel: prefs.charisma,
+            charismaLabel: "РЕПЛИКИ: " + Charisma.title(level: prefs.charisma),
             intelligenceLabel: prefs.connections.active.map { "ПОДКЛЮЧЕНИЕ: " + $0.name.uppercased() } ?? "НЕТ ПОДКЛЮЧЕНИЙ",
             intelligenceCount: prefs.connections.items.count
         )
     }
 
-    /// «+» и «−» у характеристики: S — размер, E — сон, I — подключение к нейросети, A — скорость полёта.
+    /// «+» и «−» у характеристики: S — размер, C — реплики, E — сон, I — подключение к нейросети, A — скорость полёта.
     private func adjustSpecial(_ stat: SpecialStat, _ delta: Int) {
         switch stat {
         case .strength:
@@ -190,6 +192,8 @@ final class CompanionController: NSObject {
             prefs.scale = scales[min(max(index + delta, 0), scales.count - 1)]
         case .agility:
             prefs.agility = Agility.clamp(prefs.agility + delta)
+        case .charisma:
+            prefs.charisma = Charisma.clamp(prefs.charisma + delta)
         case .endurance:
             prefs.endurance = Endurance.clamp(prefs.endurance + delta)
             // Из сна «пока не потревожат» выходим сразу, как только он отменён.
@@ -198,7 +202,7 @@ final class CompanionController: NSObject {
             }
         case .intelligence:
             switchConnection(delta, announce: false)
-        case .perception, .charisma, .luck:
+        case .perception, .luck:
             break
         }
         refreshSpecial()

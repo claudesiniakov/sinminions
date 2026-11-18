@@ -431,6 +431,14 @@ final class SpecialStatsTests: XCTestCase {
         XCTAssertEqual(Endurance.title(level: 2, sleepMinutes: 0), "НЕ ЗАСЫПАЕТ")
     }
 
+    func testCharismaLevels() {
+        XCTAssertEqual(Charisma.levels, 4)
+        XCTAssertEqual(Charisma.clamp(-1), 0)
+        XCTAssertEqual(Charisma.clamp(9), 3)
+        XCTAssertEqual(Charisma.title(level: 0), "МОЛЧИТ")
+        XCTAssertEqual(Charisma.title(level: Charisma.defaultLevel), "ОБЫЧНО (2–5 МИН)")
+    }
+
     func testSleepsAlways() {
         var config = BehaviorConfig()
         config.sleepsAlways = true

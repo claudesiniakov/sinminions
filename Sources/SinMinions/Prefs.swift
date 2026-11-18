@@ -127,6 +127,28 @@ final class Prefs {
         }
     }
 
+    /// Харизма (C): 0 — молчит, 1 — редко, 2 — обычно, 3 — часто.
+    var charisma: Int {
+        get {
+            guard talkEnabled else { return 0 }
+            switch talkFrequency {
+            case .rare: return 1
+            case .normal: return 2
+            case .often: return 3
+            }
+        }
+        set {
+            let level = Charisma.clamp(newValue)
+            talkEnabled = level > 0
+            switch level {
+            case 1: talkFrequency = .rare
+            case 2: talkFrequency = .normal
+            case 3: talkFrequency = .often
+            default: break
+            }
+        }
+    }
+
     /// Ловкость (A): скорость случайных перелётов.
     var flightSpeedRange: ClosedRange<Double> { Agility.speedRange(level: agility) }
 

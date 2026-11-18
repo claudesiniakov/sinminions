@@ -145,8 +145,8 @@ enum LayoutEvent {
     case resize(GesturePhase)
 }
 
-/// Характеристики призрака, как в Fallout. Работают S (размер), E (сон), I (подключение к нейросети) и
-/// A (скорость полёта); остальные пока без назначения.
+/// Характеристики призрака, как в Fallout. Работают S (размер), C (частота реплик), E (сон), I (подключение
+/// к нейросети) и A (скорость полёта); P и L пока без назначения.
 enum SpecialStat: Int, CaseIterable, Identifiable {
     case strength, perception, endurance, charisma, intelligence, agility, luck
     var id: Int { rawValue }
@@ -154,7 +154,7 @@ enum SpecialStat: Int, CaseIterable, Identifiable {
     var title: String {
         ["СИЛА", "ВОСПРИЯТИЕ", "ВЫНОСЛИВОСТЬ", "ХАРИЗМА", "ИНТЕЛЛЕКТ", "ЛОВКОСТЬ", "УДАЧА"][rawValue]
     }
-    var isActive: Bool { self == .strength || self == .endurance || self == .intelligence || self == .agility }
+    var isActive: Bool { self == .strength || self == .endurance || self == .intelligence || self == .agility || self == .charisma }
 }
 
 /// Значения характеристик для экрана S.P.E.C.I.A.L.
@@ -165,6 +165,8 @@ struct SpecialState: Equatable {
     var agilityLabel = "ОБЫЧНО"
     var enduranceLevel = 1
     var enduranceLabel = "ЗАСЫПАЕТ ЧЕРЕЗ 5 МИН"
+    var charismaLevel = Charisma.defaultLevel
+    var charismaLabel = "ОБЫЧНО (2–5 МИН)"
     var intelligenceLabel = "—"
     var intelligenceCount = 0
 }
@@ -624,6 +626,7 @@ private struct SpecialScreen: View {
         case .strength: return (state.scaleLevel, Prefs.scales.count, state.scaleLabel)
         case .endurance: return (state.enduranceLevel, Endurance.levels, state.enduranceLabel)
         case .agility: return (state.agilityLevel, Agility.levels, state.agilityLabel)
+        case .charisma: return (state.charismaLevel, Charisma.levels, state.charismaLabel)
         case .intelligence: return (-1, 0, state.intelligenceLabel)
         default: return nil
         }

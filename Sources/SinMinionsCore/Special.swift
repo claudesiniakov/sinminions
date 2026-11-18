@@ -52,3 +52,15 @@ public enum Endurance {
         }
     }
 }
+
+/// Харизма (C): частота реплик. 0 — молчит, дальше от редких к частым.
+public enum Charisma {
+    public static let levels = 4
+    public static let defaultLevel = 2
+
+    public static func clamp(_ level: Int) -> Int { min(max(level, 0), levels - 1) }
+
+    public static func title(level: Int) -> String {
+        ["МОЛЧИТ", "РЕДКО (5–15 МИН)", "ОБЫЧНО (2–5 МИН)", "ЧАСТО (8–14 С)"][clamp(level)]
+    }
+}
