@@ -320,6 +320,7 @@ final class ConsoleModel {
         stat.isActive && !(character == .ab && stat == .perception)
     }
     var coffee = false
+    var outfit: Outfit = .armor
     /// Выбранная буква S.P.E.C.I.A.L. в мониторе: её уровень меняют большие «−» и «+».
     var selectedStat: SpecialStat = .intelligence
     var llmConnections: [LLMConnectionRow] = []
@@ -741,10 +742,11 @@ private struct GhostFigure: NSViewRepresentable {
     let style: GhostStyle
     let coffee: Bool
     let character: CompanionCharacter
+    let outfit: Outfit
 
-    func makeNSView(context: Context) -> GhostFigureHost { GhostFigureHost(style: style, coffee: coffee, character: character) }
+    func makeNSView(context: Context) -> GhostFigureHost { GhostFigureHost(style: style, coffee: coffee, character: character, outfit: outfit) }
 
-    func updateNSView(_ view: GhostFigureHost, context: Context) { view.show(style, coffee: coffee, character: character) }
+    func updateNSView(_ view: GhostFigureHost, context: Context) { view.show(style, coffee: coffee, character: character, outfit: outfit) }
 }
 
 /// Призрак для монитора: те же слои, что у призрака на экране, размером 72×84.
@@ -752,11 +754,13 @@ final class GhostFigureHost: NSView {
     private var style: GhostStyle
     private var coffee: Bool
     private var character: CompanionCharacter
+    private var outfit: Outfit
 
-    init(style: GhostStyle, coffee: Bool, character: CompanionCharacter) {
+    init(style: GhostStyle, coffee: Bool, character: CompanionCharacter, outfit: Outfit) {
         self.style = style
         self.coffee = coffee
         self.character = character
+        self.outfit = outfit
         super.init(frame: NSRect(x: 0, y: 0, width: 72, height: 84))
         wantsLayer = true
         layer?.masksToBounds = false
@@ -768,17 +772,18 @@ final class GhostFigureHost: NSView {
 
     override var intrinsicContentSize: NSSize { NSSize(width: 72, height: 84) }
 
-    func show(_ style: GhostStyle, coffee: Bool, character: CompanionCharacter) {
-        guard style != self.style || coffee != self.coffee || character != self.character else { return }
+    func show(_ style: GhostStyle, coffee: Bool, character: CompanionCharacter, outfit: Outfit) {
+        guard style != self.style || coffee != self.coffee || character != self.character || outfit != self.outfit else { return }
         self.style = style
         self.coffee = coffee
         self.character = character
+        self.outfit = outfit
         rebuild()
     }
 
     private func rebuild() {
         layer?.sublayers?.forEach { $0.removeFromSuperlayer() }
-        let art: any CompanionArt = character == .ab ? GoldenArt(scale: 1.5) : GhostArt(style: style, scale: 1.5, coffee: coffee)
+        let art: any CompanionArt = character == .ab ? GoldenArt(scale: 1.5, coffee: coffee, outfit: outfit) : GhostArt(style: style, scale: 1.5, coffee: coffee)
         art.root.frame = CGRect(x: 0, y: 0, width: 72, height: 84)
         art.body.shadowRadius = 6 * art.glowScale
         art.body.shadowOpacity = 0.6
@@ -851,7 +856,7 @@ struct MonitorView: View {
         let levels = info?.levels ?? 0
         return VStack(spacing: 6) {
             specialStrip
-            GhostFigure(style: model.ghostStyle, coffee: model.coffee, character: model.character)
+            GhostFigure(style: model.ghostStyle, coffee: model.coffee, character: model.character, outfit: model.outfit)
                 .frame(width: 72, height: 84)
             Text(stat.title)
                 .foregroundStyle(Term.dim)
