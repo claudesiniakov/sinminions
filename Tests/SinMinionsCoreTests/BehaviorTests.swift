@@ -1112,6 +1112,31 @@ final class NewBehaviorsTests: XCTestCase {
         XCTAssertEqual(engine.handle(.click, now: 442), [.stopPlay, .hop, .say(.click)])
     }
 
+    func testSingStartsStopsAndInterrupts() {
+        var config = BehaviorConfig()
+        config.singEnabled = true
+        config.singDuration = Anthem.duration
+        config.sleepAfter = nil
+        config.talkEnabled = false
+        config.wanderEnabled = false
+        var engine = BehaviorEngine(config: config, now: 0, random: { $0.lowerBound })
+        XCTAssertEqual(engine.tick(now: 899, idleSeconds: 1), [])
+        XCTAssertEqual(engine.tick(now: 900, idleSeconds: 1), [.startSing])
+        XCTAssertEqual(engine.mode, .singing)
+        XCTAssertEqual(engine.tick(now: 910, idleSeconds: 1), [])
+        XCTAssertEqual(engine.tick(now: 900 + Anthem.duration, idleSeconds: 1), [.stopSing])
+        XCTAssertEqual(engine.mode, .idle)
+        XCTAssertEqual(engine.handle(.singNow, now: 1000), [.startSing])
+        XCTAssertEqual(engine.handle(.click, now: 1001), [.stopSing, .hop, .say(.click)])
+        XCTAssertEqual(Anthem.lines.count, 5)
+        XCTAssertTrue(Anthem.lines.last?.contains("в бой") == true)
+    }
+
+    func testSingOffDoesNothing() {
+        var engine = makeEngine()
+        XCTAssertEqual(engine.handle(.singNow, now: 1), [])
+    }
+
     func testPlayOffDoesNothing() {
         var engine = makeEngine()
         XCTAssertEqual(engine.handle(.playNow, now: 1), [])

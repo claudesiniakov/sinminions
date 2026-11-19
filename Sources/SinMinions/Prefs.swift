@@ -81,6 +81,8 @@ final class Prefs {
     var searchEnabled: Bool { didSet { store(searchEnabled, "searchEnabled") } }
     /// Игра на приставке рядом с телевизором: есть только у золотого стража.
     var playEnabled: Bool { didSet { store(playEnabled, "playEnabled") } }
+    /// Песня: страж иногда поёт гимн (только у него).
+    var singEnabled: Bool { didSet { store(singEnabled, "singEnabled") } }
     /// Смена одежды стража по времени: ночью пижама и колпак, днём доспех.
     var pajamaAuto: Bool { didSet { store(pajamaAuto, "pajamaAuto") } }
     var pajamaFrom: Int { didSet { store(pajamaFrom, "pajamaFrom") } }
@@ -114,6 +116,7 @@ final class Prefs {
         shooEnabled = c.shoo
         searchEnabled = c.search
         playEnabled = c.play
+        singEnabled = c.sing
         pajamaAuto = c.pajamaAuto
         pajamaFrom = c.pajamaFrom
         pajamaTo = c.pajamaTo
@@ -141,6 +144,7 @@ final class Prefs {
         shooEnabled = c.shoo
         searchEnabled = c.search
         playEnabled = c.play
+        singEnabled = c.sing
         pajamaAuto = c.pajamaAuto
         pajamaFrom = c.pajamaFrom
         pajamaTo = c.pajamaTo
@@ -242,6 +246,8 @@ final class Prefs {
         config.shooEnabled = shooEnabled
         config.searchEnabled = searchEnabled
         config.playEnabled = playEnabled && character == .ab
+        config.singEnabled = singEnabled && character == .ab
+        config.singDuration = Anthem.duration
         config.celebrateEnabled = celebrateEnabled
         config.talkEnabled = talkEnabled
         config.talkInterval = talkFrequency.talkInterval
@@ -264,6 +270,7 @@ struct CharacterSettings {
     var shoo: Bool
     var search: Bool
     var play: Bool
+    var sing: Bool
     var pajamaAuto: Bool
     var pajamaFrom: Int
     var pajamaTo: Int
@@ -294,6 +301,7 @@ struct CharacterSettings {
             shoo: bool("shooEnabled", true, true),
             search: bool("searchEnabled", true, true),
             play: bool("playEnabled", false, true),
+            sing: bool("singEnabled", false, true),
             pajamaAuto: bool("pajamaAuto", false, false),
             pajamaFrom: min(max(d.object(forKey: p + "pajamaFrom") as? Int ?? 23, 0), 23),
             pajamaTo: min(max(d.object(forKey: p + "pajamaTo") as? Int ?? 7, 0), 23),

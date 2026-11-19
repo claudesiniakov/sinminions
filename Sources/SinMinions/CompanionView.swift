@@ -338,6 +338,7 @@ final class CompanionView: NSView {
     }
 
     func cheer() { golden?.cheer() }
+    func setSinging(_ on: Bool) { golden?.setSinging(on) }
     func bow() { golden?.bow() }
     var isGolden: Bool { golden != nil }
 

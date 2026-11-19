@@ -165,9 +165,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             await wait(3)
             controller.setPajamasForDemo(false)
             await wait(1.5)
-            // Игра на приставке: терминал закрыт, рядом появляется телевизор.
+            // Песня стража: терминал закрыт, поёт гимн.
             controller.closeConsoleForDemo()
             await wait(1)
+            controller.singForDemo()
+            await wait(5.5)
+            demoMark("ab_sing")
+            await wait(3)
+            controller.stopSingForDemo()
+            await wait(1.5)
+            // Игра на приставке: рядом появляется телевизор.
             controller.playForDemo()
             await wait(3)
             demoMark("ab_play")

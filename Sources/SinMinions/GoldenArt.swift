@@ -53,6 +53,8 @@ final class GoldenArt: CompanionArt {
     private var armLAngle: CGFloat = 0
     private var armRAngle: CGFloat = 0
     private var cheering = false
+    private var singing = false
+    private var notesG: CALayer?
 
     private struct Shade {
         let base: NSColor
@@ -634,8 +636,11 @@ final class GoldenArt: CompanionArt {
         for g in [legLG, legRG, armLG, armRG, upperG] {
             g.removeAnimation(forKey: "walk")
             g.removeAnimation(forKey: "step")
+            g.removeAnimation(forKey: "sing")
         }
+        headG.removeAnimation(forKey: "sing")
         upperG.removeAnimation(forKey: "step2")
+        if singing { stopSingingEffects() }
         for g in [legLG, legRG, upperG] { g.removeAnimation(forKey: "walk2") }
         CATransaction.begin()
         CATransaction.setAnimationDuration(animated ? 0.35 : 0)
@@ -696,7 +701,7 @@ final class GoldenArt: CompanionArt {
 
     /// Переступание на месте: несколько шагов подряд, затем стойка. Идёт только в спокойной стойке.
     func stepInPlace() {
-        guard pose == .idle, !cheering else { return }
+        guard pose == .idle, !cheering, !singing else { return }
         let t: [NSNumber] = [0, 0.25, 0.5, 0.75, 1]
         let cycles = Float(Int.random(in: 2...4))
         let lift = 12 * ky, swing = radians(10), sway = radians(2.5), period: CFTimeInterval = 0.6
@@ -714,6 +719,75 @@ final class GoldenArt: CompanionArt {
         let jitter = radians(3)
         armLG.add(additive("transform.rotation.z", [0, jitter, 0], duration: 0.16, times: t), forKey: "walk")
         armRG.add(additive("transform.rotation.z", [0, -jitter, 0], duration: 0.2, times: t), forKey: "walk")
+    }
+
+    /// Пение: рот открывается и закрывается, корпус и голова покачиваются, левая рука отходит в сторону, над головой плывут ноты.
+    func setSinging(_ on: Bool) {
+        if on {
+            guard pose == .idle, !singing else { return }
+            singing = true
+            let t: [NSNumber] = [0, 0.5, 1]
+            let mouthAnim = CAKeyframeAnimation(keyPath: "opacity")
+            mouthAnim.values = [0, 1, 0.15, 1, 0]
+            mouthAnim.keyTimes = [0, 0.2, 0.45, 0.7, 1]
+            mouthAnim.duration = 0.9
+            mouthAnim.repeatCount = .infinity
+            mouthG.add(mouthAnim, forKey: "sing")
+            upperG.add(additive("transform.rotation.z", [0, radians(2.2), 0, radians(-2.2), 0], duration: 1.8, times: [0, 0.25, 0.5, 0.75, 1]), forKey: "sing")
+            headG.add(additive("transform.rotation.z", [0, radians(-4), 0, radians(4), 0], duration: 1.8, times: [0, 0.25, 0.5, 0.75, 1]), forKey: "sing")
+            armLG.add(additive("transform.rotation.z", [0, radians(-16), radians(-6), radians(-16), 0], duration: 1.8, times: [0, 0.25, 0.5, 0.75, 1]), forKey: "sing")
+            _ = t
+            addNotes()
+        } else if singing {
+            stopSingingEffects()
+        }
+    }
+
+    private func stopSingingEffects() {
+        singing = false
+        mouthG.removeAnimation(forKey: "sing")
+        upperG.removeAnimation(forKey: "sing")
+        headG.removeAnimation(forKey: "sing")
+        armLG.removeAnimation(forKey: "sing")
+        notesG?.removeFromSuperlayer()
+        notesG = nil
+    }
+
+    /// Ноты поднимаются над головой и тают.
+    private func addNotes() {
+        let group = CALayer()
+        group.frame = root.bounds
+        let glyphs = ["♪", "♫", "♪", "♫"]
+        let spots: [(CGFloat, CGFloat)] = [(120, 26), (82, 20), (140, 40), (62, 36)]
+        for (index, glyph) in glyphs.enumerated() {
+            let note = CATextLayer()
+            note.string = glyph
+            note.fontSize = max(9, 16 * kx * 3)
+            note.foregroundColor = Self.rgb(0xf9db7c).cgColor
+            note.contentsScale = NSScreen.main?.backingScaleFactor ?? 2
+            note.alignmentMode = .center
+            note.bounds = CGRect(x: 0, y: 0, width: 18 * kx * 3, height: 20 * kx * 3)
+            note.position = CGPoint(x: spots[index].0 * kx, y: size.height - spots[index].1 * ky)
+            note.opacity = 0
+            let rise = CABasicAnimation(keyPath: "transform.translation.y")
+            rise.fromValue = 0
+            rise.toValue = 26 * ky
+            let sway = CAKeyframeAnimation(keyPath: "transform.translation.x")
+            sway.values = [0, 5 * kx, -5 * kx, 0]
+            sway.keyTimes = [0, 0.33, 0.66, 1]
+            let fade = CAKeyframeAnimation(keyPath: "opacity")
+            fade.values = [0, 1, 1, 0]
+            fade.keyTimes = [0, 0.2, 0.7, 1]
+            let both = CAAnimationGroup()
+            both.animations = [rise, sway, fade]
+            both.duration = 2.4
+            both.beginTime = CACurrentMediaTime() + Double(index) * 0.6
+            both.repeatCount = .infinity
+            note.add(both, forKey: "note")
+            group.addSublayer(note)
+        }
+        root.addSublayer(group)
+        notesG = group
     }
 
     /// Клич «В бой!»: правая рука вверх, рот открыт, рука подрагивает; затем всё возвращается.

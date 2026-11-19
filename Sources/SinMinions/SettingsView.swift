@@ -80,6 +80,7 @@ private struct GeneralSettings: View {
                 Toggle("Что-нибудь ищет и находит (водяной чип и другое)", isOn: $prefs.searchEnabled)
                 if prefs.character == .ab {
                     Toggle("Играет на приставке рядом с телевизором", isOn: $prefs.playEnabled)
+                    Toggle("Иногда поёт гимн", isOn: $prefs.singEnabled)
                     Toggle("Ночью надевает пижаму и колпак (по времени)", isOn: $prefs.pajamaAuto)
                     if prefs.pajamaAuto {
                         Picker("Пижама с", selection: $prefs.pajamaFrom) {

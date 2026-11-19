@@ -49,6 +49,10 @@ public struct BehaviorConfig: Equatable, Sendable {
     public var playEnabled = false
     public var playInterval: ClosedRange<Double> = 420...900
     public var playDuration: ClosedRange<Double> = 20...40
+    /// Песня: страж иногда поёт гимн строка за строкой; время рассчитано на все строки.
+    public var singEnabled = false
+    public var singInterval: ClosedRange<Double> = 900...2400
+    public var singDuration: Double = 24
 
     public init() {}
 }
@@ -65,6 +69,8 @@ public enum Mode: Equatable, Sendable {
     case searching
     /// Игра на приставке рядом с телевизором (золотой страж).
     case playing
+    /// Пение: страж поёт гимн строка за строкой.
+    case singing
 }
 
 /// Что должен сделать интерфейс в ответ на переход автомата.
@@ -88,6 +94,9 @@ public enum Effect: Equatable, Sendable {
     /// Сесть с геймпадом и играть; рядом появляется телевизор.
     case startPlay
     case stopPlay
+    /// Запеть: рот открыт, строки гимна по очереди, ноты над головой.
+    case startSing
+    case stopSing
 }
 
 public enum Event: Equatable, Sendable {
@@ -119,6 +128,8 @@ public enum Event: Equatable, Sendable {
     case searchNow
     /// Для демонстрации: игра начинается сейчас.
     case playNow
+    /// Для демонстрации: песня начинается сейчас.
+    case singNow
     /// Повод для радости; фраза — из этого набора.
     case celebrate(PhraseKind)
 }
@@ -138,6 +149,7 @@ public struct BehaviorEngine {
     private var calmUntil: Double = 0
     public private(set) var nextSearchAt: Double
     public private(set) var nextPlayAt: Double
+    public private(set) var nextSingAt: Double
     /// После «кыш» призрак не перелетает и не телепортируется столько секунд.
     public static let shooCalm: Double = 90
     /// После испуга призрак не пугается заново столько секунд.
@@ -164,6 +176,7 @@ public struct BehaviorEngine {
         nextHideAt = now + random(config.hideInterval)
         nextSearchAt = now + random(config.searchInterval)
         nextPlayAt = now + random(config.playInterval)
+        nextSingAt = now + random(config.singInterval)
     }
 
     /// Новые настройки: таймеры перелёта и реплик запускаются заново.
@@ -176,6 +189,7 @@ public struct BehaviorEngine {
         nextHideAt = now + random(config.hideInterval)
         nextSearchAt = now + random(config.searchInterval)
         nextPlayAt = now + random(config.playInterval)
+        nextSingAt = now + random(config.singInterval)
     }
 
     /// Раз в секунду. `idleSeconds` — время с последнего ввода с клавиатуры или мыши.
@@ -183,6 +197,12 @@ public struct BehaviorEngine {
         switch mode {
         case .dragged, .wandering, .console, .teleporting:
             return []
+        case .singing:
+            guard now >= modeEndsAt else { return [] }
+            mode = .idle
+            nextSingAt = now + random(config.singInterval)
+            postpone(now: now)
+            return [.stopSing]
         case .playing:
             guard now >= modeEndsAt else { return [] }
             mode = .idle
@@ -231,6 +251,9 @@ public struct BehaviorEngine {
             }
             if config.playEnabled, now >= nextPlayAt {
                 return begin(play: now)
+            }
+            if config.singEnabled, now >= nextSingAt {
+                return begin(sing: now)
             }
             if config.hideSeekEnabled, now >= nextHideAt {
                 mode = .hiding
@@ -317,6 +340,7 @@ public struct BehaviorEngine {
             case .hiding: mode = .idle; return [.fadeIn]
             case .searching: mode = .idle; return [.stopSearch]
             case .playing: mode = .idle; return [.stopPlay]
+            case .singing: mode = .idle; return [.stopSing]
             case .dragged, .idle: mode = .idle; return []
             }
 
@@ -338,6 +362,10 @@ public struct BehaviorEngine {
             modeEndsAt = now + config.talkDuration
             postpone(now: now + config.talkDuration)
             return effects + [.spin, .say(kind)]
+
+        case .singNow:
+            guard config.singEnabled, mode == .idle else { return [] }
+            return begin(sing: now)
 
         case .playNow:
             guard config.playEnabled, mode == .idle else { return [] }
@@ -388,6 +416,13 @@ public struct BehaviorEngine {
 
     // MARK: - Внутреннее
 
+    private mutating func begin(sing now: Double) -> [Effect] {
+        mode = .singing
+        modeEndsAt = now + config.singDuration
+        nextSingAt = modeEndsAt + random(config.singInterval)
+        return [.startSing]
+    }
+
     private mutating func begin(play now: Double) -> [Effect] {
         mode = .playing
         modeEndsAt = now + random(config.playDuration)
@@ -416,6 +451,7 @@ public struct BehaviorEngine {
         case .hiding: return [.fadeIn]
         case .searching: return [.stopSearch]
         case .playing: return [.stopPlay]
+        case .singing: return [.stopSing]
         case .idle, .dragged: return []
         }
     }

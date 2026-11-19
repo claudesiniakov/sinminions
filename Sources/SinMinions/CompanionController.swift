@@ -780,6 +780,8 @@ final class CompanionController: NSObject {
                 view.bow()
             case .startPlay: startPlay()
             case .stopPlay: stopPlay()
+            case .startSing: startSing()
+            case .stopSing: stopSing()
             case .fallAsleep:
                 bubble.hide()
                 view.setSleeping(true)
@@ -872,6 +874,36 @@ final class CompanionController: NSObject {
             }
         }
     }
+
+    // MARK: - Песня
+
+    private var singTask: Task<Void, Never>?
+
+    /// Страж поёт гимн: строка за строкой в облачке, рот открыт, над головой ноты; на последней строке кричит «В бой!».
+    private func startSing() {
+        view.setSinging(true)
+        singTask?.cancel()
+        singTask = Task { @MainActor [weak self] in
+            for (index, line) in Anthem.lines.enumerated() {
+                guard !Task.isCancelled, let self, self.engine.mode == .singing else { return }
+                let moth = self.view.mothFrame.offsetBy(dx: self.panel.frame.minX, dy: self.panel.frame.minY)
+                let lifted = CGRect(x: moth.minX, y: moth.minY, width: moth.width, height: moth.height + 11 * self.view.scale)
+                self.bubble.show(line, over: lifted, in: self.area)
+                if index == Anthem.lines.count - 1 { self.view.cheer() }
+                try? await Task.sleep(for: .seconds(Anthem.secondsPerLine))
+            }
+        }
+    }
+
+    private func stopSing() {
+        singTask?.cancel()
+        singTask = nil
+        view.setSinging(false)
+        bubble.hide()
+    }
+
+    func singForDemo() { apply(engine.handle(.singNow, now: now)) }
+    func stopSingForDemo() { apply(engine.handle(.click, now: now)) }
 
     private func stopPlay() {
         playTask?.cancel()
