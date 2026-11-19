@@ -499,6 +499,15 @@ final class CompanionController: NSObject {
         case .coffee:
             prefs.coffee.toggle()
             return prefs.coffee ? "КОФЕ: НОУТБУК НЕ ЗАСНЁТ, ПОКА ВКЛЮЧЕНО" : "КОФЕ ДОПИТ: НОУТБУК СНОВА МОЖЕТ ЗАСНУТЬ"
+        case .sing:
+            guard prefs.character == .ab else { return "ПОЁТ ТОЛЬКО СТРАЖ: ПЕРЕКЛЮЧИТЕ ПЕРСОНАЖА НА ab В НАСТРОЙКАХ" }
+            apply(engine.handle(.closeConsole, now: now))
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(700))
+                guard let self else { return }
+                self.apply(self.engine.handle(.singCommand, now: self.now))
+            }
+            return nil
         case .hide:
             setHidden(true)
             return nil

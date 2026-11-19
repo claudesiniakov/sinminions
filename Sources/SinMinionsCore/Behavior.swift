@@ -130,6 +130,8 @@ public enum Event: Equatable, Sendable {
     case playNow
     /// Для демонстрации: песня начинается сейчас.
     case singNow
+    /// Команда «/петь»: песня начинается, даже если случайные песни выключены.
+    case singCommand
     /// Повод для радости; фраза — из этого набора.
     case celebrate(PhraseKind)
 }
@@ -362,6 +364,10 @@ public struct BehaviorEngine {
             modeEndsAt = now + config.talkDuration
             postpone(now: now + config.talkDuration)
             return effects + [.spin, .say(kind)]
+
+        case .singCommand:
+            guard mode == .idle else { return [] }
+            return begin(sing: now)
 
         case .singNow:
             guard config.singEnabled, mode == .idle else { return [] }

@@ -516,6 +516,7 @@ final class SlashCommandTests: XCTestCase {
         XCTAssertEqual(SlashParser.parse("/next"), .command(.next))
         XCTAssertEqual(SlashParser.parse("/пред"), .command(.previous))
         XCTAssertEqual(SlashParser.parse("/кофе"), .command(.coffee))
+        XCTAssertEqual(SlashParser.parse("/петь"), .command(.sing))
         XCTAssertEqual(SlashParser.parse("/?"), .command(.help))
     }
 
@@ -1130,6 +1131,11 @@ final class NewBehaviorsTests: XCTestCase {
         XCTAssertEqual(engine.handle(.click, now: 1001), [.stopSing, .hop, .say(.click)])
         XCTAssertEqual(Anthem.lines.count, 5)
         XCTAssertTrue(Anthem.lines.last?.contains("в бой") == true)
+    }
+
+    func testSingCommandWorksWhenSingingOff() {
+        var engine = makeEngine()
+        XCTAssertEqual(engine.handle(.singCommand, now: 1), [.startSing])
     }
 
     func testSingOffDoesNothing() {
