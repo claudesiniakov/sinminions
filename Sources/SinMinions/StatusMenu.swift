@@ -49,6 +49,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         item.button?.toolTip = "SinMinions"
         refresh()
         observeUpdater()
+        observeCharacter()
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
@@ -79,7 +80,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
             updateItem.title = "Обновление…"
             updateItem.isEnabled = false
         }
-        item.button?.image = Self.icon(dot: updater.needsAttention)
+        item.button?.image = Self.icon(dot: updater.needsAttention, character: prefs.character)
     }
 
     /// Перерисовываем меню при каждом изменении состояния обновления (в том числе пока оно открыто).
@@ -90,6 +91,18 @@ final class StatusMenu: NSObject, NSMenuDelegate {
             Task { @MainActor in
                 self?.refresh()
                 self?.observeUpdater()
+            }
+        }
+    }
+
+    /// Значок в строке меню следует за активным персонажем.
+    private func observeCharacter() {
+        withObservationTracking {
+            _ = prefs.character
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                self?.refresh()
+                self?.observeCharacter()
             }
         }
     }
@@ -134,8 +147,42 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     // MARK: - Значок
 
     /// Силуэт Moth как шаблонное изображение 18×18; точка в углу — есть обновление.
-    static func icon(dot: Bool) -> NSImage {
+    static func icon(dot: Bool, character: CompanionCharacter = .f) -> NSImage {
         let image = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { _ in
+            let path = character == .ab ? guardPath() : mothPath()
+            NSColor.black.setFill()
+            path.fill()
+
+            if dot, let context = NSGraphicsContext.current {
+                let center = NSPoint(x: 14.5, y: 3.5)
+                context.compositingOperation = .destinationOut
+                NSBezierPath(ovalIn: NSRect(x: center.x - 4, y: center.y - 4, width: 8, height: 8)).fill()
+                context.compositingOperation = .sourceOver
+                NSBezierPath(ovalIn: NSRect(x: center.x - 2.5, y: center.y - 2.5, width: 5, height: 5)).fill()
+            }
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }
+
+    /// Силуэт стража: шлем с прорезью для глаз и широкая борода.
+    private static func guardPath() -> NSBezierPath {
+        let path = NSBezierPath()
+        path.move(to: NSPoint(x: 3, y: 9.5))
+        path.curve(to: NSPoint(x: 9, y: 1.5), controlPoint1: NSPoint(x: 3, y: 5), controlPoint2: NSPoint(x: 5.5, y: 1.5))
+        path.curve(to: NSPoint(x: 15, y: 9.5), controlPoint1: NSPoint(x: 12.5, y: 1.5), controlPoint2: NSPoint(x: 15, y: 5))
+        path.line(to: NSPoint(x: 15.5, y: 12))
+        path.curve(to: NSPoint(x: 9, y: 17), controlPoint1: NSPoint(x: 15, y: 15), controlPoint2: NSPoint(x: 12, y: 17))
+        path.curve(to: NSPoint(x: 2.5, y: 12), controlPoint1: NSPoint(x: 6, y: 17), controlPoint2: NSPoint(x: 3, y: 15))
+        path.close()
+        // Прорезь шлема и глаза.
+        path.append(NSBezierPath(roundedRect: NSRect(x: 5, y: 6.3, width: 8, height: 2.6), xRadius: 1, yRadius: 1))
+        path.windingRule = .evenOdd
+        return path
+    }
+
+    private static func mothPath() -> NSBezierPath {
             let k: CGFloat = 16.0 / 56.0
             let dx = (18 - 48 * k) / 2, dy: CGFloat = 1
             func p(_ x: CGFloat, _ y: CGFloat) -> NSPoint { NSPoint(x: dx + x * k, y: dy + y * k) }
@@ -156,19 +203,6 @@ final class StatusMenu: NSObject, NSMenuDelegate {
                 path.appendOval(in: NSRect(x: c.x - 3.4 * k, y: c.y - 4 * k, width: 6.8 * k, height: 8 * k))
             }
             path.windingRule = .evenOdd
-            NSColor.black.setFill()
-            path.fill()
-
-            if dot, let context = NSGraphicsContext.current {
-                let center = NSPoint(x: 14.5, y: 3.5)
-                context.compositingOperation = .destinationOut
-                NSBezierPath(ovalIn: NSRect(x: center.x - 4, y: center.y - 4, width: 8, height: 8)).fill()
-                context.compositingOperation = .sourceOver
-                NSBezierPath(ovalIn: NSRect(x: center.x - 2.5, y: center.y - 2.5, width: 5, height: 5)).fill()
-            }
-            return true
-        }
-        image.isTemplate = true
-        return image
+            return path
     }
 }
