@@ -41,7 +41,9 @@ final class BubbleView: NSView {
             with: CGSize(width: maxWidth - padH * 2, height: .greatestFiniteMagnitude),
             options: [.usesLineFragmentOrigin, .usesFontLeading]
         )
-        return CGSize(width: ceil(box.width), height: ceil(box.height))
+        // Запас по высоте: при межстрочном множителе замер многострочного текста бывает короче отрисовки.
+        let extra = ceil(box.height / 15) > 2 ? 4 : 0
+        return CGSize(width: ceil(box.width), height: ceil(box.height) + CGFloat(extra))
     }
 
     /// Размер окна пузыря вместе с хвостиком.
