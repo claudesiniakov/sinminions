@@ -173,7 +173,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             demoMark("ab_sing")
             await wait(3)
             controller.stopSingForDemo()
-            await wait(1.5)
+            await wait(5)
             // Поиск реликвий Империума.
             controller.searchForDemo()
             await wait(14)
