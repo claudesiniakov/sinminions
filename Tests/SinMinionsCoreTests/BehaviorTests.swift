@@ -1117,6 +1117,20 @@ final class NewBehaviorsTests: XCTestCase {
         XCTAssertEqual(engine.handle(.playNow, now: 1), [])
     }
 
+    func testWardrobeByTime() {
+        XCTAssertTrue(Wardrobe.isWithin(hour: 23, from: 23, to: 7))
+        XCTAssertTrue(Wardrobe.isWithin(hour: 3, from: 23, to: 7))
+        XCTAssertFalse(Wardrobe.isWithin(hour: 7, from: 23, to: 7))
+        XCTAssertFalse(Wardrobe.isWithin(hour: 12, from: 23, to: 7))
+        XCTAssertTrue(Wardrobe.isWithin(hour: 13, from: 12, to: 14))
+        XCTAssertFalse(Wardrobe.isWithin(hour: 14, from: 12, to: 14))
+        XCTAssertTrue(Wardrobe.isWithin(hour: 5, from: 9, to: 9))
+        XCTAssertEqual(Wardrobe.outfit(alwaysAsleep: false, auto: false, from: 23, to: 7, hour: 2), .armor)
+        XCTAssertEqual(Wardrobe.outfit(alwaysAsleep: false, auto: true, from: 23, to: 7, hour: 2), .pajamas)
+        XCTAssertEqual(Wardrobe.outfit(alwaysAsleep: false, auto: true, from: 23, to: 7, hour: 12), .armor)
+        XCTAssertEqual(Wardrobe.outfit(alwaysAsleep: true, auto: false, from: 23, to: 7, hour: 12), .pajamas)
+    }
+
     func testCompanionCharacters() {
         XCTAssertEqual(CompanionCharacter.allCases.map(\.tabTitle), ["F", "ab"])
         XCTAssertEqual(CompanionCharacter.f.keyPrefix, "")

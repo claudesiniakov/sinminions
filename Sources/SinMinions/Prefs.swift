@@ -81,6 +81,10 @@ final class Prefs {
     var searchEnabled: Bool { didSet { store(searchEnabled, "searchEnabled") } }
     /// Игра на приставке рядом с телевизором: есть только у золотого стража.
     var playEnabled: Bool { didSet { store(playEnabled, "playEnabled") } }
+    /// Смена одежды стража по времени: ночью пижама и колпак, днём доспех.
+    var pajamaAuto: Bool { didSet { store(pajamaAuto, "pajamaAuto") } }
+    var pajamaFrom: Int { didSet { store(pajamaFrom, "pajamaFrom") } }
+    var pajamaTo: Int { didSet { store(pajamaTo, "pajamaTo") } }
     var shooEnabled: Bool { didSet { store(shooEnabled, "shooEnabled") } }
     var celebrateEnabled: Bool { didSet { store(celebrateEnabled, "celebrateEnabled") } }
     var wanderFrequency: Frequency { didSet { store(wanderFrequency.rawValue, "wanderFrequency") } }
@@ -110,6 +114,9 @@ final class Prefs {
         shooEnabled = c.shoo
         searchEnabled = c.search
         playEnabled = c.play
+        pajamaAuto = c.pajamaAuto
+        pajamaFrom = c.pajamaFrom
+        pajamaTo = c.pajamaTo
         ghostStyleLevel = c.ghostStyle
         agility = c.agility
         alwaysAsleep = c.alwaysAsleep
@@ -134,6 +141,9 @@ final class Prefs {
         shooEnabled = c.shoo
         searchEnabled = c.search
         playEnabled = c.play
+        pajamaAuto = c.pajamaAuto
+        pajamaFrom = c.pajamaFrom
+        pajamaTo = c.pajamaTo
         ghostStyleLevel = c.ghostStyle
         agility = c.agility
         alwaysAsleep = c.alwaysAsleep
@@ -162,6 +172,13 @@ final class Prefs {
         var list = LLMConnections()
         list.add(connection)
         return list
+    }
+
+    /// Одежда персонажа сейчас: у золотого стража пижама во сне и по расписанию, иначе доспех.
+    var outfit: Outfit {
+        guard character == .ab else { return .armor }
+        let hour = Calendar.current.component(.hour, from: Date())
+        return Wardrobe.outfit(alwaysAsleep: alwaysAsleep, auto: pajamaAuto, from: pajamaFrom, to: pajamaTo, hour: hour)
     }
 
     /// Выносливость (E в S.P.E.C.I.A.L.): 0 — спит, 1 — засыпает через 5 минут, 2 — не засыпает.
@@ -247,6 +264,9 @@ struct CharacterSettings {
     var shoo: Bool
     var search: Bool
     var play: Bool
+    var pajamaAuto: Bool
+    var pajamaFrom: Int
+    var pajamaTo: Int
     var ghostStyle: Int
     var agility: Int
     var alwaysAsleep: Bool
@@ -274,6 +294,9 @@ struct CharacterSettings {
             shoo: bool("shooEnabled", true, true),
             search: bool("searchEnabled", true, true),
             play: bool("playEnabled", false, true),
+            pajamaAuto: bool("pajamaAuto", false, false),
+            pajamaFrom: min(max(d.object(forKey: p + "pajamaFrom") as? Int ?? 23, 0), 23),
+            pajamaTo: min(max(d.object(forKey: p + "pajamaTo") as? Int ?? 7, 0), 23),
             ghostStyle: GhostStyle.clamp(d.object(forKey: p + "ghostStyle") as? Int ?? 0).rawValue,
             agility: Agility.clamp(d.object(forKey: p + "agility") as? Int ?? (ab ? 0 : Agility.defaultLevel)),
             alwaysAsleep: bool("alwaysAsleep", false, false),

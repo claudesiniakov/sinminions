@@ -83,7 +83,7 @@ final class CompanionController: NSObject {
             config: prefs.behaviorConfig(lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled),
             now: Date().timeIntervalSinceReferenceDate
         )
-        let view = CompanionView(scale: prefs.scale, style: prefs.ghostStyle, coffee: prefs.coffee, character: prefs.character)
+        let view = CompanionView(scale: prefs.scale, style: prefs.ghostStyle, coffee: prefs.coffee, character: prefs.character, outfit: prefs.outfit)
         self.view = view
         panel = NSPanel(
             contentRect: CGRect(origin: .zero, size: view.frame.size),
@@ -185,6 +185,7 @@ final class CompanionController: NSObject {
         let scaleText = prefs.scale == 1.5 ? "1,5×" : "\(Int(prefs.scale))×"
         console.model.ghostStyle = prefs.ghostStyle
         console.model.coffee = prefs.coffee
+        console.model.outfit = prefs.outfit
         console.model.special = SpecialState(
             scaleLevel: scales.firstIndex(of: prefs.scale) ?? 1,
             scaleLabel: "РАЗМЕР " + scaleText,
@@ -193,7 +194,9 @@ final class CompanionController: NSObject {
             agilityLevel: prefs.agility,
             agilityLabel: "СКОРОСТЬ ПОЛЁТА: " + Agility.title(level: prefs.agility),
             enduranceLevel: prefs.endurance,
-            enduranceLabel: Endurance.title(level: prefs.endurance, sleepMinutes: prefs.sleepMinutes),
+            enduranceLabel: prefs.character == .ab && prefs.endurance == 0
+                ? "СПИТ В ПИЖАМЕ"
+                : Endurance.title(level: prefs.endurance, sleepMinutes: prefs.sleepMinutes),
             charismaLevel: prefs.charisma,
             charismaLabel: "РЕПЛИКИ: " + Charisma.title(level: prefs.charisma),
             intelligenceLabel: prefs.connections.active.map { "ПОДКЛЮЧЕНИЕ: " + $0.name.uppercased() } ?? "НЕТ ПОДКЛЮЧЕНИЙ",
@@ -271,7 +274,7 @@ final class CompanionController: NSObject {
         if console.isOpen { refreshLimits() }
         updateCaffeine()
         applyCharacter()
-        if view.scale != CGFloat(prefs.scale) || view.style != prefs.ghostStyle || view.coffee != prefs.coffee || view.character != prefs.character { rebuildView() }
+        if view.scale != CGFloat(prefs.scale) || view.style != prefs.ghostStyle || view.coffee != prefs.coffee || view.character != prefs.character || view.outfit != prefs.outfit { rebuildView() }
         applyCollectionBehavior()
         engine.reconfigure(prefs.behaviorConfig(lowPower: lowPower), now: now)
     }
@@ -621,10 +624,16 @@ final class CompanionController: NSObject {
     }
 
 
+    /// Смена одежды по времени: раз в полминуты проверяем, не пора ли надеть пижаму или доспех.
+    private func checkOutfit() {
+        guard view.outfit != prefs.outfit else { return }
+        prefsChanged()
+    }
+
     private func rebuildView() {
         let wasSleeping = isSleeping
         let old = panel.frame
-        view = CompanionView(scale: prefs.scale, style: prefs.ghostStyle, coffee: prefs.coffee, character: prefs.character)
+        view = CompanionView(scale: prefs.scale, style: prefs.ghostStyle, coffee: prefs.coffee, character: prefs.character, outfit: prefs.outfit)
         wire(view)
         // Низ и середина по горизонтали остаются на месте.
         let size = view.frame.size
@@ -745,7 +754,10 @@ final class CompanionController: NSObject {
         guard ticks % perSecond == 0 else { return }
         let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
         apply(engine.tick(now: time, idleSeconds: idle))
-        if ticks % (perSecond * 30) == 0 { checkPower() }
+        if ticks % (perSecond * 30) == 0 {
+            checkPower()
+            checkOutfit()
+        }
     }
 
     // MARK: - Эффекты автомата
@@ -871,6 +883,13 @@ final class CompanionController: NSObject {
 
     func playForDemo() { apply(engine.handle(.playNow, now: now)) }
     func stopPlayForDemo() { apply(engine.handle(.click, now: now)) }
+    /// Для демо: пижама и колпак у стража (расписание «весь день»), затем обратно.
+    func setPajamasForDemo(_ on: Bool) {
+        prefs.pajamaFrom = 0
+        prefs.pajamaTo = 0
+        prefs.pajamaAuto = on
+    }
+
     func cheerForDemo() { view.cheer() }
     func sitForDemo(_ on: Bool) { view.setSleeping(on) }
 

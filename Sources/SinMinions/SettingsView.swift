@@ -80,6 +80,19 @@ private struct GeneralSettings: View {
                 Toggle("Что-нибудь ищет и находит (водяной чип и другое)", isOn: $prefs.searchEnabled)
                 if prefs.character == .ab {
                     Toggle("Играет на приставке рядом с телевизором", isOn: $prefs.playEnabled)
+                    Toggle("Ночью надевает пижаму и колпак (по времени)", isOn: $prefs.pajamaAuto)
+                    if prefs.pajamaAuto {
+                        Picker("Пижама с", selection: $prefs.pajamaFrom) {
+                            ForEach(0..<24, id: \.self) { Text(String(format: "%02d:00", $0)).tag($0) }
+                        }
+                        Picker("Пижама до", selection: $prefs.pajamaTo) {
+                            ForEach(0..<24, id: \.self) { Text(String(format: "%02d:00", $0)).tag($0) }
+                        }
+                        if prefs.pajamaFrom == prefs.pajamaTo {
+                            Text("Начало и конец совпадают: пижама весь день.").font(.footnote).foregroundStyle(.secondary)
+                        }
+                    }
+                    Text("Пижама надевается и на уровне «спит» буквы E в мониторе.").font(.footnote).foregroundStyle(.secondary)
                 }
                 Toggle("Играет в прятки: тает и выскакивает с «бу!»", isOn: $prefs.hideSeekEnabled)
                 Toggle("Танцует, когда подключили зарядку", isOn: $prefs.celebrateEnabled)

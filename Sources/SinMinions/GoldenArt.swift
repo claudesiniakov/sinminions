@@ -31,6 +31,7 @@ final class GoldenArt: CompanionArt {
     private let kx: CGFloat
     private let ky: CGFloat
     private let coffee: Bool
+    let outfit: Outfit
     /// Контейнер всего рисунка: опускается, когда страж садится.
     private let figure = CALayer()
     /// Куда сейчас рисуются детали (группа, которую собирает `build`).
@@ -61,7 +62,11 @@ final class GoldenArt: CompanionArt {
 
     private static func rgb(_ hex: UInt32) -> NSColor { CompanionView.Palette.rgb(hex) }
 
-    private let outline = GoldenArt.rgb(0x1c1206)
+    private let outline: NSColor
+    private let pink = Shade(base: GoldenArt.rgb(0xf6adc0), shade: GoldenArt.rgb(0xd27791), hi: GoldenArt.rgb(0xffd9e3))
+    private let white = Shade(base: GoldenArt.rgb(0xfbf1f3), shade: GoldenArt.rgb(0xd9c3c9), hi: GoldenArt.rgb(0xffffff))
+    private let plum = Shade(base: GoldenArt.rgb(0x7a3350), shade: GoldenArt.rgb(0x4d1d32), hi: GoldenArt.rgb(0xa85a78))
+    private let bare = Shade(base: GoldenArt.rgb(0xf0c9a4), shade: GoldenArt.rgb(0xcf9f78), hi: GoldenArt.rgb(0xfbe3cb))
     private let gold = Shade(base: GoldenArt.rgb(0xe1aa3a), shade: GoldenArt.rgb(0xa9731f), hi: GoldenArt.rgb(0xf9db7c))
     private let dark = Shade(base: GoldenArt.rgb(0xb98428), shade: GoldenArt.rgb(0x7e5413), hi: GoldenArt.rgb(0xe0b04e))
     private let red = Shade(base: GoldenArt.rgb(0xa3261e), shade: GoldenArt.rgb(0x661410), hi: GoldenArt.rgb(0xd4564a))
@@ -74,9 +79,11 @@ final class GoldenArt: CompanionArt {
     private static let designWidth: CGFloat = 200
     private static let designHeight: CGFloat = 232
 
-    init(scale: CGFloat, coffee: Bool = false) {
+    init(scale: CGFloat, coffee: Bool = false, outfit: Outfit = .armor) {
         self.scale = scale
         self.coffee = coffee
+        self.outfit = outfit
+        outline = outfit == .pajamas ? GoldenArt.rgb(0x2a1420) : GoldenArt.rgb(0x1c1206)
         size = CGSize(width: MothShape.size.width * scale, height: MothShape.size.height * scale)
         kx = size.width / Self.designWidth
         ky = size.height / Self.designHeight
@@ -192,7 +199,8 @@ final class GoldenArt: CompanionArt {
     }
 
     /// Мультяшная заливка: тень на всю форму, основной цвет со сдвигом (остаётся полоса тени), блик по краю, контур сверху.
-    private func piece(_ p: CGPath, _ c: Shade, sx: CGFloat = -4, sy: CGFloat = -4, width: CGFloat = 3) {
+    private func piece(_ p: CGPath, _ c: Shade, sx: CGFloat = -4, sy: CGFloat = -4, width: CGFloat = 3,
+                       stripes: [CGRect] = [], stripeT: CGAffineTransform = .identity) {
         let wrap = CALayer()
         wrap.frame = root.bounds
         let clip = CALayer()
@@ -206,6 +214,12 @@ final class GoldenArt: CompanionArt {
         var shiftHi = CGAffineTransform(translationX: sx * 0.7 * kx, y: -sy * 0.7 * ky)
         clip.addSublayer(layer(p, fill: c.shade))
         clip.addSublayer(layer(p.copy(using: &shift) ?? p, fill: c.base))
+        if !stripes.isEmpty {
+            let bars = CGMutablePath()
+            let m = stripeT.concatenating(flip)
+            for r in stripes { bars.addRect(r, transform: m) }
+            clip.addSublayer(layer(bars, fill: NSColor.white.withAlphaComponent(0.6)))
+        }
         clip.addSublayer(layer(p.copy(using: &shiftHi) ?? p, stroke: c.hi, width: 2.6, opacity: 0.9))
         wrap.addSublayer(clip)
         wrap.addSublayer(layer(p, stroke: outline, width: width))
@@ -213,6 +227,17 @@ final class GoldenArt: CompanionArt {
     }
 
     private func add(_ l: CALayer) { sink.addSublayer(l) }
+
+    /// Вертикальные полоски пижамы: шаг 9, ширина 4,2 (единицы макета).
+    private func stripeRects(from x0: CGFloat, to x1: CGFloat, y: CGFloat, height: CGFloat) -> [CGRect] {
+        var rects: [CGRect] = []
+        var x = x0
+        while x < x1 {
+            rects.append(CGRect(x: x, y: y, width: 4.2, height: height))
+            x += 9
+        }
+        return rects
+    }
 
     /// Группа слоёв с осью поворота в точке макета: внутри координаты те же, что у корня.
     private func group(pivot: CGPoint, raster: Bool = true) -> CALayer {
@@ -335,16 +360,17 @@ final class GoldenArt: CompanionArt {
         add(layer(path("M-6 -14 H6", t), stroke: Self.rgb(0x4fc3ff), width: 1.6))
     }
 
-    /// Кружка в левой руке и пар над ней (режим «кофе»).
-    private func cup() {
+    /// Кружка в левой руке и пар над ней (режим «кофе»); `dy` — на сколько кисть ниже, чем у доспешной версии.
+    private func cup(dy: CGFloat = 0) {
+        let t = CGAffineTransform(translationX: 0, y: dy)
         let porcelain = Shade(base: Self.rgb(0xf3efe6), shade: Self.rgb(0xc9c1ad), hi: .white)
-        add(layer(path("M34 156 Q43 158 41 168 Q39 173 34 172"), stroke: outline, width: 6))
-        add(layer(path("M34 156 Q43 158 41 168 Q39 173 34 172"), stroke: porcelain.base, width: 3))
-        piece(path("M12 152 H34 V172 Q34 179 27 179 H19 Q12 179 12 172 Z"), porcelain, sx: -3, sy: -3, width: 2)
-        add(layer(ellipse(23, 152.5, 11, 2.6), fill: Self.rgb(0x5a3a22), stroke: outline, width: 1.2))
+        add(layer(path("M34 156 Q43 158 41 168 Q39 173 34 172", t), stroke: outline, width: 6))
+        add(layer(path("M34 156 Q43 158 41 168 Q39 173 34 172", t), stroke: porcelain.base, width: 3))
+        piece(path("M12 152 H34 V172 Q34 179 27 179 H19 Q12 179 12 172 Z", t), porcelain, sx: -3, sy: -3, width: 2)
+        add(layer(ellipse(23, 152.5, 11, 2.6, t), fill: Self.rgb(0x5a3a22), stroke: outline, width: 1.2))
         let steamX: [CGFloat] = [19, 27]
         for (index, x) in steamX.enumerated() {
-            let steam = layer(path("M\(x) 148 Q\(x + 3) 144 \(x) 140 Q\(x - 3) 136 \(x) 132"), stroke: .white, width: 1.6, opacity: 0)
+            let steam = layer(path("M\(x) 148 Q\(x + 3) 144 \(x) 140 Q\(x - 3) 136 \(x) 132", t), stroke: .white, width: 1.6, opacity: 0)
             let fade = CAKeyframeAnimation(keyPath: "opacity")
             fade.values = [0, 0.75, 0.75, 0]
             fade.keyTimes = [0, 0.3, 0.7, 1]
@@ -370,7 +396,7 @@ final class GoldenArt: CompanionArt {
 
     // MARK: - Сборка
 
-    private func build() {
+    private func buildArmorBody() {
         // Плащ, воротник, ноги, табард, корпус, пояс, наплечники, руки, горжет и лицо — в порядке рисования макета.
         // Подвижные части собраны в группы с осью поворота: бёдра у ног, плечи у рук, пояс у корпуса.
         capeG = group(pivot: CGPoint(x: 100, y: 96))
@@ -417,6 +443,80 @@ final class GoldenArt: CompanionArt {
         sink = armRG
         arm(pivot: CGPoint(x: 176, y: 116))
         upperG.addSublayer(armRG)
+    }
+
+    // MARK: - Пижама и колпак
+
+    private func pajamaLeg(_ extra: CGAffineTransform) {
+        piece(path("M44 214 Q34 226 52 228 L90 228 Q98 220 92 214 Z", extra), plum, sx: -3, sy: -3)
+        piece(path("M48 150 L98 150 L97 214 L43 214 Z", extra), pink, stripes: stripeRects(from: 40, to: 100, y: 140, height: 90), stripeT: extra)
+        add(layer(path("M43 208 L97 208", extra), stroke: white.base, width: 4))
+        add(layer(path("M43 208 L97 208", extra), stroke: outline, width: 1, opacity: 0.5))
+    }
+
+    /// Рукав с манжетой и кистью вниз от плеча (0, 0); `t` ставит плечо на место, у правой руки с отражением.
+    private func pajamaSleeve(_ t: CGAffineTransform) {
+        piece(path("M-14 -6 Q-18 24 -14 54 L12 54 Q14 24 12 -6 Q-1 -16 -14 -6 Z", t), pink, width: 2.8,
+              stripes: stripeRects(from: -20, to: 18, y: -20, height: 90), stripeT: t)
+        piece(path("M-15 50 L13 50 L13 60 L-15 60 Z", t), white, sx: -2, sy: -2, width: 2.2)
+        piece(path("M-12 58 Q-14 76 -2 78 Q12 76 12 58 Z", t), bare, sx: -3, sy: -3, width: 2.4)
+        add(layer(path("M-6 70 V76 M2 70 V76", t), stroke: outline, width: 1.4, opacity: 0.6))
+    }
+
+    private func buildPajamaBody() {
+        capeG = group(pivot: CGPoint(x: 100, y: 96))
+        figure.addSublayer(capeG)
+
+        legLG = group(pivot: CGPoint(x: 73, y: 164))
+        sink = legLG
+        pajamaLeg(.identity)
+        figure.addSublayer(legLG)
+        legRG = group(pivot: CGPoint(x: 127, y: 164))
+        sink = legRG
+        pajamaLeg(mirror)
+        figure.addSublayer(legRG)
+
+        upperG = group(pivot: CGPoint(x: 100, y: 170), raster: false)
+        let torsoG = group(pivot: CGPoint(x: 100, y: 170))
+        sink = torsoG
+        let bars = stripeRects(from: 30, to: 175, y: 70, height: 110)
+        piece(path("M36 100 Q30 134 38 168 L162 168 Q170 134 164 100 Q132 84 100 84 Q68 84 36 100 Z"), pink, stripes: bars)
+        add(layer(path("M38 164 L162 164"), stroke: white.base, width: 4))
+        add(layer(path("M38 168 L162 168"), stroke: outline, width: 1, opacity: 0.5))
+        piece(path("M80 86 Q100 98 120 86 L100 126 Z"), bare, sx: -2, sy: -2, width: 2.4)
+        piece(path("M78 84 L98 128 L84 134 L62 100 Z"), pink, width: 2.6, stripes: stripeRects(from: 60, to: 100, y: 80, height: 60))
+        piece(path("M78 84 L98 128 L84 134 L62 100 Z", mirror), pink, width: 2.6, stripes: stripeRects(from: 60, to: 100, y: 80, height: 60), stripeT: mirror)
+        add(layer(path("M100 128 V168"), stroke: outline, width: 2, opacity: 0.6))
+        piece(path("M116 124 H138 V142 H116 Z"), pink, sx: -2, sy: -2, width: 2, stripes: stripeRects(from: 114, to: 140, y: 120, height: 26))
+        for y in [138, 150, 162] as [CGFloat] {
+            add(layer(ellipse(100, y, 3, 3), fill: white.base, stroke: outline, width: 1.6))
+        }
+        upperG.addSublayer(torsoG)
+
+        armLG = group(pivot: CGPoint(x: 26, y: 112), raster: !coffee)
+        sink = armLG
+        pajamaSleeve(CGAffineTransform(translationX: 26, y: 112))
+        cupG = group(pivot: CGPoint(x: 26, y: 170))
+        sink = cupG
+        if coffee { cup(dy: 14) }
+        armLG.addSublayer(cupG)
+        upperG.addSublayer(armLG)
+        armRG = group(pivot: CGPoint(x: 174, y: 112))
+        sink = armRG
+        pajamaSleeve(CGAffineTransform(translationX: 26, y: 112).concatenating(mirror))
+        upperG.addSublayer(armRG)
+    }
+
+    /// Ночной колпак: белая лента на лбу, полосатый конус и свисающий хвост с помпоном.
+    private func nightcap() {
+        piece(path("M66 44 Q62 16 92 8 Q124 0 146 28 Q160 52 154 82 L140 84 Q146 60 132 44 Q118 30 100 30 Q82 30 66 44 Z"), pink, width: 3,
+              stripes: stripeRects(from: 60, to: 165, y: 0, height: 90))
+        piece(path("M62 44 Q100 22 138 44 L136 54 Q100 34 64 54 Z"), white, sx: -2, sy: -3, width: 2.6)
+        piece(path(circlePath(147, 88, 8)), white, sx: -2, sy: -2, width: 2.6)
+    }
+
+    private func build() {
+        if outfit == .pajamas { buildPajamaBody() } else { buildArmorBody() }
 
         padG = group(pivot: CGPoint(x: 100, y: 140))
         sink = padG
@@ -427,9 +527,15 @@ final class GoldenArt: CompanionArt {
         headG = group(pivot: CGPoint(x: 100, y: 80), raster: false)
         let headStatic = group(pivot: CGPoint(x: 100, y: 80))
         sink = headStatic
-        piece(path("M66 82 Q100 100 134 82 L138 98 Q100 114 62 98 Z"), gold, sx: -3, sy: -3)
-        piece(path(circlePath(100, 100, 4)), red, sx: -1, sy: -1, width: 2)
-        face()
+        if outfit == .pajamas {
+            add(layer(path("M86 82 H114 V98 H86 Z"), fill: bare.shade))
+            face()
+            nightcap()
+        } else {
+            piece(path("M66 82 Q100 100 134 82 L138 98 Q100 114 62 98 Z"), gold, sx: -3, sy: -3)
+            piece(path(circlePath(100, 100, 4)), red, sx: -1, sy: -1, width: 2)
+            face()
+        }
         headG.addSublayer(headStatic)
         mouthG = group(pivot: CGPoint(x: 100, y: 80))
         sink = mouthG
@@ -443,25 +549,35 @@ final class GoldenArt: CompanionArt {
 
         // Силуэт для попаданий мыши и для свечения: корпус, наплечники, голова, ноги.
         let silhouette = CGMutablePath()
-        for d in [
-            "M40 96 Q4 150 12 216 L188 216 Q196 150 160 96 Z",
-            "M40 98 Q34 130 44 156 L156 156 Q166 130 160 98 Q130 82 100 82 Q70 82 40 98 Z",
-            "M0 112 Q-4 68 34 62 Q68 64 70 98 Q68 134 34 140 Q2 138 0 112 Z",
-            "M56 100 L48 46 Q100 26 152 46 L144 100 Z",
-        ] {
-            silhouette.addPath(path(d))
+        if outfit == .pajamas {
+            silhouette.addPath(path("M36 100 Q30 134 38 168 L162 168 Q170 134 164 100 Q132 84 100 84 Q68 84 36 100 Z"))
+            silhouette.addPath(path("M-14 -6 Q-18 24 -14 54 L12 78 L12 -6 Z", CGAffineTransform(translationX: 26, y: 112)))
+            silhouette.addPath(path("M-14 -6 Q-18 24 -14 54 L12 78 L12 -6 Z", CGAffineTransform(translationX: 26, y: 112).concatenating(mirror)))
+            silhouette.addPath(path("M43 150 L98 150 L97 228 L38 228 Z"))
+            silhouette.addPath(path("M43 150 L98 150 L97 228 L38 228 Z", mirror))
+            silhouette.addPath(ellipse(100, 55, 32, 34))
+            silhouette.addPath(path("M66 44 Q62 16 92 8 Q124 0 146 28 Q160 52 154 82 L140 84 Q146 60 132 44 Z"))
+        } else {
+            for d in [
+                "M40 96 Q4 150 12 216 L188 216 Q196 150 160 96 Z",
+                "M40 98 Q34 130 44 156 L156 156 Q166 130 160 98 Q130 82 100 82 Q70 82 40 98 Z",
+                "M0 112 Q-4 68 34 62 Q68 64 70 98 Q68 134 34 140 Q2 138 0 112 Z",
+                "M56 100 L48 46 Q100 26 152 46 L144 100 Z",
+            ] {
+                silhouette.addPath(path(d))
+            }
+            silhouette.addPath(path("M0 112 Q-4 68 34 62 Q68 64 70 98 Q68 134 34 140 Q2 138 0 112 Z", mirror))
+            silhouette.addPath(path("M40 194 Q30 214 48 216 L92 216 Q100 206 92 192 Z"))
+            silhouette.addPath(path("M40 194 Q30 214 48 216 L92 216 Q100 206 92 192 Z", mirror))
+            silhouette.addPath(ellipse(100, 55, 32, 34))
         }
-        silhouette.addPath(path("M0 112 Q-4 68 34 62 Q68 64 70 98 Q68 134 34 140 Q2 138 0 112 Z", mirror))
-        silhouette.addPath(path("M40 194 Q30 214 48 216 L92 216 Q100 206 92 192 Z"))
-        silhouette.addPath(path("M40 194 Q30 214 48 216 L92 216 Q100 206 92 192 Z", mirror))
-        silhouette.addPath(ellipse(100, 55, 32, 34))
         bodyPath = silhouette
 
         body.frame = root.bounds
         body.path = bodyPath
         body.fillColor = dark.shade.cgColor
         body.shadowPath = bodyPath
-        body.shadowColor = Self.rgb(0xe8b84a).cgColor
+        body.shadowColor = Self.rgb(outfit == .pajamas ? 0xf6adc0 : 0xe8b84a).cgColor
         body.shadowOffset = .zero
         body.shadowRadius = 3 * scale
         body.shadowOpacity = 0.35
@@ -484,6 +600,9 @@ final class GoldenArt: CompanionArt {
 
     /// Углы рук по позе в градусах слоя (против часовой стрелки): левая висит чуть наружу, правая прижата к груди.
     private func armAngles(for pose: Pose) -> (left: CGFloat, right: CGFloat) {
+        if outfit == .pajamas {
+            return pose == .play ? (66.5, -66.5) : (-4, 4)
+        }
         switch pose {
         case .idle: return (-5, -96)
         case .walk: return (-5, 5)
@@ -578,7 +697,7 @@ final class GoldenArt: CompanionArt {
     func cheer() {
         guard !cheering, pose != .play else { return }
         cheering = true
-        let up: CGFloat = -192
+        let up: CGFloat = outfit == .pajamas ? 168 : -192
         turnArm(armRG, from: armRAngle, to: up, duration: 0.3)
         let shake = additive("transform.rotation.z", [0, radians(5), 0, radians(-5), 0], duration: 0.18, times: [0, 0.25, 0.5, 0.75, 1])
         armRG.add(shake, forKey: "shout")
