@@ -621,6 +621,7 @@ final class CompanionController: NSObject {
             book = PhraseBook(character: prefs.character)
         }
         console.model.character = prefs.character
+        bubble.character = prefs.character
     }
 
 

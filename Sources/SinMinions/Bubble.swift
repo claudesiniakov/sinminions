@@ -13,21 +13,23 @@ final class BubbleView: NSView {
     private typealias Palette = CompanionView.Palette
 
     var text = ""
+    /// У золотого стража пузырь золотой с багряной рамкой, у призрака зелёный.
+    var character: CompanionCharacter = .f
     var below = false
     var tailX: CGFloat = 0
 
-    private static func attributed(_ text: String) -> NSAttributedString {
+    private static func attributed(_ text: String, character: CompanionCharacter = .f) -> NSAttributedString {
         let style = NSMutableParagraphStyle()
         style.alignment = .center
         style.lineBreakMode = .byWordWrapping
         style.lineHeightMultiple = 1.15
         let glow = NSShadow()
-        glow.shadowColor = Palette.green.withAlphaComponent(0.55)
+        glow.shadowColor = (character == .ab ? Palette.rgb(0xf0d58c) : Palette.green).withAlphaComponent(0.55)
         glow.shadowBlurRadius = 6
         glow.shadowOffset = .zero
         return NSAttributedString(string: text, attributes: [
             .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .regular),
-            .foregroundColor: Palette.greenDim,
+            .foregroundColor: character == .ab ? Palette.rgb(0xf0d58c) : Palette.greenDim,
             .kern: 0.5,
             .shadow: glow,
             .paragraphStyle: style,
@@ -45,7 +47,8 @@ final class BubbleView: NSView {
     /// Размер окна пузыря вместе с хвостиком.
     static func size(for text: String) -> CGSize {
         let t = textSize(text)
-        return CGSize(width: max(t.width + padH * 2, 44) + 2, height: t.height + padV * 2 + tail + 2)
+        // Запас по ширине, чтобы при рисовании строки переносились так же, как при замере.
+        return CGSize(width: max(t.width + padH * 2, 44) + 6, height: t.height + padV * 2 + tail + 2)
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -56,9 +59,11 @@ final class BubbleView: NSView {
             : CGRect(x: inset.minX, y: inset.minY + Self.tail, width: inset.width, height: inset.height - Self.tail)
 
         let frame = NSBezierPath(rect: box)
-        Palette.panel.setFill()
+        let panelColor = character == .ab ? Palette.rgb(0x0e0808) : Palette.panel
+        let edgeColor = character == .ab ? Palette.rgb(0x7a2222) : Palette.greenDark
+        panelColor.setFill()
         frame.fill()
-        Palette.greenDark.setStroke()
+        edgeColor.setStroke()
         frame.lineWidth = 1
         frame.stroke()
 
@@ -71,14 +76,14 @@ final class BubbleView: NSView {
         triangle.line(to: CGPoint(x: x, y: tipY))
         triangle.line(to: CGPoint(x: x + Self.tail, y: baseY + overlap))
         triangle.close()
-        Palette.panel.setFill()
+        panelColor.setFill()
         triangle.fill()
         let edges = NSBezierPath()
         edges.move(to: CGPoint(x: x - Self.tail, y: baseY))
         edges.line(to: CGPoint(x: x, y: tipY))
         edges.line(to: CGPoint(x: x + Self.tail, y: baseY))
         edges.lineWidth = 1
-        Palette.greenDark.setStroke()
+        edgeColor.setStroke()
         edges.stroke()
 
         let t = Self.textSize(text)
@@ -86,7 +91,7 @@ final class BubbleView: NSView {
             x: box.minX + Self.padH, y: box.midY - t.height / 2,
             width: box.width - Self.padH * 2, height: t.height
         )
-        Self.attributed(text).draw(with: textRect, options: [.usesLineFragmentOrigin, .usesFontLeading])
+        Self.attributed(text, character: character).draw(with: textRect, options: [.usesLineFragmentOrigin, .usesFontLeading])
     }
 }
 
@@ -95,6 +100,13 @@ final class BubbleView: NSView {
 final class BubblePanel {
     private let panel: NSPanel
     private let view = BubbleView()
+
+    var character: CompanionCharacter = .f {
+        didSet {
+            view.character = character
+            view.needsDisplay = true
+        }
+    }
     private var generation = 0
 
     init() {
