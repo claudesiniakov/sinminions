@@ -36,7 +36,7 @@ public enum CompanionCharacter: String, CaseIterable, Sendable, Identifiable {
     public var monitorName: String {
         switch self {
         case .f: return "СИСТЕМА"
-        case .ab: return "ОКО МЕХАНИКУМА"
+        case .ab: return "АУСПЕКС"
         }
     }
 }
