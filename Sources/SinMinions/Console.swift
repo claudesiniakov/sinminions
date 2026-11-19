@@ -1018,6 +1018,12 @@ struct MonitorView: View {
                 line("СЕТЬ ↑", MetricFormat.rate(s.netUp))
                 line("НАГРЕВ", thermal)
                 line("В РАБОТЕ", MetricFormat.uptime(s.uptime))
+                if model.coffee {
+                    // Режим «кофе»: система и экран не засыпают, пока он включён.
+                    line("КОФЕ", "ВКЛ · ЭКРАН НЕ ГАСНЕТ")
+                        .foregroundStyle(Term.green)
+                        .bold()
+                }
                 if model.showLimits {
                     Rectangle().fill(Term.dark).frame(height: 1)
                     limitsBlock
