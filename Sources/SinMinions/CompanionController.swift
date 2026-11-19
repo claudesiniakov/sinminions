@@ -9,6 +9,7 @@ final class CompanionController: NSObject {
     private let prefs: Prefs
     private var engine: BehaviorEngine
     private var book = PhraseBook()
+    private var bookCharacter = CompanionCharacter.f
     private let panel: NSPanel
     private var view: CompanionView
     private let bubble = BubblePanel()
@@ -78,7 +79,7 @@ final class CompanionController: NSObject {
             config: prefs.behaviorConfig(lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled),
             now: Date().timeIntervalSinceReferenceDate
         )
-        let view = CompanionView(scale: prefs.scale, style: prefs.ghostStyle, coffee: prefs.coffee)
+        let view = CompanionView(scale: prefs.scale, style: prefs.ghostStyle, coffee: prefs.coffee, character: prefs.character)
         self.view = view
         panel = NSPanel(
             contentRect: CGRect(origin: .zero, size: view.frame.size),
@@ -108,6 +109,7 @@ final class CompanionController: NSObject {
         console.onSlash = { [weak self] command in self?.perform(command) }
         console.onAdjustSpecial = { [weak self] stat, delta in self?.adjustSpecial(stat, delta) }
         power = Self.readPower()
+        applyCharacter()
 
         let workspace = NSWorkspace.shared.notificationCenter
         workspace.addObserver(self, selector: #selector(systemDidWake), name: NSWorkspace.didWakeNotification, object: nil)
@@ -264,7 +266,8 @@ final class CompanionController: NSObject {
         refreshSpecial()
         if console.isOpen { refreshLimits() }
         updateCaffeine()
-        if view.scale != CGFloat(prefs.scale) || view.style != prefs.ghostStyle || view.coffee != prefs.coffee { rebuildView() }
+        applyCharacter()
+        if view.scale != CGFloat(prefs.scale) || view.style != prefs.ghostStyle || view.coffee != prefs.coffee || view.character != prefs.character { rebuildView() }
         applyCollectionBehavior()
         engine.reconfigure(prefs.behaviorConfig(lowPower: lowPower), now: now)
     }
@@ -422,6 +425,7 @@ final class CompanionController: NSObject {
     // MARK: - Средний режим
 
     private func openConsole() {
+        applyCharacter()
         refreshLLM()
         refreshSpecial()
         refreshLimits()
@@ -553,6 +557,11 @@ final class CompanionController: NSObject {
         prefsChanged()
     }
 
+    /// Для демо: переключает персонажа (как вкладка «F» и «ab» в настройках).
+    func setCharacterForDemo(_ character: CompanionCharacter) {
+        prefs.character = character
+    }
+
     func setGhostStyleForDemo(_ level: Int) {
         prefs.ghostStyleLevel = GhostStyle.clamp(level).rawValue
         prefsChanged()
@@ -598,10 +607,19 @@ final class CompanionController: NSObject {
         }
     }
 
+    /// Смена персонажа: реплики и стиль терминала с монитором переключаются на его набор.
+    private func applyCharacter() {
+        if bookCharacter != prefs.character {
+            bookCharacter = prefs.character
+            book = PhraseBook(character: prefs.character)
+        }
+        console.model.character = prefs.character
+    }
+
     private func rebuildView() {
         let wasSleeping = isSleeping
         let old = panel.frame
-        view = CompanionView(scale: prefs.scale, style: prefs.ghostStyle, coffee: prefs.coffee)
+        view = CompanionView(scale: prefs.scale, style: prefs.ghostStyle, coffee: prefs.coffee, character: prefs.character)
         wire(view)
         // Низ и середина по горизонтали остаются на месте.
         let size = view.frame.size

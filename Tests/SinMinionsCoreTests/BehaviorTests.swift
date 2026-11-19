@@ -1094,6 +1094,25 @@ final class NewBehaviorsTests: XCTestCase {
         XCTAssertEqual(SearchFind.pick { _ in 0.99 }, .stimpak)
     }
 
+    func testCompanionCharacters() {
+        XCTAssertEqual(CompanionCharacter.allCases.map(\.tabTitle), ["F", "ab"])
+        XCTAssertEqual(CompanionCharacter.f.keyPrefix, "")
+        XCTAssertEqual(CompanionCharacter.ab.keyPrefix, "ab.")
+        XCTAssertNotEqual(CompanionCharacter.f.terminalName, CompanionCharacter.ab.terminalName)
+        XCTAssertNotEqual(CompanionCharacter.f.monitorName, CompanionCharacter.ab.monitorName)
+    }
+
+    func testGuardPhrasesDifferFromGhostAndFallBack() {
+        XCTAssertEqual(PhraseBook.pool(.click, hour: 12, character: .ab), PhraseBook.guardByKind[.click])
+        XCTAssertNotEqual(PhraseBook.pool(.click, hour: 12, character: .ab), PhraseBook.pool(.click, hour: 12, character: .f))
+        XCTAssertTrue(PhraseBook.pool(.ambient, hour: 12, character: .ab).contains("пост принят"))
+        XCTAssertFalse(PhraseBook.pool(.ambient, hour: 12, character: .ab).contains("war never changes"))
+        // Для повода без своих реплик у стража берётся общий набор.
+        XCTAssertEqual(PhraseBook.pool(.charging, hour: 12, character: .ab), PhraseBook.pool(.charging, hour: 12, character: .f))
+        var book = PhraseBook(character: .ab, shuffle: { $0 })
+        XCTAssertFalse(book.next(.click, hour: 12).isEmpty)
+    }
+
     func testShooOffDoesNothing() {
         var engine = makeEngine()
         XCTAssertEqual(engine.handle(.shoo, now: 1), [])

@@ -307,6 +307,18 @@ final class ConsoleModel {
     var showLimits = true
     /// Облик призрака в мониторе.
     var ghostStyle: GhostStyle = .classic
+    /// Активный персонаж: меняет рисунок в мониторе, стиль окон и названия.
+    var character: CompanionCharacter = .f {
+        didSet {
+            Term.theme = character
+            if character == .ab, selectedStat == .perception { selectedStat = .intelligence }
+        }
+    }
+
+    /// Доступна ли буква: у золотого стража один облик, поэтому «P» неактивна.
+    func isActive(_ stat: SpecialStat) -> Bool {
+        stat.isActive && !(character == .ab && stat == .perception)
+    }
     var coffee = false
     /// Выбранная буква S.P.E.C.I.A.L. в мониторе: её уровень меняют большие «−» и «+».
     var selectedStat: SpecialStat = .intelligence
@@ -391,17 +403,24 @@ private extension String {
     var nonEmpty: String? { isEmpty ? nil : self }
 }
 
+/// Палитра терминала и монитора. У первого персонажа зелёный терминал из Fallout, у второго золото и багрянец в духе Вархаммера.
 private enum Term {
-    static let body = Color(nsColor: CompanionView.Palette.body)
-    static let bodyStroke = Color(nsColor: CompanionView.Palette.bodyStroke)
-    static let pupil = Color(nsColor: CompanionView.Palette.pupil)
-    static let amber = Color(red: 1, green: 0.69, blue: 0.2)
-    static let green = Color(nsColor: CompanionView.Palette.green)
-    static let dim = Color(nsColor: CompanionView.Palette.greenDim)
-    static let dark = Color(nsColor: CompanionView.Palette.greenDark)
-    static let background = Color(nsColor: CompanionView.Palette.rgb(0x0b0f0a))
-    static let font = Font.system(size: 13, design: .monospaced)
-    static let small = Font.system(size: 11, design: .monospaced)
+    nonisolated(unsafe) static var theme: CompanionCharacter = .f
+    private static var gothic: Bool { theme == .ab }
+
+    static var body: Color { Color(nsColor: CompanionView.Palette.body) }
+    static var bodyStroke: Color { Color(nsColor: CompanionView.Palette.bodyStroke) }
+    static var pupil: Color { Color(nsColor: CompanionView.Palette.pupil) }
+    /// Предупреждения и ошибки: янтарь у Moth, багрянец у стража.
+    static var amber: Color { gothic ? Color(nsColor: CompanionView.Palette.rgb(0xe5533f)) : Color(red: 1, green: 0.69, blue: 0.2) }
+    static var green: Color { gothic ? Color(nsColor: CompanionView.Palette.rgb(0xf2c24e)) : Color(nsColor: CompanionView.Palette.green) }
+    static var dim: Color { gothic ? Color(nsColor: CompanionView.Palette.rgb(0xb98a38)) : Color(nsColor: CompanionView.Palette.greenDim) }
+    static var dark: Color { gothic ? Color(nsColor: CompanionView.Palette.rgb(0x5e4214)) : Color(nsColor: CompanionView.Palette.greenDark) }
+    static var background: Color { gothic ? Color(nsColor: CompanionView.Palette.rgb(0x100a05)) : Color(nsColor: CompanionView.Palette.rgb(0x0b0f0a)) }
+    static var font: Font { Font.system(size: 13, design: .monospaced) }
+    static var small: Font { Font.system(size: 11, design: .monospaced) }
+    /// Заголовки окон: у стража — готический засечный шрифт.
+    static var title: Font { gothic ? Font.system(size: 12, weight: .bold, design: .serif) : small }
 }
 
 /// Рамка окна терминала: тёмный фон, зелёная рамка, строки развёртки, заголовок.
@@ -417,8 +436,11 @@ private struct TerminalFrame<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
+                if model.character == .ab {
+                    Text("✠").font(Term.title).foregroundStyle(Term.green)
+                }
                 Text(title)
-                    .font(Term.small)
+                    .font(Term.title)
                     .tracking(1)
                     .foregroundStyle(Term.dim)
                     .lineLimit(1)
@@ -441,6 +463,23 @@ private struct TerminalFrame<Content: View>: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .background(Term.background.opacity(0.96))
+        .overlay {
+            if model.character == .ab {
+                // Двойная рамка с угловыми знаками, как на готической табличке.
+                ZStack {
+                    Rectangle().strokeBorder(Term.dark, lineWidth: 1).padding(4)
+                    VStack {
+                        HStack { Text("✠"); Spacer(); Text("✠") }
+                        Spacer()
+                        HStack { Text("✠"); Spacer(); Text("✠") }
+                    }
+                    .font(.system(size: 9))
+                    .foregroundStyle(Term.dim)
+                    .padding(6)
+                }
+                .allowsHitTesting(false)
+            }
+        }
         .overlay {
             Canvas { context, size in
                 var y: CGFloat = 0
@@ -472,6 +511,7 @@ private struct TerminalFrame<Content: View>: View {
         }
         .shadow(color: Term.green.opacity(0.35), radius: 8)
         .padding(10)
+        .id(model.character)
     }
 
     private var moveGesture: some Gesture {
@@ -510,7 +550,7 @@ struct TerminalView: View {
     }
 
     private var menu: some View {
-        TerminalFrame(title: "MOTH-OS // ТЕРМИНАЛ", window: .terminal, model: model) {
+        TerminalFrame(title: "\(model.character.terminalName) // ТЕРМИНАЛ", window: .terminal, model: model) {
             ShellScreen(model: model)
         }
     }
@@ -622,7 +662,7 @@ private struct ChatScreen: View {
 
     var body: some View {
         @Bindable var chat = model.chat
-        TerminalFrame(title: "MOTH-OS // " + ([model.llmName, model.llmModelName].compactMap { $0 }.joined(separator: " · ").nonEmpty ?? "НЕЙРОСЕТЬ").uppercased(), window: .terminal, model: model) {
+        TerminalFrame(title: model.character.terminalName + " // " + ([model.llmName, model.llmModelName].compactMap { $0 }.joined(separator: " · ").nonEmpty ?? "НЕЙРОСЕТЬ").uppercased(), window: .terminal, model: model) {
             VStack(alignment: .leading, spacing: 8) {
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -700,20 +740,23 @@ private struct ChatScreen: View {
 private struct GhostFigure: NSViewRepresentable {
     let style: GhostStyle
     let coffee: Bool
+    let character: CompanionCharacter
 
-    func makeNSView(context: Context) -> GhostFigureHost { GhostFigureHost(style: style, coffee: coffee) }
+    func makeNSView(context: Context) -> GhostFigureHost { GhostFigureHost(style: style, coffee: coffee, character: character) }
 
-    func updateNSView(_ view: GhostFigureHost, context: Context) { view.show(style, coffee: coffee) }
+    func updateNSView(_ view: GhostFigureHost, context: Context) { view.show(style, coffee: coffee, character: character) }
 }
 
 /// Призрак для монитора: те же слои, что у призрака на экране, размером 72×84.
 final class GhostFigureHost: NSView {
     private var style: GhostStyle
     private var coffee: Bool
+    private var character: CompanionCharacter
 
-    init(style: GhostStyle, coffee: Bool) {
+    init(style: GhostStyle, coffee: Bool, character: CompanionCharacter) {
         self.style = style
         self.coffee = coffee
+        self.character = character
         super.init(frame: NSRect(x: 0, y: 0, width: 72, height: 84))
         wantsLayer = true
         layer?.masksToBounds = false
@@ -725,16 +768,17 @@ final class GhostFigureHost: NSView {
 
     override var intrinsicContentSize: NSSize { NSSize(width: 72, height: 84) }
 
-    func show(_ style: GhostStyle, coffee: Bool) {
-        guard style != self.style || coffee != self.coffee else { return }
+    func show(_ style: GhostStyle, coffee: Bool, character: CompanionCharacter) {
+        guard style != self.style || coffee != self.coffee || character != self.character else { return }
         self.style = style
         self.coffee = coffee
+        self.character = character
         rebuild()
     }
 
     private func rebuild() {
         layer?.sublayers?.forEach { $0.removeFromSuperlayer() }
-        let art = GhostArt(style: style, scale: 1.5, coffee: coffee)
+        let art: any CompanionArt = character == .ab ? GoldenArt(scale: 1.5) : GhostArt(style: style, scale: 1.5, coffee: coffee)
         art.root.frame = CGRect(x: 0, y: 0, width: 72, height: 84)
         art.body.shadowRadius = 6 * art.glowScale
         art.body.shadowOpacity = 0.6
@@ -781,7 +825,7 @@ struct MonitorView: View {
         HStack(spacing: 4) {
             ForEach(SpecialStat.allCases) { stat in
                 let selected = model.selectedStat == stat
-                let strength: Double = selected ? 1 : (stat.isActive ? 0.5 : 0.28)
+                let strength: Double = selected ? 1 : (model.isActive(stat) ? 0.5 : 0.28)
                 // Буква и точка внутри одного квадрата: «S.», «P.», …
                 Text(stat.letter + ".")
                     .font(.system(size: 15, weight: .bold, design: .monospaced))
@@ -792,7 +836,7 @@ struct MonitorView: View {
                     .opacity(strength)
                     .shadow(color: Term.green.opacity(selected ? 0.9 : 0), radius: selected ? 5 : 0)
                     .contentShape(Rectangle())
-                    .onTapGesture { if stat.isActive { model.selectedStat = stat } }
+                    .onTapGesture { if model.isActive(stat) { model.selectedStat = stat } }
             }
         }
         .frame(maxWidth: .infinity)
@@ -807,7 +851,7 @@ struct MonitorView: View {
         let levels = info?.levels ?? 0
         return VStack(spacing: 6) {
             specialStrip
-            GhostFigure(style: model.ghostStyle, coffee: model.coffee)
+            GhostFigure(style: model.ghostStyle, coffee: model.coffee, character: model.character)
                 .frame(width: 72, height: 84)
             Text(stat.title)
                 .foregroundStyle(Term.dim)
@@ -930,7 +974,7 @@ struct MonitorView: View {
 
     var body: some View {
         let s = model.snapshot
-        TerminalFrame(title: "СИСТЕМА // МОНИТОР", window: .monitor, model: model) {
+        TerminalFrame(title: "\(model.character.monitorName) // МОНИТОР", window: .monitor, model: model) {
             // Если окно сделали ниже содержимого, оно прокручивается.
             ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 9) {

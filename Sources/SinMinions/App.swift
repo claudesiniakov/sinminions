@@ -136,6 +136,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             demoMark("coffee")
             await wait(3)
             controller.setCoffeeForDemo(false)
+            // Второй персонаж: золотой страж и стиль терминала с монитором в духе Вархаммера.
+            controller.setCharacterForDemo(.ab)
+            await wait(3)
+            demoMark("ab")
+            await wait(3)
+            controller.setCharacterForDemo(.f)
+            await wait(1)
             controller.closeConsoleForDemo()
             await wait(1)
             // Поиск и находка (водяной чип и т. п.).

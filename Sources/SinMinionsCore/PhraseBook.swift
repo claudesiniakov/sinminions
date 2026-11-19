@@ -73,15 +73,49 @@ public struct PhraseBook {
         }
     }
 
-    public static func pool(_ kind: PhraseKind, hour: Int) -> [String] {
-        kind == .ambient ? general + timeOfDay(hour: hour) : (byKind[kind] ?? general)
+    /// Реплики золотого стража: суровый готический тон. Остальные поводы берутся из общего набора.
+    public static let guardAmbient: [String] = [
+        "пост принят",
+        "Император защищает",
+        "терпение — тоже оружие",
+        "стою и слежу",
+        "порядок будет",
+        "я невысок, но тяжёл",
+        "слава труду",
+        "в строю",
+        "враг не пройдёт. почта тоже",
+        "доспех блестит, душа спокойна",
+        "делаю обход периметра",
+        "рапорт: всё тихо",
+        "огонь веры не гаснет",
+        "наблюдаю",
+    ]
+    public static let guardByKind: [PhraseKind: [String]] = [
+        .click: ["слушаю!", "на посту!", "докладывай", "я здесь", "ну что?"],
+        .wake: ["вернулся? хорошо", "пост цел", "я всё стерёг"],
+        .scared: ["не так быстро!", "осторожнее!", "кто там?!", "тревога!"],
+        .curious: ["что там у тебя?", "дай-ка взгляну", "я рядом", "докладывай"],
+        .boo: ["в бой!", "а вот и я!", "тревога!"],
+        .shooed: ["понял, ухожу", "не мешаю", "отхожу на позицию", "есть, отойти"],
+        .searching: ["ищу…", "где-то тут было", "обыскиваю сектор", "минуту, проверю"],
+        .teleport: ["перемещён", "врата открыты", "я на месте"],
+    ]
+
+    public static func pool(_ kind: PhraseKind, hour: Int, character: CompanionCharacter = .f) -> [String] {
+        if character == .ab {
+            if kind == .ambient { return guardAmbient + timeOfDay(hour: hour) }
+            if let own = guardByKind[kind] { return own }
+        }
+        return kind == .ambient ? general + timeOfDay(hour: hour) : (byKind[kind] ?? general)
     }
 
     private var decks: [String: [String]] = [:]
     private var last: String?
     private let shuffle: ([String]) -> [String]
+    public let character: CompanionCharacter
 
-    public init(shuffle: @escaping ([String]) -> [String] = { $0.shuffled() }) {
+    public init(character: CompanionCharacter = .f, shuffle: @escaping ([String]) -> [String] = { $0.shuffled() }) {
+        self.character = character
         self.shuffle = shuffle
     }
 
@@ -90,7 +124,7 @@ public struct PhraseBook {
         let key = kind == .ambient ? "ambient-\(Self.timeOfDay(hour: hour).first ?? "")" : kind.rawValue
         var deck = decks[key] ?? []
         if deck.isEmpty {
-            deck = shuffle(Self.pool(kind, hour: hour))
+            deck = shuffle(Self.pool(kind, hour: hour, character: character))
             // Новая колода не должна начинаться с только что сказанного.
             if deck.count > 1, deck.last == last { deck.swapAt(0, deck.count - 1) }
         }

@@ -50,6 +50,18 @@ private struct GeneralSettings: View {
     var body: some View {
         Form {
             Section("Персонаж") {
+                // Вкладки персонажей: у каждого свои настройки поведения, облик и стиль терминала с монитором.
+                Picker("Персонаж", selection: $prefs.character) {
+                    ForEach(CompanionCharacter.allCases) { character in
+                        Text(character.tabTitle).tag(character)
+                    }
+                }
+                .pickerStyle(.segmented)
+                Text(prefs.character == .f
+                    ? "F: призрак Moth, терминал и монитор в стиле Fallout."
+                    : "ab: золотой страж, терминал и монитор в стиле Вархаммера.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 Picker("Размер", selection: $prefs.scale) {
                     ForEach(Prefs.scales, id: \.self) { value in
                         Text(value == 1.5 ? "1,5×" : "\(Int(value))×").tag(value)
@@ -58,7 +70,7 @@ private struct GeneralSettings: View {
                 .pickerStyle(.segmented)
             }
 
-            Section("Поведение") {
+            Section("Поведение: \(prefs.character.tabTitle)") {
                 Toggle("Перелёты по экрану", isOn: $prefs.wanderEnabled)
                 Toggle("Телепорты через порталы", isOn: $prefs.teleportEnabled)
                 Toggle("Подлетает к курсору (в составе перелётов)", isOn: $prefs.chaseEnabled)

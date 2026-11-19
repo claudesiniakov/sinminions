@@ -55,8 +55,16 @@ final class Prefs {
     /// Минуты до сна; 0 — никогда.
     static let sleepOptions: [Int] = [1, 5, 15, 0]
 
-    var mode: CompanionMode { didSet { store(mode.rawValue, "mode") } }
-    var connections: LLMConnections { didSet { store(connections.json() ?? Data(), "llmConnections") } }
+    var mode: CompanionMode { didSet { storeGlobal(mode.rawValue, "mode") } }
+    var connections: LLMConnections { didSet { storeGlobal(connections.json() ?? Data(), "llmConnections") } }
+    /// Активный персонаж: на экране показан он, а настройки поведения ниже относятся к нему.
+    var character: CompanionCharacter {
+        didSet {
+            guard character != oldValue else { return }
+            storeGlobal(character.rawValue, "character")
+            applyCharacterSettings()
+        }
+    }
     var scale: Double { didSet { store(scale, "scale") } }
     var wanderEnabled: Bool { didSet { store(wanderEnabled, "wanderEnabled") } }
     var teleportEnabled: Bool { didSet { store(teleportEnabled, "teleportEnabled") } }
@@ -67,7 +75,7 @@ final class Prefs {
     var ghostStyleLevel: Int { didSet { store(ghostStyleLevel, "ghostStyle") } }
     var ghostStyle: GhostStyle { GhostStyle.clamp(ghostStyleLevel) }
     /// Режим «кофе» (уровень 3 буквы E или команда /coffee): ноутбук не засыпает. После перезапуска выключен, чтобы не разряжать батарею втихую.
-    var coffee = false { didSet { onChange() } }
+    var coffee = false { didSet { if !applying { onChange() } } }
     var alwaysAsleep: Bool { didSet { store(alwaysAsleep, "alwaysAsleep") } }
     var hideSeekEnabled: Bool { didSet { store(hideSeekEnabled, "hideSeekEnabled") } }
     var searchEnabled: Bool { didSet { store(searchEnabled, "searchEnabled") } }
@@ -77,35 +85,62 @@ final class Prefs {
     var talkEnabled: Bool { didSet { store(talkEnabled, "talkEnabled") } }
     var talkFrequency: Frequency { didSet { store(talkFrequency.rawValue, "talkFrequency") } }
     var sleepMinutes: Int { didSet { store(sleepMinutes, "sleepMinutes") } }
-    var hideInFullScreen: Bool { didSet { store(hideInFullScreen, "hideInFullScreen") } }
+    var hideInFullScreen: Bool { didSet { storeGlobal(hideInFullScreen, "hideInFullScreen") } }
 
     /// Вызывается после любого изменения.
     @ObservationIgnored var onChange: () -> Void = {}
     @ObservationIgnored private let defaults = UserDefaults.standard
+    @ObservationIgnored private var applying = false
 
     init() {
         let d = UserDefaults.standard
         mode = CompanionMode(rawValue: d.string(forKey: "mode") ?? "") ?? .medium
         connections = LLMConnections.decode(d.data(forKey: "llmConnections")) ?? Self.legacyConnections(d)
-        let savedScale = d.object(forKey: "scale") as? Double ?? 1.5
-        scale = Self.scales.contains(savedScale) ? savedScale : 1.5
-        wanderEnabled = d.object(forKey: "wanderEnabled") as? Bool ?? true
-        teleportEnabled = d.object(forKey: "teleportEnabled") as? Bool ?? true
-        scareEnabled = d.object(forKey: "scareEnabled") as? Bool ?? true
-        chaseEnabled = d.object(forKey: "chaseEnabled") as? Bool ?? true
-        hideSeekEnabled = d.object(forKey: "hideSeekEnabled") as? Bool ?? true
-        shooEnabled = d.object(forKey: "shooEnabled") as? Bool ?? true
-        searchEnabled = d.object(forKey: "searchEnabled") as? Bool ?? true
-        ghostStyleLevel = GhostStyle.clamp(d.object(forKey: "ghostStyle") as? Int ?? 0).rawValue
-        agility = Agility.clamp(d.object(forKey: "agility") as? Int ?? Agility.defaultLevel)
-        alwaysAsleep = d.object(forKey: "alwaysAsleep") as? Bool ?? false
-        celebrateEnabled = d.object(forKey: "celebrateEnabled") as? Bool ?? true
-        wanderFrequency = Frequency(rawValue: d.string(forKey: "wanderFrequency") ?? "") ?? .normal
-        talkEnabled = d.object(forKey: "talkEnabled") as? Bool ?? true
-        talkFrequency = Frequency(rawValue: d.string(forKey: "talkFrequency") ?? "") ?? .normal
-        let savedSleep = d.object(forKey: "sleepMinutes") as? Int ?? 5
-        sleepMinutes = Self.sleepOptions.contains(savedSleep) ? savedSleep : 5
+        let active = CompanionCharacter(rawValue: d.string(forKey: "character") ?? "") ?? .f
+        character = active
+        let c = CharacterSettings.read(d, active)
+        scale = c.scale
+        wanderEnabled = c.wander
+        teleportEnabled = c.teleport
+        scareEnabled = c.scare
+        chaseEnabled = c.chase
+        hideSeekEnabled = c.hideSeek
+        shooEnabled = c.shoo
+        searchEnabled = c.search
+        ghostStyleLevel = c.ghostStyle
+        agility = c.agility
+        alwaysAsleep = c.alwaysAsleep
+        celebrateEnabled = c.celebrate
+        wanderFrequency = c.wanderFrequency
+        talkEnabled = c.talkEnabled
+        talkFrequency = c.talkFrequency
+        sleepMinutes = c.sleepMinutes
         hideInFullScreen = d.object(forKey: "hideInFullScreen") as? Bool ?? true
+    }
+
+    /// Загружает настройки активного персонажа в свойства (при переключении вкладки F и ab).
+    private func applyCharacterSettings() {
+        let c = CharacterSettings.read(defaults, character)
+        applying = true
+        scale = c.scale
+        wanderEnabled = c.wander
+        teleportEnabled = c.teleport
+        scareEnabled = c.scare
+        chaseEnabled = c.chase
+        hideSeekEnabled = c.hideSeek
+        shooEnabled = c.shoo
+        searchEnabled = c.search
+        ghostStyleLevel = c.ghostStyle
+        agility = c.agility
+        alwaysAsleep = c.alwaysAsleep
+        celebrateEnabled = c.celebrate
+        wanderFrequency = c.wanderFrequency
+        talkEnabled = c.talkEnabled
+        talkFrequency = c.talkFrequency
+        sleepMinutes = c.sleepMinutes
+        coffee = false
+        applying = false
+        onChange()
     }
 
     /// До v0.1.8 было одно подключение GigaChat: ключ лежал в Связке ключей под прежним именем,
@@ -161,9 +196,16 @@ final class Prefs {
     /// Ловкость (A): скорость случайных перелётов.
     var flightSpeedRange: ClosedRange<Double> { Agility.speedRange(level: agility) }
 
+    /// Настройка активного персонажа: ключ получает его префикс.
     private func store(_ value: Any, _ key: String) {
+        defaults.set(value, forKey: character.keyPrefix + key)
+        if !applying { onChange() }
+    }
+
+    /// Общая настройка, не зависящая от персонажа.
+    private func storeGlobal(_ value: Any, _ key: String) {
         defaults.set(value, forKey: key)
-        onChange()
+        if !applying { onChange() }
     }
 
     /// Настройки поведения; в режиме энергосбережения перелёты отключаются.
@@ -185,5 +227,54 @@ final class Prefs {
         config.sleepsAlways = alwaysAsleep
         config.consoleEnabled = mode == .medium
         return config
+    }
+}
+
+/// Настройки поведения одного персонажа, прочитанные из UserDefaults. Значения по умолчанию у персонажей разные:
+/// золотой страж тяжёлый и медленный, не прячется и не пугается.
+struct CharacterSettings {
+    var scale: Double
+    var wander: Bool
+    var teleport: Bool
+    var scare: Bool
+    var chase: Bool
+    var hideSeek: Bool
+    var shoo: Bool
+    var search: Bool
+    var ghostStyle: Int
+    var agility: Int
+    var alwaysAsleep: Bool
+    var celebrate: Bool
+    var wanderFrequency: Frequency
+    var talkEnabled: Bool
+    var talkFrequency: Frequency
+    var sleepMinutes: Int
+
+    static func read(_ d: UserDefaults, _ character: CompanionCharacter) -> CharacterSettings {
+        let p = character.keyPrefix
+        let ab = character == .ab
+        func bool(_ key: String, _ first: Bool, _ second: Bool) -> Bool {
+            d.object(forKey: p + key) as? Bool ?? (ab ? second : first)
+        }
+        let savedScale = d.object(forKey: p + "scale") as? Double ?? 1.5
+        let savedSleep = d.object(forKey: p + "sleepMinutes") as? Int ?? 5
+        return CharacterSettings(
+            scale: Prefs.scales.contains(savedScale) ? savedScale : 1.5,
+            wander: bool("wanderEnabled", true, true),
+            teleport: bool("teleportEnabled", true, true),
+            scare: bool("scareEnabled", true, false),
+            chase: bool("chaseEnabled", true, false),
+            hideSeek: bool("hideSeekEnabled", true, false),
+            shoo: bool("shooEnabled", true, true),
+            search: bool("searchEnabled", true, true),
+            ghostStyle: GhostStyle.clamp(d.object(forKey: p + "ghostStyle") as? Int ?? 0).rawValue,
+            agility: Agility.clamp(d.object(forKey: p + "agility") as? Int ?? (ab ? 0 : Agility.defaultLevel)),
+            alwaysAsleep: bool("alwaysAsleep", false, false),
+            celebrate: bool("celebrateEnabled", true, true),
+            wanderFrequency: Frequency(rawValue: d.string(forKey: p + "wanderFrequency") ?? "") ?? .normal,
+            talkEnabled: bool("talkEnabled", true, true),
+            talkFrequency: Frequency(rawValue: d.string(forKey: p + "talkFrequency") ?? "") ?? .normal,
+            sleepMinutes: Prefs.sleepOptions.contains(savedSleep) ? savedSleep : 5
+        )
     }
 }
