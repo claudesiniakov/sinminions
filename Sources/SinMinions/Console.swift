@@ -288,7 +288,7 @@ final class ChatSession {
     func loadDemo() {
         entries = [
             ChatEntry(kind: .user, text: "привет, как дела?"),
-            ChatEntry(kind: .assistant, text: "всё под контролем, смотритель. радиация в норме, периметр чист. текст можно выделить мышью и скопировать по ⌘C.", speaker: "GIGACHAT"),
+            ChatEntry(kind: .assistant, text: "всё под контролем, периметр чист. текст можно выделить мышью и скопировать по ⌘C.", speaker: "GIGACHAT"),
             ChatEntry(kind: .user, text: "а если без шуток?"),
             ChatEntry(kind: .error, text: "Сервис GigaChat недоступен (503)"),
         ]
@@ -441,7 +441,7 @@ private enum Term {
     static var font: Font { Font.system(size: 13, design: .monospaced) }
     static var small: Font { Font.system(size: 11, design: .monospaced) }
     /// Заголовки окон: у стража — готический засечный шрифт.
-    static var title: Font { gothic ? Font.system(size: 12, weight: .bold, design: .serif) : small }
+    static var title: Font { gothic ? Font.system(size: 11, weight: .bold, design: .serif) : small }
 }
 
 /// Рамка окна терминала: тёмный фон, зелёная рамка, строки развёртки, заголовок.
