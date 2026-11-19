@@ -174,6 +174,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             await wait(3)
             controller.stopSingForDemo()
             await wait(1.5)
+            // Поиск реликвий Империума.
+            controller.searchForDemo()
+            await wait(14)
+            demoMark("ab_find")
+            await wait(9)
             // Игра на приставке: рядом появляется телевизор.
             controller.playForDemo()
             await wait(3)
