@@ -1144,8 +1144,17 @@ final class NewBehaviorsTests: XCTestCase {
         XCTAssertNotEqual(PhraseBook.pool(.click, hour: 12, character: .ab), PhraseBook.pool(.click, hour: 12, character: .f))
         XCTAssertTrue(PhraseBook.pool(.ambient, hour: 12, character: .ab).contains("пост принят"))
         XCTAssertFalse(PhraseBook.pool(.ambient, hour: 12, character: .ab).contains("war never changes"))
-        // Для повода без своих реплик у стража берётся общий набор.
-        XCTAssertEqual(PhraseBook.pool(.charging, hour: 12, character: .ab), PhraseBook.pool(.charging, hour: 12, character: .f))
+        // У стража свои реплики на все поводы и никаких отсылок к Fallout.
+        let banned = ["vault", "fallout", "радиац", "смотритель", "пустош", "nuka", "пип-бой", "крышек", "реактор", "убежищ", "гейгер", "moth", "war never"]
+        for kind in PhraseKind.allCases {
+            for hour in [3, 8, 14, 20] {
+                let pool = PhraseBook.pool(kind, hour: hour, character: .ab)
+                XCTAssertFalse(pool.isEmpty, "\(kind)")
+                for phrase in pool {
+                    for word in banned { XCTAssertFalse(phrase.lowercased().contains(word), "\(kind): \(phrase)") }
+                }
+            }
+        }
         var book = PhraseBook(character: .ab, shuffle: { $0 })
         XCTAssertFalse(book.next(.click, hour: 12).isEmpty)
     }

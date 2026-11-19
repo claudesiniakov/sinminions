@@ -306,9 +306,15 @@ final class CompanionView: NSView {
     /// Золотой страж двигается по-своему: шагает, садится, играет, кричит «В бой!» и кланяется. У призрака этого нет.
     private var golden: GoldenArt? { art as? GoldenArt }
 
+    private var walkingShown = false
+
+    /// Пока страж идёт, он не парит: парение снимается, ноги ступают по очереди.
     func setWalking(_ on: Bool) {
         guard let golden, golden.pose == .idle || golden.pose == .walk else { return }
         golden.setPose(on ? .walk : .idle)
+        guard on != walkingShown else { return }
+        walkingShown = on
+        if on { moth.removeAnimation(forKey: "float") } else { startFloating() }
     }
 
     func setPlaying(_ on: Bool) {

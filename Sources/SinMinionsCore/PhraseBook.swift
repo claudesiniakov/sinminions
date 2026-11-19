@@ -90,22 +90,43 @@ public struct PhraseBook {
         "огонь веры не гаснет",
         "наблюдаю",
     ]
+    /// Время суток для стража: без отсылок к Fallout.
+    public static let guardMorning = ["доброе утро, пост сдан", "утро. рапорт готов", "новый день, та же служба", "подъём, доспех начищен"]
+    public static let guardDay = ["день идёт, пост держим", "обед — тоже долг", "середина смены", "работаем, как положено"]
+    public static let guardEvening = ["вечер, смена на исходе", "пора закругляться", "скоро отбой", "вечером спокойнее"]
+    public static let guardNight = ["поздний час", "ночь, но пост не оставлен", "я бодрствую. а ты?", "отбой бы не помешал"]
+
+    public static func guardTimeOfDay(hour: Int) -> [String] {
+        switch hour {
+        case 6..<12: return guardMorning
+        case 12..<18: return guardDay
+        case 18..<23: return guardEvening
+        default: return guardNight
+        }
+    }
+
     public static let guardByKind: [PhraseKind: [String]] = [
+        .charging: ["энергия пошла", "питание подключено", "силовая броня благодарит", "заряд растёт"],
+        .lowBattery: ["заряда мало, нужна розетка", "резерв на исходе", "пора к зарядке", "энергия на исходе"],
+        .updateAvailable: ["вышла новая версия", "есть обновление, загляни в меню", "доспех можно обновить"],
+        .needAccess: ["для поиска нужен «Универсальный доступ»", "нет доступа. если он выдан — сбрось его в настройках"],
+        .spotlightOff: ["сочетание Spotlight выключено в настройках системы"],
+        .playing: ["есть!", "ещё разок", "ну давай же", "ага, вот так", "тут я мастер", "уровень пройден"],
         .click: ["слушаю!", "на посту!", "докладывай", "я здесь", "ну что?"],
         .wake: ["вернулся? хорошо", "пост цел", "я всё стерёг"],
         .scared: ["не так быстро!", "осторожнее!", "кто там?!", "тревога!"],
         .curious: ["что там у тебя?", "дай-ка взгляну", "я рядом", "докладывай"],
         .boo: ["в бой!", "а вот и я!", "тревога!"],
         .shooed: ["понял, ухожу", "не мешаю", "отхожу на позицию", "есть, отойти"],
-        .playing: ["есть!", "ещё разок", "ну давай же", "ага, вот так", "тут я мастер", "уровень пройден"],
         .searching: ["ищу…", "где-то тут было", "обыскиваю сектор", "минуту, проверю"],
         .teleport: ["перемещён", "врата открыты", "я на месте"],
     ]
 
     public static func pool(_ kind: PhraseKind, hour: Int, character: CompanionCharacter = .f) -> [String] {
         if character == .ab {
-            if kind == .ambient { return guardAmbient + timeOfDay(hour: hour) }
-            if let own = guardByKind[kind] { return own }
+            // У стража свой набор целиком: реплики призрака с отсылками к Fallout сюда не попадают.
+            if kind == .ambient { return guardAmbient + guardTimeOfDay(hour: hour) }
+            return guardByKind[kind] ?? guardAmbient
         }
         return kind == .ambient ? general + timeOfDay(hour: hour) : (byKind[kind] ?? general)
     }

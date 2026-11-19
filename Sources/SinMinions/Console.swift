@@ -186,7 +186,25 @@ struct ChatEntry: Identifiable, Equatable {
 @MainActor
 @Observable
 final class ChatSession {
-    static let systemPrompt = "Ты — Moth, призрак-компаньон на рабочем столе Mac. Отвечай по-русски, кратко (1–4 предложения), в духе терминала Fallout, без эмодзи."
+    static func systemPrompt(for character: CompanionCharacter) -> String {
+        switch character {
+        case .f:
+            return "Ты — Moth, призрак-компаньон на рабочем столе Mac. Отвечай по-русски, кратко (1–4 предложения), в духе терминала Fallout, без эмодзи."
+        case .ab:
+            return "Ты — золотой страж, коренастый воин в золочёном доспехе, компаньон на рабочем столе Mac. Отвечай по-русски, кратко (1–4 предложения), в суровом готическом тоне торжественного караульного. Без отсылок к Fallout и без эмодзи."
+        }
+    }
+    static var systemPrompt: String { systemPrompt(for: .f) }
+    private(set) var character: CompanionCharacter = .f
+
+    /// Смена персонажа меняет тон ответов: обновляем системное сообщение, историю беседы оставляем.
+    func setCharacter(_ new: CompanionCharacter) {
+        guard new != character else { return }
+        character = new
+        if let first = history.first, first.role == .system {
+            history[0] = ChatMessage(.system, Self.systemPrompt(for: new))
+        }
+    }
 
     var entries: [ChatEntry] = []
     var input = ""
@@ -262,7 +280,7 @@ final class ChatSession {
         task?.cancel()
         task = nil
         isSending = false
-        history = [ChatMessage(.system, Self.systemPrompt)]
+        history = [ChatMessage(.system, Self.systemPrompt(for: character))]
         entries = []
     }
 
@@ -311,6 +329,7 @@ final class ConsoleModel {
     var character: CompanionCharacter = .f {
         didSet {
             Term.theme = character
+            chat.setCharacter(character)
             if character == .ab, selectedStat == .perception { selectedStat = .intelligence }
         }
     }
@@ -413,11 +432,12 @@ private enum Term {
     static var bodyStroke: Color { Color(nsColor: CompanionView.Palette.bodyStroke) }
     static var pupil: Color { Color(nsColor: CompanionView.Palette.pupil) }
     /// Предупреждения и ошибки: янтарь у Moth, багрянец у стража.
-    static var amber: Color { gothic ? Color(nsColor: CompanionView.Palette.rgb(0xe5533f)) : Color(red: 1, green: 0.69, blue: 0.2) }
-    static var green: Color { gothic ? Color(nsColor: CompanionView.Palette.rgb(0xf2c24e)) : Color(nsColor: CompanionView.Palette.green) }
-    static var dim: Color { gothic ? Color(nsColor: CompanionView.Palette.rgb(0xb98a38)) : Color(nsColor: CompanionView.Palette.greenDim) }
-    static var dark: Color { gothic ? Color(nsColor: CompanionView.Palette.rgb(0x5e4214)) : Color(nsColor: CompanionView.Palette.greenDark) }
-    static var background: Color { gothic ? Color(nsColor: CompanionView.Palette.rgb(0x100a05)) : Color(nsColor: CompanionView.Palette.rgb(0x0b0f0a)) }
+    static var amber: Color { gothic ? Color(nsColor: CompanionView.Palette.rgb(0xff6b57)) : Color(red: 1, green: 0.69, blue: 0.2) }
+    // У стража: тёплый пергамент для текста и рамок, кровавый багрянец для линий и разделителей, чёрно-красный фон.
+    static var green: Color { gothic ? Color(nsColor: CompanionView.Palette.rgb(0xf0d58c)) : Color(nsColor: CompanionView.Palette.green) }
+    static var dim: Color { gothic ? Color(nsColor: CompanionView.Palette.rgb(0xb59a62)) : Color(nsColor: CompanionView.Palette.greenDim) }
+    static var dark: Color { gothic ? Color(nsColor: CompanionView.Palette.rgb(0x7a2222)) : Color(nsColor: CompanionView.Palette.greenDark) }
+    static var background: Color { gothic ? Color(nsColor: CompanionView.Palette.rgb(0x0e0808)) : Color(nsColor: CompanionView.Palette.rgb(0x0b0f0a)) }
     static var font: Font { Font.system(size: 13, design: .monospaced) }
     static var small: Font { Font.system(size: 11, design: .monospaced) }
     /// Заголовки окон: у стража — готический засечный шрифт.

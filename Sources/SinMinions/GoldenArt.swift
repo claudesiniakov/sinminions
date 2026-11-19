@@ -630,7 +630,7 @@ final class GoldenArt: CompanionArt {
 
     private func applyPose(animated: Bool) {
         for g in [legLG, legRG, armLG, armRG, upperG] { g.removeAnimation(forKey: "walk") }
-        upperG.removeAnimation(forKey: "walk2")
+        for g in [legLG, legRG, upperG] { g.removeAnimation(forKey: "walk2") }
         CATransaction.begin()
         CATransaction.setAnimationDuration(animated ? 0.35 : 0)
         let seated = pose == .sit || pose == .play
@@ -676,13 +676,16 @@ final class GoldenArt: CompanionArt {
     /// Шаг: ноги поднимаются по очереди, руки качаются навстречу, корпус подпрыгивает и покачивается.
     private func startWalking() {
         let t: [NSNumber] = [0, 0.25, 0.5, 0.75, 1]
-        let lift = 9 * ky, swing = radians(12), sway = radians(2.2)
-        legLG.add(additive("transform.translation.y", [0, lift, 0, 0, 0], duration: 0.7, times: t), forKey: "walk")
-        legRG.add(additive("transform.translation.y", [0, 0, 0, lift, 0], duration: 0.7, times: t), forKey: "walk")
-        armLG.add(additive("transform.rotation.z", [0, swing, 0, -swing, 0], duration: 0.7, times: t), forKey: "walk")
-        armRG.add(additive("transform.rotation.z", [0, -swing, 0, swing, 0], duration: 0.7, times: t), forKey: "walk")
-        upperG.add(additive("transform.translation.y", [0, 2.4 * ky, 0, 2.4 * ky, 0], duration: 0.7, times: t), forKey: "walk")
-        upperG.add(additive("transform.rotation.z", [0, sway, 0, -sway, 0], duration: 0.7, times: t), forKey: "walk2")
+        // Шаг заметный: нога поднимается высоко, корпус клонится в сторону опорной ноги и подпрыгивает.
+        let lift = 16 * ky, swing = radians(18), sway = radians(3.5), period: CFTimeInterval = 0.55
+        legLG.add(additive("transform.translation.y", [0, lift, 0, 0, 0], duration: period, times: t), forKey: "walk")
+        legRG.add(additive("transform.translation.y", [0, 0, 0, lift, 0], duration: period, times: t), forKey: "walk")
+        legLG.add(additive("transform.rotation.z", [0, radians(-8), 0, 0, 0], duration: period, times: t), forKey: "walk2")
+        legRG.add(additive("transform.rotation.z", [0, 0, 0, radians(8), 0], duration: period, times: t), forKey: "walk2")
+        armLG.add(additive("transform.rotation.z", [0, swing, 0, -swing, 0], duration: period, times: t), forKey: "walk")
+        armRG.add(additive("transform.rotation.z", [0, -swing, 0, swing, 0], duration: period, times: t), forKey: "walk")
+        upperG.add(additive("transform.translation.y", [0, 4 * ky, 0, 4 * ky, 0], duration: period, times: t), forKey: "walk")
+        upperG.add(additive("transform.rotation.z", [0, sway, 0, -sway, 0], duration: period, times: t), forKey: "walk2")
     }
 
     /// Игра: руки на пульте подрагивают, пульт мигает кнопками.
