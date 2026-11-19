@@ -342,7 +342,8 @@ final class GoldenArt: CompanionArt {
         add(layer(path("M34 156 Q43 158 41 168 Q39 173 34 172"), stroke: porcelain.base, width: 3))
         piece(path("M12 152 H34 V172 Q34 179 27 179 H19 Q12 179 12 172 Z"), porcelain, sx: -3, sy: -3, width: 2)
         add(layer(ellipse(23, 152.5, 11, 2.6), fill: Self.rgb(0x5a3a22), stroke: outline, width: 1.2))
-        for (index, x) in [19, 27].enumerated() as [(Int, CGFloat)] {
+        let steamX: [CGFloat] = [19, 27]
+        for (index, x) in steamX.enumerated() {
             let steam = layer(path("M\(x) 148 Q\(x + 3) 144 \(x) 140 Q\(x - 3) 136 \(x) 132"), stroke: .white, width: 1.6, opacity: 0)
             let fade = CAKeyframeAnimation(keyPath: "opacity")
             fade.values = [0, 0.75, 0.75, 0]
