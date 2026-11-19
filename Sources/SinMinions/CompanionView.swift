@@ -93,7 +93,7 @@ final class CompanionView: NSView {
         self.style = style
         self.coffee = coffee
         self.character = character
-        art = character == .ab ? GoldenArt(scale: scale) : GhostArt(style: style, scale: scale, coffee: coffee)
+        art = character == .ab ? GoldenArt(scale: scale, coffee: coffee) : GhostArt(style: style, scale: scale, coffee: coffee)
         moth = art.root
         body = art.body
         eyes = art.eyes
@@ -301,9 +301,26 @@ final class CompanionView: NSView {
         eyes.add(blink, forKey: "blink")
     }
 
+    /// Золотой страж двигается по-своему: шагает, садится, играет, кричит «В бой!» и кланяется. У призрака этого нет.
+    private var golden: GoldenArt? { art as? GoldenArt }
+
+    func setWalking(_ on: Bool) {
+        guard let golden, golden.pose == .idle || golden.pose == .walk else { return }
+        golden.setPose(on ? .walk : .idle)
+    }
+
+    func setPlaying(_ on: Bool) {
+        golden?.setPose(on ? .play : (sleeping ? .sit : .idle))
+    }
+
+    func cheer() { golden?.cheer() }
+    func bow() { golden?.bow() }
+    var isGolden: Bool { golden != nil }
+
     func setSleeping(_ value: Bool) {
         guard value != sleeping else { return }
         sleeping = value
+        golden?.setPose(value ? .sit : .idle)
         CATransaction.begin()
         CATransaction.setAnimationDuration(0.3)
         eyes.transform = value ? CATransform3DMakeScale(1, 0.12, 1) : CATransform3DIdentity

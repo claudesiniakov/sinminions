@@ -30,7 +30,28 @@ final class GoldenArt: CompanionArt {
     private let size: CGSize
     private let kx: CGFloat
     private let ky: CGFloat
+    private let coffee: Bool
+    /// Контейнер всего рисунка: опускается, когда страж садится.
     private let figure = CALayer()
+    /// Куда сейчас рисуются детали (группа, которую собирает `build`).
+    private var sink = CALayer()
+    private var capeG = CALayer()
+    private var legLG = CALayer()
+    private var legRG = CALayer()
+    private var upperG = CALayer()
+    private var armLG = CALayer()
+    private var armRG = CALayer()
+    private var padG = CALayer()
+    private var headG = CALayer()
+    private var mouthG = CALayer()
+    private var cupG = CALayer()
+
+    /// Основная поза; короткие реакции (клич, поклон) идут поверх неё.
+    enum Pose { case idle, walk, sit, play }
+    private(set) var pose: Pose = .idle
+    private var armLAngle: CGFloat = 0
+    private var armRAngle: CGFloat = 0
+    private var cheering = false
 
     private struct Shade {
         let base: NSColor
@@ -53,13 +74,15 @@ final class GoldenArt: CompanionArt {
     private static let designWidth: CGFloat = 200
     private static let designHeight: CGFloat = 232
 
-    init(scale: CGFloat) {
+    init(scale: CGFloat, coffee: Bool = false) {
         self.scale = scale
+        self.coffee = coffee
         size = CGSize(width: MothShape.size.width * scale, height: MothShape.size.height * scale)
         kx = size.width / Self.designWidth
         ky = size.height / Self.designHeight
         root.bounds = CGRect(origin: .zero, size: size)
         figure.frame = root.bounds
+        sink = figure
         build()
     }
 
@@ -186,10 +209,23 @@ final class GoldenArt: CompanionArt {
         clip.addSublayer(layer(p.copy(using: &shiftHi) ?? p, stroke: c.hi, width: 2.6, opacity: 0.9))
         wrap.addSublayer(clip)
         wrap.addSublayer(layer(p, stroke: outline, width: width))
-        figure.addSublayer(wrap)
+        sink.addSublayer(wrap)
     }
 
-    private func add(_ l: CALayer) { figure.addSublayer(l) }
+    private func add(_ l: CALayer) { sink.addSublayer(l) }
+
+    /// Группа слоёв с осью поворота в точке макета: внутри координаты те же, что у корня.
+    private func group(pivot: CGPoint, raster: Bool = true) -> CALayer {
+        let g = CALayer()
+        g.bounds = root.bounds
+        g.anchorPoint = CGPoint(x: pivot.x * kx / size.width, y: 1 - pivot.y * ky / size.height)
+        g.position = CGPoint(x: pivot.x * kx, y: size.height - pivot.y * ky)
+        if raster {
+            g.shouldRasterize = true
+            g.rasterizationScale = NSScreen.main?.backingScaleFactor ?? 2
+        }
+        return g
+    }
 
     private func place(_ x: CGFloat, _ y: CGFloat, _ k: CGFloat, _ extra: CGAffineTransform = .identity) -> CGAffineTransform {
         CGAffineTransform(a: k, b: 0, c: 0, d: k, tx: x, ty: y).concatenating(extra)
@@ -237,8 +273,8 @@ final class GoldenArt: CompanionArt {
     }
 
     /// Рука висит вниз от плеча; `angle` — поворот по часовой стрелке вокруг плеча, как на макете.
-    private func arm(pivot: CGPoint, angle: CGFloat) {
-        let t = CGAffineTransform(translationX: pivot.x, y: pivot.y).rotated(by: angle * .pi / 180)
+    private func arm(pivot: CGPoint) {
+        let t = CGAffineTransform(translationX: pivot.x, y: pivot.y)
         let line = path("M0 0 L0 44", t)
         add(layer(line, stroke: outline, width: 29))
         add(layer(line, stroke: gold.shade, width: 23))
@@ -281,14 +317,79 @@ final class GoldenArt: CompanionArt {
         }
     }
 
+    // MARK: - Геймпад, кружка, рот
+
+    private func gamepad() {
+        let t = CGAffineTransform(translationX: 100, y: 140)
+        let padShade = Shade(base: Self.rgb(0x3a4150), shade: Self.rgb(0x1d222c), hi: Self.rgb(0x7a86a0))
+        piece(path("M-31 -6 Q-36 8 -31 15 Q-26 23 -18 15 L-10 9 H10 L18 15 Q26 23 31 15 Q36 8 31 -6 Q20 -14 0 -14 Q-20 -14 -31 -6 Z", t), padShade, sx: -2, sy: -2, width: 2.4)
+        add(layer(path("M-11 -11 H11 V-5 H-11 Z", t), fill: Self.rgb(0x566074), stroke: outline, width: 1.4))
+        add(layer(path("M-23 -4 H-15 M-19 -8 V0", t), stroke: Self.rgb(0xe8eefb), width: 3))
+        for (x, y, color) in [(19, -8, 0x37c871), (24, -3, 0xe0453a), (19, 2, 0x4a8dff), (14, -3, 0xe07ab8)] as [(CGFloat, CGFloat, UInt32)] {
+            add(layer(ellipse(x, y, 2.5, 2.5, t), fill: Self.rgb(color), stroke: outline, width: 1))
+        }
+        for x in [-8, 8] as [CGFloat] {
+            add(layer(ellipse(x, 6, 4.6, 4.6, t), fill: Self.rgb(0x161a22), stroke: outline, width: 1.6))
+            add(layer(ellipse(x, 6, 2, 2, t), fill: Self.rgb(0x4a5266)))
+        }
+        add(layer(path("M-6 -14 H6", t), stroke: Self.rgb(0x4fc3ff), width: 1.6))
+    }
+
+    /// Кружка в левой руке и пар над ней (режим «кофе»).
+    private func cup() {
+        let porcelain = Shade(base: Self.rgb(0xf3efe6), shade: Self.rgb(0xc9c1ad), hi: .white)
+        add(layer(path("M34 156 Q43 158 41 168 Q39 173 34 172"), stroke: outline, width: 6))
+        add(layer(path("M34 156 Q43 158 41 168 Q39 173 34 172"), stroke: porcelain.base, width: 3))
+        piece(path("M12 152 H34 V172 Q34 179 27 179 H19 Q12 179 12 172 Z"), porcelain, sx: -3, sy: -3, width: 2)
+        add(layer(ellipse(23, 152.5, 11, 2.6), fill: Self.rgb(0x5a3a22), stroke: outline, width: 1.2))
+        for (index, x) in [19, 27].enumerated() as [(Int, CGFloat)] {
+            let steam = layer(path("M\(x) 148 Q\(x + 3) 144 \(x) 140 Q\(x - 3) 136 \(x) 132"), stroke: .white, width: 1.6, opacity: 0)
+            let fade = CAKeyframeAnimation(keyPath: "opacity")
+            fade.values = [0, 0.75, 0.75, 0]
+            fade.keyTimes = [0, 0.3, 0.7, 1]
+            let rise = CABasicAnimation(keyPath: "transform.translation.y")
+            rise.fromValue = 0
+            rise.toValue = 4 * ky
+            let both = CAAnimationGroup()
+            both.animations = [fade, rise]
+            both.duration = 2.2
+            both.beginTime = CACurrentMediaTime() + Double(index) * 1.1
+            both.repeatCount = .infinity
+            steam.add(both, forKey: "steam")
+            add(steam)
+        }
+    }
+
+    /// Открытый рот для клича «В бой!»: поверх закрытого.
+    private func mouth() {
+        let t = CGAffineTransform(translationX: 70, y: 22)
+        add(layer(ellipse(30, 51.5, 7, 5.6, t), fill: Self.rgb(0x2a0c0c), stroke: faceLine, width: 1.2))
+        add(layer(ellipse(30, 54.5, 4, 2.2, t), fill: Self.rgb(0xb24a4a)))
+    }
+
     // MARK: - Сборка
 
     private func build() {
         // Плащ, воротник, ноги, табард, корпус, пояс, наплечники, руки, горжет и лицо — в порядке рисования макета.
+        // Подвижные части собраны в группы с осью поворота: бёдра у ног, плечи у рук, пояс у корпуса.
+        capeG = group(pivot: CGPoint(x: 100, y: 96))
+        sink = capeG
         piece(path("M40 96 Q4 150 12 216 L188 216 Q196 150 160 96 Z"), red, sx: -6, sy: 0)
-        piece(path("M56 100 L48 46 Q100 26 152 46 L144 100 Z"), dark, sx: -4, sy: -3)
+        figure.addSublayer(capeG)
+
+        legLG = group(pivot: CGPoint(x: 73, y: 164))
+        sink = legLG
         leg(.identity)
+        figure.addSublayer(legLG)
+        legRG = group(pivot: CGPoint(x: 127, y: 164))
+        sink = legRG
         leg(mirror)
+        figure.addSublayer(legRG)
+
+        upperG = group(pivot: CGPoint(x: 100, y: 170), raster: false)
+        let torsoG = group(pivot: CGPoint(x: 100, y: 170))
+        sink = torsoG
+        piece(path("M56 100 L48 46 Q100 26 152 46 L144 100 Z"), dark, sx: -4, sy: -3)
         piece(path("M88 170 H112 L110 202 L100 210 L90 202 Z"), cream)
         add(layer(path("M100 176 V200"), stroke: red.base, width: 3))
         piece(path("M40 98 Q34 130 44 156 L156 156 Q166 130 160 98 Q130 82 100 82 Q70 82 40 98 Z"), gold)
@@ -300,12 +401,44 @@ final class GoldenArt: CompanionArt {
         skull(93, 155, 14)
         pauldron(.identity)
         pauldron(mirror)
-        arm(pivot: CGPoint(x: 24, y: 116), angle: 5)
-        // Правая рука прижата к груди, как на выбранном варианте «Рука к сердцу».
-        arm(pivot: CGPoint(x: 176, y: 116), angle: 96)
+        upperG.addSublayer(torsoG)
+
+        // Руки висят вниз от плеч; нужный угол задаёт поза.
+        armLG = group(pivot: CGPoint(x: 24, y: 116), raster: !coffee)
+        sink = armLG
+        arm(pivot: CGPoint(x: 24, y: 116))
+        cupG = group(pivot: CGPoint(x: 24, y: 160))
+        sink = cupG
+        if coffee { cup() }
+        armLG.addSublayer(cupG)
+        upperG.addSublayer(armLG)
+        armRG = group(pivot: CGPoint(x: 176, y: 116))
+        sink = armRG
+        arm(pivot: CGPoint(x: 176, y: 116))
+        upperG.addSublayer(armRG)
+
+        padG = group(pivot: CGPoint(x: 100, y: 140))
+        sink = padG
+        gamepad()
+        padG.opacity = 0
+        upperG.addSublayer(padG)
+
+        headG = group(pivot: CGPoint(x: 100, y: 80), raster: false)
+        let headStatic = group(pivot: CGPoint(x: 100, y: 80))
+        sink = headStatic
         piece(path("M66 82 Q100 100 134 82 L138 98 Q100 114 62 98 Z"), gold, sx: -3, sy: -3)
         piece(path(circlePath(100, 100, 4)), red, sx: -1, sy: -1, width: 2)
         face()
+        headG.addSublayer(headStatic)
+        mouthG = group(pivot: CGPoint(x: 100, y: 80))
+        sink = mouthG
+        mouth()
+        mouthG.opacity = 0
+        headG.addSublayer(mouthG)
+        headG.addSublayer(eyes)
+        upperG.addSublayer(headG)
+        figure.addSublayer(upperG)
+        sink = figure
 
         // Силуэт для попаданий мыши и для свечения: корпус, наплечники, голова, ноги.
         let silhouette = CGMutablePath()
@@ -332,10 +465,6 @@ final class GoldenArt: CompanionArt {
         body.shadowRadius = 3 * scale
         body.shadowOpacity = 0.35
 
-        // Статичная часть кэшируется: окно двигается и парит, а рисунок остаётся прежним.
-        figure.shouldRasterize = true
-        figure.rasterizationScale = NSScreen.main?.backingScaleFactor ?? 2
-
         eyes.bounds = root.bounds
         eyesHome = CGPoint(x: size.width / 2, y: size.height - 51.4 * ky)
         eyes.anchorPoint = CGPoint(x: 0.5, y: eyesHome.y / size.height)
@@ -343,6 +472,140 @@ final class GoldenArt: CompanionArt {
 
         root.addSublayer(body)
         root.addSublayer(figure)
-        root.addSublayer(eyes)
+        applyPose(animated: false)
+    }
+
+    // MARK: - Позы и анимации
+
+    private func radians(_ degrees: CGFloat) -> CGFloat { degrees * .pi / 180 }
+
+    private func rotation(_ degrees: CGFloat) -> CATransform3D { CATransform3DMakeRotation(radians(degrees), 0, 0, 1) }
+
+    /// Углы рук по позе в градусах слоя (против часовой стрелки): левая висит чуть наружу, правая прижата к груди.
+    private func armAngles(for pose: Pose) -> (left: CGFloat, right: CGFloat) {
+        switch pose {
+        case .idle: return (-5, -96)
+        case .walk: return (-5, 5)
+        case .sit: return (-5, -96)
+        case .play: return (66.5, -66.5)
+        }
+    }
+
+    /// Сменить основную позу: стойка, ходьба (перелёт), посадка (сон) или игра на приставке.
+    func setPose(_ newPose: Pose) {
+        guard newPose != pose else { return }
+        pose = newPose
+        applyPose(animated: true)
+    }
+
+    private func turnArm(_ layer: CALayer, from: CGFloat, to: CGFloat, duration: CFTimeInterval = 0.35) {
+        let turn = CABasicAnimation(keyPath: "transform.rotation.z")
+        turn.fromValue = radians(from)
+        turn.toValue = radians(to)
+        turn.duration = max(duration, 0.001)
+        turn.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        layer.transform = rotation(to)
+        layer.add(turn, forKey: "turn")
+    }
+
+    private func applyPose(animated: Bool) {
+        for g in [legLG, legRG, armLG, armRG, upperG] { g.removeAnimation(forKey: "walk") }
+        upperG.removeAnimation(forKey: "walk2")
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(animated ? 0.35 : 0)
+        let seated = pose == .sit || pose == .play
+        figure.transform = CATransform3DMakeTranslation(0, seated ? -(pose == .play ? 32 : 24) * ky : 0, 0)
+        let legScale: CGFloat = seated ? (pose == .play ? 0.5 : 0.6) : 1
+        let splay: CGFloat = seated ? (pose == .play ? 26 : 16) : 0
+        legLG.transform = CATransform3DConcat(CATransform3DMakeScale(1, legScale, 1), rotation(-splay))
+        legRG.transform = CATransform3DConcat(CATransform3DMakeScale(1, legScale, 1), rotation(splay))
+        padG.opacity = pose == .play ? 1 : 0
+        cupG.opacity = pose == .play ? 0 : 1
+        // Голова поворачивается к телевизору и чуть наклоняется.
+        headG.transform = pose == .play
+            ? CATransform3DConcat(rotation(-5), CATransform3DMakeTranslation(3 * kx, -6 * ky, 0))
+            : CATransform3DIdentity
+        upperG.transform = pose == .play ? CATransform3DMakeScale(1, 0.95, 1) : CATransform3DIdentity
+        CATransaction.commit()
+
+        let target = armAngles(for: pose)
+        let d: CFTimeInterval = animated ? 0.35 : 0.001
+        if !cheering {
+            turnArm(armLG, from: armLAngle, to: target.left, duration: d)
+            turnArm(armRG, from: armRAngle, to: target.right, duration: d)
+            armLAngle = target.left
+            armRAngle = target.right
+        } else {
+            turnArm(armLG, from: armLAngle, to: target.left, duration: d)
+            armLAngle = target.left
+        }
+        if pose == .walk { startWalking() }
+        if pose == .play { startPlayingMotion() }
+    }
+
+    private func additive(_ keyPath: String, _ values: [CGFloat], duration: CFTimeInterval, times: [NSNumber]) -> CAKeyframeAnimation {
+        let a = CAKeyframeAnimation(keyPath: keyPath)
+        a.values = values
+        a.keyTimes = times
+        a.duration = duration
+        a.repeatCount = .infinity
+        a.isAdditive = true
+        return a
+    }
+
+    /// Шаг: ноги поднимаются по очереди, руки качаются навстречу, корпус подпрыгивает и покачивается.
+    private func startWalking() {
+        let t: [NSNumber] = [0, 0.25, 0.5, 0.75, 1]
+        let lift = 9 * ky, swing = radians(12), sway = radians(2.2)
+        legLG.add(additive("transform.translation.y", [0, lift, 0, 0, 0], duration: 0.7, times: t), forKey: "walk")
+        legRG.add(additive("transform.translation.y", [0, 0, 0, lift, 0], duration: 0.7, times: t), forKey: "walk")
+        armLG.add(additive("transform.rotation.z", [0, swing, 0, -swing, 0], duration: 0.7, times: t), forKey: "walk")
+        armRG.add(additive("transform.rotation.z", [0, -swing, 0, swing, 0], duration: 0.7, times: t), forKey: "walk")
+        upperG.add(additive("transform.translation.y", [0, 2.4 * ky, 0, 2.4 * ky, 0], duration: 0.7, times: t), forKey: "walk")
+        upperG.add(additive("transform.rotation.z", [0, sway, 0, -sway, 0], duration: 0.7, times: t), forKey: "walk2")
+    }
+
+    /// Игра: руки на пульте подрагивают, пульт мигает кнопками.
+    private func startPlayingMotion() {
+        let t: [NSNumber] = [0, 0.5, 1]
+        let jitter = radians(3)
+        armLG.add(additive("transform.rotation.z", [0, jitter, 0], duration: 0.16, times: t), forKey: "walk")
+        armRG.add(additive("transform.rotation.z", [0, -jitter, 0], duration: 0.2, times: t), forKey: "walk")
+    }
+
+    /// Клич «В бой!»: правая рука вверх, рот открыт, рука подрагивает; затем всё возвращается.
+    func cheer() {
+        guard !cheering, pose != .play else { return }
+        cheering = true
+        let up: CGFloat = -192
+        turnArm(armRG, from: armRAngle, to: up, duration: 0.3)
+        let shake = additive("transform.rotation.z", [0, radians(5), 0, radians(-5), 0], duration: 0.18, times: [0, 0.25, 0.5, 0.75, 1])
+        armRG.add(shake, forKey: "shout")
+        mouthG.opacity = 1
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.armRG.removeAnimation(forKey: "shout")
+                self.mouthG.opacity = 0
+                self.cheering = false
+                let target = self.armAngles(for: self.pose).right
+                self.turnArm(self.armRG, from: up, to: target, duration: 0.4)
+                self.armRAngle = target
+            }
+        }
+    }
+
+    /// Поклон: корпус сжимается по вертикали, голова опускается, затем распрямляется.
+    func bow() {
+        let squash = CAKeyframeAnimation(keyPath: "transform.scale.y")
+        squash.values = [1, 0.83, 0.83, 1]
+        squash.keyTimes = [0, 0.3, 0.7, 1]
+        squash.duration = 1.2
+        upperG.add(squash, forKey: "bow")
+        let lower = CAKeyframeAnimation(keyPath: "transform.translation.y")
+        lower.values = [0, -14 * ky, -14 * ky, 0]
+        lower.keyTimes = [0, 0.3, 0.7, 1]
+        lower.duration = 1.2
+        headG.add(lower, forKey: "bow")
     }
 }

@@ -78,6 +78,9 @@ private struct GeneralSettings: View {
                 Toggle("Пугается быстрого курсора", isOn: $prefs.scareEnabled)
                 Toggle("Отлетает в сторону, если щёлкнуть правой кнопкой", isOn: $prefs.shooEnabled)
                 Toggle("Что-нибудь ищет и находит (водяной чип и другое)", isOn: $prefs.searchEnabled)
+                if prefs.character == .ab {
+                    Toggle("Играет на приставке рядом с телевизором", isOn: $prefs.playEnabled)
+                }
                 Toggle("Играет в прятки: тает и выскакивает с «бу!»", isOn: $prefs.hideSeekEnabled)
                 Toggle("Танцует, когда подключили зарядку", isOn: $prefs.celebrateEnabled)
                 Picker("Частота перелётов и телепортов", selection: $prefs.wanderFrequency) {

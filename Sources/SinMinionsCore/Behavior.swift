@@ -2,7 +2,7 @@ import Foundation
 
 /// Повод для реплики.
 public enum PhraseKind: String, Sendable, CaseIterable {
-    case ambient, click, charging, lowBattery, wake, updateAvailable, needAccess, spotlightOff, teleport, scared, curious, boo, shooed, searching
+    case ambient, click, charging, lowBattery, wake, updateAvailable, needAccess, spotlightOff, teleport, scared, curious, boo, shooed, searching, playing
 }
 
 public struct BehaviorConfig: Equatable, Sendable {
@@ -45,6 +45,10 @@ public struct BehaviorConfig: Equatable, Sendable {
     public var searchEnabled = false
     public var searchInterval: ClosedRange<Double> = 300...720
     public var searchDuration: ClosedRange<Double> = 8...12
+    /// Игра на приставке: сколько ждать между играми и сколько играть.
+    public var playEnabled = false
+    public var playInterval: ClosedRange<Double> = 420...900
+    public var playDuration: ClosedRange<Double> = 20...40
 
     public init() {}
 }
@@ -59,6 +63,8 @@ public enum Mode: Equatable, Sendable {
     case hiding
     /// Поиск: призрак что-то ищет, потом находит.
     case searching
+    /// Игра на приставке рядом с телевизором (золотой страж).
+    case playing
 }
 
 /// Что должен сделать интерфейс в ответ на переход автомата.
@@ -79,6 +85,9 @@ public enum Effect: Equatable, Sendable {
     case stopSearch
     /// Находка: показать предмет рядом с призраком и сказать про него.
     case showFind
+    /// Сесть с геймпадом и играть; рядом появляется телевизор.
+    case startPlay
+    case stopPlay
 }
 
 public enum Event: Equatable, Sendable {
@@ -108,6 +117,8 @@ public enum Event: Equatable, Sendable {
     case shoo
     /// Для демонстрации: поиск начинается сейчас.
     case searchNow
+    /// Для демонстрации: игра начинается сейчас.
+    case playNow
     /// Повод для радости; фраза — из этого набора.
     case celebrate(PhraseKind)
 }
@@ -126,6 +137,7 @@ public struct BehaviorEngine {
     private var scareCooldownUntil: Double = 0
     private var calmUntil: Double = 0
     public private(set) var nextSearchAt: Double
+    public private(set) var nextPlayAt: Double
     /// После «кыш» призрак не перелетает и не телепортируется столько секунд.
     public static let shooCalm: Double = 90
     /// После испуга призрак не пугается заново столько секунд.
@@ -151,6 +163,7 @@ public struct BehaviorEngine {
         nextTeleportAt = now + random(config.teleportInterval)
         nextHideAt = now + random(config.hideInterval)
         nextSearchAt = now + random(config.searchInterval)
+        nextPlayAt = now + random(config.playInterval)
     }
 
     /// Новые настройки: таймеры перелёта и реплик запускаются заново.
@@ -162,6 +175,7 @@ public struct BehaviorEngine {
         nextTeleportAt = now + random(config.teleportInterval)
         nextHideAt = now + random(config.hideInterval)
         nextSearchAt = now + random(config.searchInterval)
+        nextPlayAt = now + random(config.playInterval)
     }
 
     /// Раз в секунду. `idleSeconds` — время с последнего ввода с клавиатуры или мыши.
@@ -169,6 +183,12 @@ public struct BehaviorEngine {
         switch mode {
         case .dragged, .wandering, .console, .teleporting:
             return []
+        case .playing:
+            guard now >= modeEndsAt else { return [] }
+            mode = .idle
+            nextPlayAt = now + random(config.playInterval)
+            postpone(now: now)
+            return [.stopPlay]
         case .searching:
             guard now >= modeEndsAt else { return [] }
             mode = .reacting
@@ -208,6 +228,9 @@ public struct BehaviorEngine {
             }
             if config.searchEnabled, now >= nextSearchAt {
                 return begin(search: now)
+            }
+            if config.playEnabled, now >= nextPlayAt {
+                return begin(play: now)
             }
             if config.hideSeekEnabled, now >= nextHideAt {
                 mode = .hiding
@@ -293,6 +316,7 @@ public struct BehaviorEngine {
             case .teleporting: mode = .idle; return [.stopTeleport]
             case .hiding: mode = .idle; return [.fadeIn]
             case .searching: mode = .idle; return [.stopSearch]
+            case .playing: mode = .idle; return [.stopPlay]
             case .dragged, .idle: mode = .idle; return []
             }
 
@@ -314,6 +338,10 @@ public struct BehaviorEngine {
             modeEndsAt = now + config.talkDuration
             postpone(now: now + config.talkDuration)
             return effects + [.spin, .say(kind)]
+
+        case .playNow:
+            guard config.playEnabled, mode == .idle else { return [] }
+            return begin(play: now)
 
         case .searchNow:
             guard config.searchEnabled, mode == .idle else { return [] }
@@ -360,6 +388,13 @@ public struct BehaviorEngine {
 
     // MARK: - Внутреннее
 
+    private mutating func begin(play now: Double) -> [Effect] {
+        mode = .playing
+        modeEndsAt = now + random(config.playDuration)
+        nextPlayAt = modeEndsAt + random(config.playInterval)
+        return [.startPlay]
+    }
+
     private mutating func begin(search now: Double) -> [Effect] {
         mode = .searching
         modeEndsAt = now + random(config.searchDuration)
@@ -380,6 +415,7 @@ public struct BehaviorEngine {
         case .teleporting: return [.stopTeleport]
         case .hiding: return [.fadeIn]
         case .searching: return [.stopSearch]
+        case .playing: return [.stopPlay]
         case .idle, .dragged: return []
         }
     }

@@ -14,6 +14,10 @@ final class CompanionController: NSObject {
     private var view: CompanionView
     private let bubble = BubblePanel()
     private let findPanel = FindPanel()
+    private var tvPanel: TVPanel?
+    private var tvScale: Double = 0
+    private var collectionBehavior: NSWindow.CollectionBehavior = []
+    private var playTask: Task<Void, Never>?
     private var searchTask: Task<Void, Never>?
     private let console = ConsoleController()
     private let portalA = PortalWindow(color: PortalWindow.blue)
@@ -616,6 +620,7 @@ final class CompanionController: NSObject {
         console.model.character = prefs.character
     }
 
+
     private func rebuildView() {
         let wasSleeping = isSleeping
         let old = panel.frame
@@ -642,6 +647,8 @@ final class CompanionController: NSObject {
         panel.collectionBehavior = behavior
         bubble.setCollectionBehavior(behavior)
         findPanel.setCollectionBehavior(behavior)
+        collectionBehavior = behavior
+        tvPanel?.setCollectionBehavior(behavior)
         console.setCollectionBehavior(behavior)
         portalA.setCollectionBehavior(behavior)
         portalB.setCollectionBehavior(behavior)
@@ -756,7 +763,11 @@ final class CompanionController: NSObject {
                 findPanel.hide()
             case .startSearch: startSearch()
             case .stopSearch: stopSearch()
-            case .showFind: showFind()
+            case .showFind:
+                showFind()
+                view.bow()
+            case .startPlay: startPlay()
+            case .stopPlay: stopPlay()
             case .fallAsleep:
                 bubble.hide()
                 view.setSleeping(true)
@@ -767,7 +778,8 @@ final class CompanionController: NSObject {
             case .closeConsole: closeConsole(returnHome: !view.isDragging)
             case .startTeleport: startTeleport()
             case .shake: view.shake()
-            case .spin: view.spin()
+            case .spin:
+                if view.isGolden { view.cheer() } else { view.spin() }
             case .fadeOut:
                 NSAnimationContext.beginGrouping()
                 NSAnimationContext.current.duration = 0.6
@@ -825,6 +837,42 @@ final class CompanionController: NSObject {
         let lifted = CGRect(x: moth.minX, y: moth.minY, width: moth.width, height: moth.height + 11 * view.scale)
         bubble.show(text, over: lifted, in: area)
     }
+
+    // MARK: - Игра на приставке
+
+    /// Страж садится на пол с геймпадом, рядом появляется телевизор; время от времени он радуется вслух.
+    private func startPlay() {
+        view.setPlaying(true)
+        if tvPanel == nil || tvScale != prefs.scale {
+            tvPanel = TVPanel(scale: CGFloat(prefs.scale))
+            tvPanel?.setCollectionBehavior(collectionBehavior)
+            tvScale = prefs.scale
+        }
+        let moth = view.mothFrame.offsetBy(dx: panel.frame.minX, dy: panel.frame.minY)
+        tvPanel?.show(beside: moth, in: area)
+        playTask?.cancel()
+        playTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(6))
+                guard !Task.isCancelled, let self, self.engine.mode == .playing else { return }
+                self.view.hop()
+                self.say(.playing)
+            }
+        }
+    }
+
+    private func stopPlay() {
+        playTask?.cancel()
+        playTask = nil
+        view.setPlaying(false)
+        tvPanel?.hide()
+        bubble.hide()
+    }
+
+    func playForDemo() { apply(engine.handle(.playNow, now: now)) }
+    func stopPlayForDemo() { apply(engine.handle(.click, now: now)) }
+    func cheerForDemo() { view.cheer() }
+    func sitForDemo(_ on: Bool) { view.setSleeping(on) }
 
     func searchForDemo() {
         apply(engine.handle(.searchNow, now: now))
@@ -884,6 +932,7 @@ final class CompanionController: NSObject {
     }
 
     private func startFlightTimer() {
+        view.setWalking(true)
         flightTimer?.invalidate()
         let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.flightStep() }
@@ -939,6 +988,7 @@ final class CompanionController: NSObject {
     /// `snap` — прерванное перемещение к терминалу или обратно сразу довести до цели
     /// (обычный перелёт просто останавливается там, где его прервали).
     private func stopFlight(snap: Bool = true) {
+        view.setWalking(false)
         flightTimer?.invalidate()
         flightTimer = nil
         if let interrupted = flight {

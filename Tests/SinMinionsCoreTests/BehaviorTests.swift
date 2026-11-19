@@ -1094,6 +1094,29 @@ final class NewBehaviorsTests: XCTestCase {
         XCTAssertEqual(SearchFind.pick { _ in 0.99 }, .stimpak)
     }
 
+    func testPlayStartsStopsAndInterrupts() {
+        var config = BehaviorConfig()
+        config.playEnabled = true
+        config.sleepAfter = nil
+        config.talkEnabled = false
+        config.wanderEnabled = false
+        var engine = BehaviorEngine(config: config, now: 0, random: { $0.lowerBound })
+        XCTAssertEqual(engine.tick(now: 419, idleSeconds: 1), [])
+        XCTAssertEqual(engine.tick(now: 420, idleSeconds: 1), [.startPlay])
+        XCTAssertEqual(engine.mode, .playing)
+        XCTAssertEqual(engine.tick(now: 430, idleSeconds: 1), [])
+        XCTAssertEqual(engine.tick(now: 440, idleSeconds: 1), [.stopPlay])
+        XCTAssertEqual(engine.mode, .idle)
+        // Щелчок прерывает игру.
+        XCTAssertEqual(engine.handle(.playNow, now: 441), [.startPlay])
+        XCTAssertEqual(engine.handle(.click, now: 442), [.stopPlay, .hop, .say(.click)])
+    }
+
+    func testPlayOffDoesNothing() {
+        var engine = makeEngine()
+        XCTAssertEqual(engine.handle(.playNow, now: 1), [])
+    }
+
     func testCompanionCharacters() {
         XCTAssertEqual(CompanionCharacter.allCases.map(\.tabTitle), ["F", "ab"])
         XCTAssertEqual(CompanionCharacter.f.keyPrefix, "")

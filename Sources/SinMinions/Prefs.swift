@@ -79,6 +79,8 @@ final class Prefs {
     var alwaysAsleep: Bool { didSet { store(alwaysAsleep, "alwaysAsleep") } }
     var hideSeekEnabled: Bool { didSet { store(hideSeekEnabled, "hideSeekEnabled") } }
     var searchEnabled: Bool { didSet { store(searchEnabled, "searchEnabled") } }
+    /// Игра на приставке рядом с телевизором: есть только у золотого стража.
+    var playEnabled: Bool { didSet { store(playEnabled, "playEnabled") } }
     var shooEnabled: Bool { didSet { store(shooEnabled, "shooEnabled") } }
     var celebrateEnabled: Bool { didSet { store(celebrateEnabled, "celebrateEnabled") } }
     var wanderFrequency: Frequency { didSet { store(wanderFrequency.rawValue, "wanderFrequency") } }
@@ -107,6 +109,7 @@ final class Prefs {
         hideSeekEnabled = c.hideSeek
         shooEnabled = c.shoo
         searchEnabled = c.search
+        playEnabled = c.play
         ghostStyleLevel = c.ghostStyle
         agility = c.agility
         alwaysAsleep = c.alwaysAsleep
@@ -130,6 +133,7 @@ final class Prefs {
         hideSeekEnabled = c.hideSeek
         shooEnabled = c.shoo
         searchEnabled = c.search
+        playEnabled = c.play
         ghostStyleLevel = c.ghostStyle
         agility = c.agility
         alwaysAsleep = c.alwaysAsleep
@@ -220,6 +224,7 @@ final class Prefs {
         config.hideSeekEnabled = hideSeekEnabled
         config.shooEnabled = shooEnabled
         config.searchEnabled = searchEnabled
+        config.playEnabled = playEnabled && character == .ab
         config.celebrateEnabled = celebrateEnabled
         config.talkEnabled = talkEnabled
         config.talkInterval = talkFrequency.talkInterval
@@ -241,6 +246,7 @@ struct CharacterSettings {
     var hideSeek: Bool
     var shoo: Bool
     var search: Bool
+    var play: Bool
     var ghostStyle: Int
     var agility: Int
     var alwaysAsleep: Bool
@@ -267,6 +273,7 @@ struct CharacterSettings {
             hideSeek: bool("hideSeekEnabled", true, false),
             shoo: bool("shooEnabled", true, true),
             search: bool("searchEnabled", true, true),
+            play: bool("playEnabled", false, true),
             ghostStyle: GhostStyle.clamp(d.object(forKey: p + "ghostStyle") as? Int ?? 0).rawValue,
             agility: Agility.clamp(d.object(forKey: p + "agility") as? Int ?? (ab ? 0 : Agility.defaultLevel)),
             alwaysAsleep: bool("alwaysAsleep", false, false),
