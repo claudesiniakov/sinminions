@@ -326,7 +326,7 @@ final class CompanionView: NSView {
         let delay = Double.random(in: 5...12)
         stepTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] timer in
             MainActor.assumeIsolated {
-                guard let self, self.window != nil || self.superview == nil else { timer.invalidate(); return }
+                guard let self, self.window != nil else { timer.invalidate(); return }
                 if !self.sleeping { self.golden?.stepInPlace() }
                 self.scheduleStep()
             }
