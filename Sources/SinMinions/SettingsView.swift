@@ -77,7 +77,7 @@ private struct GeneralSettings: View {
                     .disabled(!prefs.wanderEnabled)
                 Toggle("Пугается быстрого курсора", isOn: $prefs.scareEnabled)
                 Toggle("Отлетает в сторону, если щёлкнуть правой кнопкой", isOn: $prefs.shooEnabled)
-                Toggle("Что-нибудь ищет и находит (водяной чип и другое)", isOn: $prefs.searchEnabled)
+                Toggle(prefs.character == .ab ? "Ищет реликвии Империума и находит их" : "Что-нибудь ищет и находит (водяной чип и другое)", isOn: $prefs.searchEnabled)
                 if prefs.character == .ab {
                     Toggle("Играет на приставке рядом с телевизором", isOn: $prefs.playEnabled)
                     Toggle("Иногда поёт гимн", isOn: $prefs.singEnabled)

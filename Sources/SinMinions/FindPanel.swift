@@ -86,7 +86,7 @@ final class FindPanel {
         let green = Palette.green
         let glow = CALayer()
         glow.frame = root.bounds
-        glow.shadowColor = green.cgColor
+        glow.shadowColor = (find.isRelic ? Palette.rgb(0xf0c24e) : green).cgColor
         glow.shadowOpacity = 0.8
         glow.shadowRadius = 7
         glow.shadowOffset = .zero
@@ -155,6 +155,82 @@ final class FindPanel {
             needle.addLine(to: CGPoint(x: 48, y: 33))
             var turn2 = CGAffineTransform(translationX: 28, y: 28).rotated(by: .pi / 5).translatedBy(x: -28, y: -28)
             glow.addSublayer(shape(needle.copy(using: &turn2) ?? needle, stroke: green, width: 1.6))
+
+        case .aquila:
+            // Золотой орёл с раскрытыми крыльями и багряным ромбом.
+            let ink = Palette.rgb(0x241505), gold = Palette.rgb(0xe8b84a)
+            let wing = CGMutablePath()
+            wing.move(to: CGPoint(x: 28, y: 36))
+            wing.addQuadCurve(to: CGPoint(x: 3, y: 38), control: CGPoint(x: 14, y: 50))
+            wing.addQuadCurve(to: CGPoint(x: 13, y: 31), control: CGPoint(x: 9, y: 34))
+            wing.addQuadCurve(to: CGPoint(x: 5, y: 24), control: CGPoint(x: 6, y: 29))
+            wing.addQuadCurve(to: CGPoint(x: 21, y: 26), control: CGPoint(x: 12, y: 22))
+            wing.addLine(to: CGPoint(x: 28, y: 22))
+            wing.closeSubpath()
+            var flipX = CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: 56, ty: 0)
+            glow.addSublayer(shape(wing, fill: gold, stroke: ink, width: 1.6))
+            glow.addSublayer(shape(wing.copy(using: &flipX) ?? wing, fill: gold, stroke: ink, width: 1.6))
+            let diamond = CGMutablePath()
+            diamond.move(to: CGPoint(x: 28, y: 42)); diamond.addLine(to: CGPoint(x: 34, y: 28))
+            diamond.addLine(to: CGPoint(x: 28, y: 12)); diamond.addLine(to: CGPoint(x: 22, y: 28)); diamond.closeSubpath()
+            glow.addSublayer(shape(diamond, fill: Palette.rgb(0xa62e22), stroke: ink, width: 1.6))
+            glow.addSublayer(shape(CGPath(ellipseIn: CGRect(x: 25.5, y: 25.5, width: 5, height: 5), transform: nil),
+                                   fill: Palette.rgb(0xffe7a0), stroke: ink, width: 1))
+        case .purityScroll:
+            // Пергамент с свёрнутыми краями, красной печатью и лентами.
+            let ink = Palette.rgb(0x241505), parchment = Palette.rgb(0xefe3c8)
+            glow.addSublayer(shape(CGPath(rect: CGRect(x: 14, y: 14, width: 28, height: 28), transform: nil),
+                                   fill: parchment, stroke: ink, width: 1.4))
+            for y in [42.0, 8.0] as [CGFloat] {
+                glow.addSublayer(shape(CGPath(roundedRect: CGRect(x: 11, y: y - 3, width: 34, height: 6), cornerWidth: 3, cornerHeight: 3, transform: nil),
+                                       fill: Palette.rgb(0xd9c9a3), stroke: ink, width: 1.2))
+            }
+            let lines = CGMutablePath()
+            for y in [36.0, 31.0, 26.0] as [CGFloat] {
+                lines.move(to: CGPoint(x: 18, y: y)); lines.addLine(to: CGPoint(x: 38, y: y))
+            }
+            glow.addSublayer(shape(lines, fill: nil, stroke: Palette.rgb(0x8a6b3a), width: 1))
+            let ribbons = CGMutablePath()
+            ribbons.move(to: CGPoint(x: 25, y: 18)); ribbons.addLine(to: CGPoint(x: 22, y: 9)); ribbons.addLine(to: CGPoint(x: 26, y: 11)); ribbons.closeSubpath()
+            ribbons.move(to: CGPoint(x: 31, y: 18)); ribbons.addLine(to: CGPoint(x: 34, y: 9)); ribbons.addLine(to: CGPoint(x: 30, y: 11)); ribbons.closeSubpath()
+            glow.addSublayer(shape(ribbons, fill: Palette.rgb(0xa62e22), stroke: ink, width: 1))
+            glow.addSublayer(shape(CGPath(ellipseIn: CGRect(x: 23, y: 16, width: 10, height: 10), transform: nil),
+                                   fill: Palette.rgb(0xa62e22), stroke: ink, width: 1.2))
+            glow.addSublayer(shape(CGPath(ellipseIn: CGRect(x: 26, y: 19, width: 4, height: 4), transform: nil),
+                                   fill: Palette.rgb(0xd4564a)))
+        case .goldenSkull:
+            // Золочёный череп с нимбом.
+            let ink = Palette.rgb(0x241505), gold = Palette.rgb(0xf0c24e)
+            let ring = CGPath(ellipseIn: CGRect(x: 16, y: 44, width: 24, height: 6), transform: nil)
+            glow.addSublayer(shape(ring, fill: nil, stroke: Palette.rgb(0xffe7a0), width: 2))
+            let skull = CGMutablePath()
+            skull.addEllipse(in: CGRect(x: 14, y: 22, width: 28, height: 24))
+            skull.addRoundedRect(in: CGRect(x: 20, y: 11, width: 16, height: 14), cornerWidth: 3, cornerHeight: 3)
+            glow.addSublayer(shape(skull, fill: gold, stroke: ink, width: 1.6))
+            for x in [22.0, 34.0] as [CGFloat] {
+                glow.addSublayer(shape(CGPath(ellipseIn: CGRect(x: x - 4, y: 28, width: 8, height: 9), transform: nil), fill: ink))
+            }
+            let nose = CGMutablePath()
+            nose.move(to: CGPoint(x: 28, y: 26)); nose.addLine(to: CGPoint(x: 25.5, y: 21)); nose.addLine(to: CGPoint(x: 30.5, y: 21)); nose.closeSubpath()
+            glow.addSublayer(shape(nose, fill: ink))
+            let teeth = CGMutablePath()
+            for x in [23.0, 28.0, 33.0] as [CGFloat] { teeth.move(to: CGPoint(x: x, y: 11)); teeth.addLine(to: CGPoint(x: x, y: 18)) }
+            glow.addSublayer(shape(teeth, fill: nil, stroke: ink, width: 1.2))
+        case .chalice:
+            // Золотая чаша с рубином.
+            let ink = Palette.rgb(0x241505), gold = Palette.rgb(0xf0c24e)
+            let cup = CGMutablePath()
+            cup.move(to: CGPoint(x: 12, y: 44)); cup.addLine(to: CGPoint(x: 44, y: 44))
+            cup.addQuadCurve(to: CGPoint(x: 28, y: 26), control: CGPoint(x: 44, y: 30))
+            cup.addQuadCurve(to: CGPoint(x: 12, y: 44), control: CGPoint(x: 12, y: 30))
+            cup.closeSubpath()
+            glow.addSublayer(shape(cup, fill: gold, stroke: ink, width: 1.6))
+            glow.addSublayer(shape(CGPath(rect: CGRect(x: 25, y: 14, width: 6, height: 13), transform: nil), fill: gold, stroke: ink, width: 1.4))
+            glow.addSublayer(shape(CGPath(roundedRect: CGRect(x: 16, y: 8, width: 24, height: 7), cornerWidth: 3, cornerHeight: 3, transform: nil),
+                                   fill: gold, stroke: ink, width: 1.4))
+            glow.addSublayer(shape(CGPath(ellipseIn: CGRect(x: 24, y: 33, width: 8, height: 8), transform: nil),
+                                   fill: Palette.rgb(0xc0262c), stroke: ink, width: 1.2))
+            glow.addSublayer(shape(CGPath(ellipseIn: CGRect(x: 25.5, y: 37, width: 2.4, height: 2.4), transform: nil), fill: Palette.rgb(0xffd0d0)))
         }
         root.addSublayer(glow)
         return root

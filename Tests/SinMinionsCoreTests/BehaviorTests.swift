@@ -1184,6 +1184,23 @@ final class NewBehaviorsTests: XCTestCase {
         XCTAssertFalse(book.next(.click, hour: 12).isEmpty)
     }
 
+    func testGuardSearchesOnlyRelics() {
+        for roll in stride(from: 0.0, through: 1.0, by: 0.05) {
+            XCTAssertTrue(SearchFind.pick(for: .ab, { _ in roll }).isRelic, "\(roll)")
+            XCTAssertFalse(SearchFind.pick(for: .f, { _ in roll }).isRelic, "\(roll)")
+        }
+        XCTAssertEqual(SearchFind.pick(for: .ab, { _ in 0.1 }), .aquila)
+        XCTAssertEqual(SearchFind.pick(for: .ab, { _ in 0.99 }), .chalice)
+        for find in SearchFind.allCases where find.isRelic {
+            XCTAssertFalse(find.phrases.isEmpty)
+            for phrase in find.phrases {
+                for word in ["чип", "стимпак", "крышк", "голозапис", "vault", "радиац"] {
+                    XCTAssertFalse(phrase.lowercased().contains(word), phrase)
+                }
+            }
+        }
+    }
+
     func testShooOffDoesNothing() {
         var engine = makeEngine()
         XCTAssertEqual(engine.handle(.shoo, now: 1), [])

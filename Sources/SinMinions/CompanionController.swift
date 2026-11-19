@@ -845,7 +845,7 @@ final class CompanionController: NSObject {
 
     /// Находка: предмет появляется рядом с призраком, он радуется и говорит про запас.
     private func showFind() {
-        let find = SearchFind.pick()
+        let find = SearchFind.pick(for: prefs.character)
         let moth = view.mothFrame.offsetBy(dx: panel.frame.minX, dy: panel.frame.minY)
         findPanel.show(find, beside: moth, in: area)
         let text = find.phrases.randomElement() ?? find.title
