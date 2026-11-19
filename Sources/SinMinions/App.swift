@@ -149,7 +149,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             controller.setCoffeeForDemo(false)
             await wait(1.5)
             controller.cheerForDemo()
-            await wait(1)
+            await wait(0.4)
             demoMark("ab_cheer")
             await wait(3)
             controller.sitForDemo(true)
