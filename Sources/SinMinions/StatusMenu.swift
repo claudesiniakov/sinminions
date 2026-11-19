@@ -166,19 +166,29 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         return image
     }
 
-    /// Силуэт стража: шлем с прорезью для глаз и широкая борода.
+    /// Силуэт стража: шлем с гребнем и двумя прорезями для глаз, под ним отдельно — раздвоенная борода.
     private static func guardPath() -> NSBezierPath {
         let path = NSBezierPath()
-        path.move(to: NSPoint(x: 3, y: 9.5))
-        path.curve(to: NSPoint(x: 9, y: 1.5), controlPoint1: NSPoint(x: 3, y: 5), controlPoint2: NSPoint(x: 5.5, y: 1.5))
-        path.curve(to: NSPoint(x: 15, y: 9.5), controlPoint1: NSPoint(x: 12.5, y: 1.5), controlPoint2: NSPoint(x: 15, y: 5))
-        path.line(to: NSPoint(x: 15.5, y: 12))
-        path.curve(to: NSPoint(x: 9, y: 17), controlPoint1: NSPoint(x: 15, y: 15), controlPoint2: NSPoint(x: 12, y: 17))
-        path.curve(to: NSPoint(x: 2.5, y: 12), controlPoint1: NSPoint(x: 6, y: 17), controlPoint2: NSPoint(x: 3, y: 15))
+        // Шлем с гребнем.
+        path.move(to: NSPoint(x: 3, y: 8.2))
+        path.curve(to: NSPoint(x: 9, y: 2.6), controlPoint1: NSPoint(x: 3, y: 4.8), controlPoint2: NSPoint(x: 5.6, y: 2.6))
+        path.curve(to: NSPoint(x: 15, y: 8.2), controlPoint1: NSPoint(x: 12.4, y: 2.6), controlPoint2: NSPoint(x: 15, y: 4.8))
         path.close()
-        // Прорезь шлема и глаза.
-        path.append(NSBezierPath(roundedRect: NSRect(x: 5, y: 6.3, width: 8, height: 2.6), xRadius: 1, yRadius: 1))
+        path.appendRect(NSRect(x: 8.1, y: 0.5, width: 1.8, height: 2.3))
+        // Прорези для глаз.
+        path.append(NSBezierPath(roundedRect: NSRect(x: 5.1, y: 5.2, width: 3, height: 1.6), xRadius: 0.8, yRadius: 0.8))
+        path.append(NSBezierPath(roundedRect: NSRect(x: 9.9, y: 5.2, width: 3, height: 1.6), xRadius: 0.8, yRadius: 0.8))
         path.windingRule = .evenOdd
+        // Борода: широкая, с вырезом посередине.
+        let beard = NSBezierPath()
+        beard.move(to: NSPoint(x: 2.6, y: 9.6))
+        beard.line(to: NSPoint(x: 15.4, y: 9.6))
+        beard.curve(to: NSPoint(x: 12.4, y: 17.6), controlPoint1: NSPoint(x: 15.4, y: 13.6), controlPoint2: NSPoint(x: 14, y: 16.4))
+        beard.line(to: NSPoint(x: 9, y: 14.2))
+        beard.line(to: NSPoint(x: 5.6, y: 17.6))
+        beard.curve(to: NSPoint(x: 2.6, y: 9.6), controlPoint1: NSPoint(x: 4, y: 16.4), controlPoint2: NSPoint(x: 2.6, y: 13.6))
+        beard.close()
+        path.append(beard)
         return path
     }
 
