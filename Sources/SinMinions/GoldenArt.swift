@@ -590,6 +590,8 @@ final class GoldenArt: CompanionArt {
         root.addSublayer(body)
         root.addSublayer(figure)
         applyPose(animated: false)
+        // Едва заметное дыхание: страж стоит на месте, но не замирает.
+        upperG.add(additive("transform.translation.y", [0, 1.2 * ky, 0], duration: 3.2, times: [0, 0.5, 1]), forKey: "breath")
     }
 
     // MARK: - Позы и анимации
@@ -629,7 +631,11 @@ final class GoldenArt: CompanionArt {
     }
 
     private func applyPose(animated: Bool) {
-        for g in [legLG, legRG, armLG, armRG, upperG] { g.removeAnimation(forKey: "walk") }
+        for g in [legLG, legRG, armLG, armRG, upperG] {
+            g.removeAnimation(forKey: "walk")
+            g.removeAnimation(forKey: "step")
+        }
+        upperG.removeAnimation(forKey: "step2")
         for g in [legLG, legRG, upperG] { g.removeAnimation(forKey: "walk2") }
         CATransaction.begin()
         CATransaction.setAnimationDuration(animated ? 0.35 : 0)
@@ -663,12 +669,12 @@ final class GoldenArt: CompanionArt {
         if pose == .play { startPlayingMotion() }
     }
 
-    private func additive(_ keyPath: String, _ values: [CGFloat], duration: CFTimeInterval, times: [NSNumber]) -> CAKeyframeAnimation {
+    private func additive(_ keyPath: String, _ values: [CGFloat], duration: CFTimeInterval, times: [NSNumber], repeats: Float = .infinity) -> CAKeyframeAnimation {
         let a = CAKeyframeAnimation(keyPath: keyPath)
         a.values = values
         a.keyTimes = times
         a.duration = duration
-        a.repeatCount = .infinity
+        a.repeatCount = repeats
         a.isAdditive = true
         return a
     }
@@ -686,6 +692,20 @@ final class GoldenArt: CompanionArt {
         armRG.add(additive("transform.rotation.z", [0, -swing, 0, swing, 0], duration: period, times: t), forKey: "walk")
         upperG.add(additive("transform.translation.y", [0, 4 * ky, 0, 4 * ky, 0], duration: period, times: t), forKey: "walk")
         upperG.add(additive("transform.rotation.z", [0, sway, 0, -sway, 0], duration: period, times: t), forKey: "walk2")
+    }
+
+    /// Переступание на месте: несколько шагов подряд, затем стойка. Идёт только в спокойной стойке.
+    func stepInPlace() {
+        guard pose == .idle, !cheering else { return }
+        let t: [NSNumber] = [0, 0.25, 0.5, 0.75, 1]
+        let cycles = Float(Int.random(in: 2...4))
+        let lift = 12 * ky, swing = radians(10), sway = radians(2.5), period: CFTimeInterval = 0.6
+        legLG.add(additive("transform.translation.y", [0, lift, 0, 0, 0], duration: period, times: t, repeats: cycles), forKey: "step")
+        legRG.add(additive("transform.translation.y", [0, 0, 0, lift, 0], duration: period, times: t, repeats: cycles), forKey: "step")
+        armLG.add(additive("transform.rotation.z", [0, swing, 0, -swing, 0], duration: period, times: t, repeats: cycles), forKey: "step")
+        armRG.add(additive("transform.rotation.z", [0, -swing, 0, swing, 0], duration: period, times: t, repeats: cycles), forKey: "step")
+        upperG.add(additive("transform.translation.y", [0, 3 * ky, 0, 3 * ky, 0], duration: period, times: t, repeats: cycles), forKey: "step")
+        upperG.add(additive("transform.rotation.z", [0, sway, 0, -sway, 0], duration: period, times: t, repeats: cycles), forKey: "step2")
     }
 
     /// Игра: руки на пульте подрагивают, пульт мигает кнопками.

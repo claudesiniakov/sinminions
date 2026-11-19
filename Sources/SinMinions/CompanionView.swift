@@ -123,6 +123,7 @@ final class CompanionView: NSView {
         zzz.opacity = 0
         layer?.addSublayer(zzz)
         startFloating()
+        if character == .ab { scheduleStep() }
     }
 
     @available(*, unavailable)
@@ -178,7 +179,12 @@ final class CompanionView: NSView {
             glowOpacity.toValue = 0.8
         }
         group.repeatCount = .infinity
-        moth.add(group, forKey: "float")
+        if golden != nil {
+            // Страж не парит: стоит на месте, а раз в несколько секунд сам переступает.
+            moth.removeAnimation(forKey: "float")
+        } else {
+            moth.add(group, forKey: "float")
+        }
 
         for glow in [glowRadius, glowOpacity] {
             glow.duration = 1.5
@@ -306,15 +312,25 @@ final class CompanionView: NSView {
     /// Золотой страж двигается по-своему: шагает, садится, играет, кричит «В бой!» и кланяется. У призрака этого нет.
     private var golden: GoldenArt? { art as? GoldenArt }
 
-    private var walkingShown = false
-
-    /// Пока страж идёт, он не парит: парение снимается, ноги ступают по очереди.
+    /// Перелёт стража — это шаги: ноги ступают по очереди, а парения нет.
     func setWalking(_ on: Bool) {
         guard let golden, golden.pose == .idle || golden.pose == .walk else { return }
         golden.setPose(on ? .walk : .idle)
-        guard on != walkingShown else { return }
-        walkingShown = on
-        if on { moth.removeAnimation(forKey: "float") } else { startFloating() }
+    }
+
+    private var stepTimer: Timer?
+
+    /// На месте страж стоит и время от времени, раз в 5–12 секунд, переступает с ноги на ногу несколько шагов.
+    private func scheduleStep() {
+        stepTimer?.invalidate()
+        let delay = Double.random(in: 5...12)
+        stepTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] timer in
+            MainActor.assumeIsolated {
+                guard let self, self.window != nil || self.superview == nil else { timer.invalidate(); return }
+                if !self.sleeping { self.golden?.stepInPlace() }
+                self.scheduleStep()
+            }
+        }
     }
 
     func setPlaying(_ on: Bool) {
