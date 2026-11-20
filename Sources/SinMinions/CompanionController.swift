@@ -20,6 +20,8 @@ final class CompanionController: NSObject {
     private var playTask: Task<Void, Never>?
     private var searchTask: Task<Void, Never>?
     private let console = ConsoleController()
+    private let analytics = AnalyticsWindow()
+    private var usage: UsageStore?
     private let portalA = PortalWindow(color: PortalWindow.blue)
     private let portalB = PortalWindow(color: PortalWindow.orange)
     private var teleportTask: Task<Void, Never>?
@@ -257,6 +259,17 @@ final class CompanionController: NSObject {
         console.model.limits.fetch = fetch
     }
 
+    /// Журнал расхода токенов для окна «/аналитика».
+    func attachAnalytics(usage: UsageStore) {
+        self.usage = usage
+    }
+
+    func showAnalytics() {
+        guard let usage else { return }
+        analytics.show(store: usage, limits: console.model.limits, connections: prefs.connections.items,
+                       character: prefs.character, near: console.terminalFrame)
+    }
+
     /// «+» и «−» на мониторе: следующее или предыдущее подключение по кругу.
     private func switchConnection(_ delta: Int, announce: Bool = true) {
         var list = prefs.connections
@@ -316,6 +329,8 @@ final class CompanionController: NSObject {
         console.model.screen = .chat
         console.activateForTyping()
     }
+
+    func hideAnalyticsForDemo() { analytics.hide() }
 
     func closeConsoleForDemo() {
         apply(engine.handle(.closeConsole, now: now))
@@ -508,6 +523,9 @@ final class CompanionController: NSObject {
                 self.apply(self.engine.handle(.singCommand, now: self.now))
             }
             return nil
+        case .analytics:
+            showAnalytics()
+            return "АНАЛИТИКА ТОКЕНОВ ОТКРЫТА В ОТДЕЛЬНОМ ОКНЕ"
         case .hide:
             setHidden(true)
             return nil

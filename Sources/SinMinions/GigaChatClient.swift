@@ -33,7 +33,7 @@ actor GigaChatClient {
         _ = try await token(key: key, scope: scope, forceRefresh: true)
     }
 
-    func send(_ messages: [ChatMessage], key: String, scope: String, model: String) async throws -> String {
+    func send(_ messages: [ChatMessage], key: String, scope: String, model: String) async throws -> LLMReply {
         var refreshed = false
         while true {
             let token = try await token(key: key, scope: scope, forceRefresh: refreshed)
@@ -47,7 +47,7 @@ actor GigaChatClient {
             guard (200..<300).contains(status) else {
                 throw LLMError.http(status, GigaChatAPI.errorDetail(data), .chat)
             }
-            return try GigaChatAPI.parseChat(data)
+            return LLMReply(text: try GigaChatAPI.parseChat(data), usage: TokenUsage.parse(data))
         }
     }
 

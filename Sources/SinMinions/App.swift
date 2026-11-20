@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let prefs = Prefs()
     private let updater = Updater()
     private let llm = LLMService()
+    private let usage = UsageStore()
     private let settingsRouter = SettingsRouter()
     private var controller: CompanionController?
     private var statusMenu: StatusMenu?
@@ -34,11 +35,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return nil }
             return try await self.llm.limits(connection: connection, key: key)
         }
+        controller.attachAnalytics(usage: usage)
         controller.attachChat(
             send: { [weak self] messages in
                 guard let self, let connection = self.prefs.connections.active,
                       let key = Keychain.read(connection.keyAccount) else { throw LLMError.noCredentials }
-                return try await self.llm.send(messages, connection: connection, key: key)
+                let reply = try await self.llm.send(messages, connection: connection, key: key)
+                self.usage.record(provider: connection.provider, model: connection.model, usage: reply.usage)
+                return reply.text
             },
             hasCredentials: { [weak self] in
                 guard let connection = self?.prefs.connections.active else { return false }
@@ -130,6 +134,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 await wait(3)
             }
             controller.setGhostStyleForDemo(0)
+            // Окно «/аналитика»: расход токенов по моделям.
+            controller.showAnalytics()
+            await wait(2.5)
+            demoMark("analytics")
+            await wait(3)
+            controller.hideAnalyticsForDemo()
             // Режим «кофе» (E, уровень 3): чашка у призрака.
             controller.setCoffeeForDemo(true)
             await wait(2.5)

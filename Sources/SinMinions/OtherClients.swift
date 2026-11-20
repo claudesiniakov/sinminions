@@ -45,13 +45,13 @@ enum HTTPTransport {
 
 /// Клиент Claude: родной Messages API Anthropic.
 actor AnthropicClient {
-    func send(_ messages: [ChatMessage], key: String, model: String) async throws -> String {
+    func send(_ messages: [ChatMessage], key: String, model: String) async throws -> LLMReply {
         let request = AnthropicAPI.chatRequest(key: key, model: model, messages: ChatHistory.trimmed(messages))
         let (data, status) = try await HTTPTransport.perform(request, service: "Claude")
         guard (200..<300).contains(status) else {
             throw LLMError.http(status, LLMResponse.errorDetail(data), .direct)
         }
-        return try AnthropicAPI.parseMessage(data)
+        return LLMReply(text: try AnthropicAPI.parseMessage(data), usage: TokenUsage.parse(data))
     }
 
     /// Проверка ключа: список моделей. Строка — что показать рядом с «работает».
@@ -70,7 +70,7 @@ actor OpenAICompatibleClient {
         self.provider = provider
     }
 
-    func send(_ messages: [ChatMessage], key: String, model: String) async throws -> String {
+    func send(_ messages: [ChatMessage], key: String, model: String) async throws -> LLMReply {
         guard let request = OpenAICompatibleAPI.chatRequest(
             provider: provider, key: key, model: model, messages: ChatHistory.trimmed(messages)
         ) else { throw LLMError.invalidResponse }
@@ -78,7 +78,7 @@ actor OpenAICompatibleClient {
         guard (200..<300).contains(status) else {
             throw LLMError.http(status, LLMResponse.errorDetail(data), .direct)
         }
-        return try LLMResponse.parseChat(data)
+        return LLMReply(text: try LLMResponse.parseChat(data), usage: TokenUsage.parse(data))
     }
 
     func check(key: String) async throws -> String? {

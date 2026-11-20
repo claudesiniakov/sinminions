@@ -424,7 +424,7 @@ private extension String {
 }
 
 /// Палитра терминала и монитора. У первого персонажа зелёный терминал из Fallout, у второго золото и багрянец в духе Вархаммера.
-private enum Term {
+enum Term {
     nonisolated(unsafe) static var theme: CompanionCharacter = .f
     private static var gothic: Bool { theme == .ab }
 
@@ -1118,6 +1118,8 @@ final class ConsoleController: NSObject, NSWindowDelegate {
     private let sampler = SystemMonitor()
     private var timer: Timer?
     private(set) var isOpen = false
+    /// Где окно терминала на экране (nil — закрыто): рядом с ним ставим окно аналитики.
+    var terminalFrame: CGRect? { isOpen && terminal.isVisible ? terminal.frame : nil }
 
     var onCommand: (ConsoleCommand) -> Void = { _ in }
     /// Команды со «/»: возвращает подтверждение для журнала.

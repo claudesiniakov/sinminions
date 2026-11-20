@@ -12,13 +12,13 @@ actor DeepSeekClient {
         session = URLSession(configuration: configuration)
     }
 
-    func send(_ messages: [ChatMessage], key: String, model: String) async throws -> String {
+    func send(_ messages: [ChatMessage], key: String, model: String) async throws -> LLMReply {
         let request = DeepSeekAPI.chatRequest(key: key, model: model, messages: ChatHistory.trimmed(messages))
         let (data, status) = try await perform(request)
         guard (200..<300).contains(status) else {
             throw LLMError.http(status, LLMResponse.errorDetail(data), .direct)
         }
-        return try LLMResponse.parseChat(data)
+        return LLMReply(text: try LLMResponse.parseChat(data), usage: TokenUsage.parse(data))
     }
 
     /// Проверка ключа: запрашивает баланс. Строка — что показать рядом с «работает».

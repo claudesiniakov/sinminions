@@ -10,7 +10,7 @@ final class LLMService: Sendable {
     private let grok = OpenAICompatibleClient(provider: .grok)
     private let gemini = OpenAICompatibleClient(provider: .gemini)
 
-    func send(_ messages: [ChatMessage], connection: LLMConnection, key: String) async throws -> String {
+    func send(_ messages: [ChatMessage], connection: LLMConnection, key: String) async throws -> LLMReply {
         switch connection.provider {
         case .gigachat:
             return try await gigaChat.send(messages, key: key, scope: connection.scope, model: connection.model)

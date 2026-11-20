@@ -517,6 +517,7 @@ final class SlashCommandTests: XCTestCase {
         XCTAssertEqual(SlashParser.parse("/пред"), .command(.previous))
         XCTAssertEqual(SlashParser.parse("/кофе"), .command(.coffee))
         XCTAssertEqual(SlashParser.parse("/петь"), .command(.sing))
+        XCTAssertEqual(SlashParser.parse("/аналитика"), .command(.analytics))
         XCTAssertEqual(SlashParser.parse("/?"), .command(.help))
     }
 
