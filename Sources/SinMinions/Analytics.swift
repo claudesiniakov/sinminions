@@ -162,6 +162,7 @@ struct AnalyticsView: View {
                 .font(.system(size: 9.5, design: .monospaced))
                 .foregroundStyle(Term.dim)
                 .lineLimit(1)
+                .minimumScaleFactor(0.7)
             Text("ЗАПРОСОВ: \(totals.requests)")
                 .font(.system(size: 9.5, design: .monospaced))
                 .foregroundStyle(Term.dim)
