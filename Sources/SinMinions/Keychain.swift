@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import SinMinionsCore
 
 enum GigaChatAccount {
     static let key = "gigachat-authorization-key"
