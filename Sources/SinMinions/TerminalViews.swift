@@ -36,14 +36,12 @@ struct TerminalFrame<Content: View>: View {
     let title: String
     let window: ConsoleWindow
     var model: ConsoleModel
-    /// Обычный терминал: серый текст на тёмном фоне, без развёртки, свечения и украшений.
-    var plain = false
     @ViewBuilder var content: Content
 
-    private var fg: Color { plain ? PlainTerm.text : Term.green }
-    private var dimColor: Color { plain ? PlainTerm.dim : Term.dim }
-    private var lineColor: Color { plain ? PlainTerm.line : Term.dark }
-    private var back: Color { plain ? PlainTerm.background : Term.background }
+    private var fg: Color { Term.green }
+    private var dimColor: Color { Term.dim }
+    private var lineColor: Color { Term.dark }
+    private var back: Color { Term.background }
 
     @State private var moving = false
     @State private var resizing = false
@@ -51,17 +49,17 @@ struct TerminalFrame<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                if model.character == .ab, !plain {
+                if model.character == .ab {
                     Text("✠").font(Term.title).foregroundStyle(Term.green)
                 }
                 Text(title)
-                    .font(plain ? .system(size: 11, weight: .medium) : Term.title)
+                    .font(Term.title)
                     .tracking(1)
                     .foregroundStyle(dimColor)
                     .lineLimit(1)
                 Spacer(minLength: 4)
                 if window == .terminal {
-                    TerminalModeSwitch(model: model, plain: plain)
+                    TerminalModeSwitch(model: model)
                 }
                 Text(model.unlocked ? "[ЗАМОК ВЫКЛ]" : "[ЗАМОК ВКЛ]")
                     .font(Term.small)
@@ -80,9 +78,9 @@ struct TerminalFrame<Content: View>: View {
                 .padding(12)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .background(back.opacity(plain ? 0.98 : 0.96))
+        .background(back.opacity(0.96))
         .overlay {
-            if model.character == .ab, !plain {
+            if model.character == .ab {
                 // Двойная рамка с угловыми знаками, как на готической табличке.
                 ZStack {
                     Rectangle().strokeBorder(Term.dark, lineWidth: 1).padding(4)
@@ -99,7 +97,7 @@ struct TerminalFrame<Content: View>: View {
             }
         }
         .overlay {
-            if !plain { scanlines }
+            scanlines
         }
         .overlay(
             // Разблокированное окно обведено пунктиром.
@@ -120,7 +118,7 @@ struct TerminalFrame<Content: View>: View {
                     .help("Потяните, чтобы изменить размер")
             }
         }
-        .shadow(color: plain ? .black.opacity(0.4) : Term.green.opacity(0.35), radius: 8)
+        .shadow(color: Term.green.opacity(0.35), radius: 8)
         .padding(10)
         .id(model.character)
     }
@@ -170,7 +168,7 @@ struct TerminalView: View {
         case .menu: menu
         case .chat: ChatScreen(model: model)
         case .shell:
-            TerminalFrame(title: "zsh — " + ShellText.abbreviate(model.shell.cwd, home: NSHomeDirectory()), window: .terminal, model: model, plain: true) {
+            TerminalFrame(title: model.character.terminalName + " // ZSH " + ShellText.abbreviate(model.shell.cwd, home: NSHomeDirectory()), window: .terminal, model: model) {
                 PlainShellScreen(model: model)
             }
         }

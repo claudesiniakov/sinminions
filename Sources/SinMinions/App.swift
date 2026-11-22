@@ -158,6 +158,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             await wait(3)
             demoMark("ab")
             await wait(3)
+            // Обычный терминал у стража — в его стиле.
+            controller.shellForDemo(true)
+            await wait(3.5)
+            demoMark("ab_shell")
+            await wait(3)
+            controller.shellForDemo(false)
+            await wait(1)
             // Чашка кофе, клич «В бой!» и посадка у золотого стража.
             controller.setCoffeeForDemo(true)
             await wait(2.5)

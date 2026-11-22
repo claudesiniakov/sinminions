@@ -274,16 +274,7 @@ final class ShellSession {
     }
 }
 
-/// Цвета обычного терминала: как профиль «Базовый» в тёмной теме Терминала macOS.
-enum PlainTerm {
-    static let background = Color(red: 0.11, green: 0.11, blue: 0.12)
-    static let text = Color(red: 0.9, green: 0.9, blue: 0.9)
-    static let dim = Color(red: 0.55, green: 0.55, blue: 0.58)
-    static let line = Color(red: 0.3, green: 0.3, blue: 0.32)
-    static let font = Font.system(size: 12, design: .monospaced)
-}
-
-/// Экран обычного терминала: журнал команд и вывода, строка ввода с приглашением.
+/// Экран обычного терминала (zsh) в стиле персонажа: журнал команд и вывода, строка ввода с приглашением.
 struct PlainShellScreen: View {
     var model: ConsoleModel
     @FocusState private var focused: Bool
@@ -295,8 +286,8 @@ struct PlainShellScreen: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         if shell.lines.isEmpty {
-                            Text("Обычный терминал (zsh). exit или /shell — назад к \(model.character.terminalName).")
-                                .foregroundStyle(PlainTerm.dim)
+                            Text("ОБЫЧНЫЙ ТЕРМИНАЛ ZSH. EXIT ИЛИ /SHELL — НАЗАД К \(model.character.terminalName).")
+                                .foregroundStyle(Term.dim)
                         } else {
                             Text(transcript(shell))
                                 .textSelection(.enabled)
@@ -331,12 +322,11 @@ struct PlainShellScreen: View {
                     }
             }
             Text(shell.isRunning ? "ВЫПОЛНЯЕТСЯ… CTRL+C ПРЕРВАТЬ · CTRL+D КОНЕЦ ВВОДА" : "↑↓ ИСТОРИЯ · CTRL+L ОЧИСТИТЬ · EXIT НАЗАД · ESC ЗАКРЫТЬ")
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(PlainTerm.dim)
+                .foregroundStyle(Term.dim)
         }
-        .font(PlainTerm.font)
-        .foregroundStyle(PlainTerm.text)
-        .tint(PlainTerm.text)
+        .font(Term.small)
+        .foregroundStyle(Term.green)
+        .tint(Term.green)
         .onAppear { focused = true }
         .onChange(of: model.focusTick) { focused = true }
     }
@@ -346,9 +336,9 @@ struct PlainShellScreen: View {
         for (index, line) in shell.lines.enumerated() {
             var part = AttributedString(line.text)
             switch line.kind {
-            case .command: part.font = .system(size: 12, weight: .semibold, design: .monospaced)
+            case .command: part.font = .system(size: 11, weight: .bold, design: .monospaced)
             case .output: break
-            case .info: part.foregroundColor = PlainTerm.dim
+            case .info: part.foregroundColor = Term.dim
             }
             result += part
             if index < shell.lines.count - 1 { result += AttributedString("\n") }
@@ -357,10 +347,9 @@ struct PlainShellScreen: View {
     }
 }
 
-/// Переключатель в заголовке терминала: терминал компаньона или обычный (zsh).
+/// Переключатель в заголовке терминала: терминал компаньона или обычный (zsh) — оба в стиле персонажа.
 struct TerminalModeSwitch: View {
     var model: ConsoleModel
-    var plain: Bool
 
     var body: some View {
         HStack(spacing: 0) {
@@ -368,18 +357,16 @@ struct TerminalModeSwitch: View {
             segment("ZSH", active: model.shellMode) { model.setShellMode(true) }
         }
         .font(.system(size: 10, design: .monospaced))
-        .overlay(Rectangle().strokeBorder(plain ? PlainTerm.line : Term.dark, lineWidth: 1))
+        .overlay(Rectangle().strokeBorder(Term.dark, lineWidth: 1))
         .help("Обычный терминал (zsh) или терминал компаньона. Команда: /shell")
     }
 
     private func segment(_ title: String, active: Bool, action: @escaping () -> Void) -> some View {
-        let fg = plain ? PlainTerm.text : Term.green
-        let bg = plain ? PlainTerm.background : Term.background
-        return Text(title)
+        Text(title)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .foregroundStyle(active ? bg : (plain ? PlainTerm.dim : Term.dim))
-            .background(active ? fg : Color.clear)
+            .foregroundStyle(active ? Term.background : Term.dim)
+            .background(active ? Term.green : Color.clear)
             .contentShape(Rectangle())
             .onTapGesture(perform: action)
     }

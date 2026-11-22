@@ -245,7 +245,7 @@ final class ConsoleModel {
             case .shell:
                 setShellMode(!shellMode)
                 if shellMode {
-                    shell.addInfo("Обычный терминал (zsh). exit или /shell — назад.")
+                    shell.addInfo("ОБЫЧНЫЙ ТЕРМИНАЛ ZSH. EXIT ИЛИ /SHELL — НАЗАД.")
                 } else if output == .chat {
                     say(["ТЕРМИНАЛ КОМПАНЬОНА"])
                 }
