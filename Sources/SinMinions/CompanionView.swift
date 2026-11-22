@@ -327,7 +327,8 @@ final class CompanionView: NSView {
         stepTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] timer in
             MainActor.assumeIsolated {
                 guard let self, self.window != nil else { timer.invalidate(); return }
-                if !self.sleeping { self.golden?.stepInPlace() }
+                // Шаги только когда стража видно и он не спит.
+                if !self.sleeping, !self.paused, self.window?.isVisible == true { self.golden?.stepInPlace() }
                 self.scheduleStep()
             }
         }
@@ -335,6 +336,25 @@ final class CompanionView: NSView {
 
     func setPlaying(_ on: Bool) {
         golden?.setPose(on ? .play : (sleeping ? .sit : .idle))
+    }
+
+    /// Окно скрыто: все бесконечные анимации слоёв (дыхание, парение, свечение) останавливаются.
+    private(set) var paused = false
+
+    func setPaused(_ on: Bool) {
+        guard on != paused, let root = layer else { return }
+        paused = on
+        if on {
+            let time = root.convertTime(CACurrentMediaTime(), from: nil)
+            root.speed = 0
+            root.timeOffset = time
+        } else {
+            let pausedAt = root.timeOffset
+            root.speed = 1
+            root.timeOffset = 0
+            root.beginTime = 0
+            root.beginTime = root.convertTime(CACurrentMediaTime(), from: nil) - pausedAt
+        }
     }
 
     func cheer() { golden?.cheer() }

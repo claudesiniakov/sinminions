@@ -124,16 +124,6 @@ public struct UsageLedger: Codable, Equatable, Sendable {
         }
     }
 
-    /// «12 345», «1,2 ТЫС», «3,4 МЛН» — коротко для плиток.
-    public static func short(_ value: Int) -> String {
-        func fraction(_ number: Double, _ suffix: String) -> String {
-            let text = number >= 100 ? String(format: "%.0f", number) : String(format: "%.1f", number)
-            return text.replacingOccurrences(of: ".", with: ",").replacingOccurrences(of: ",0", with: "") + " " + suffix
-        }
-        switch value {
-        case ..<10_000: return String(value)
-        case ..<1_000_000: return fraction(Double(value) / 1000, "ТЫС")
-        default: return fraction(Double(value) / 1_000_000, "МЛН")
-        }
-    }
+    /// «950», «1,2 ТЫС», «3,4 МЛН» — коротко для плиток; тот же формат, что у лимитов на мониторе.
+    public static func short(_ value: Int) -> String { TokenFormat.short(value) }
 }

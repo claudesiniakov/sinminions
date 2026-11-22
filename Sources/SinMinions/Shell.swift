@@ -41,7 +41,7 @@ final class ShellSession {
     @ObservationIgnored private var history: [String] = []
     @ObservationIgnored private var historyIndex: Int?
 
-    static let maxLines = 1500
+    static let maxLines = 1000
 
     init() {
         cwd = NSHomeDirectory()
@@ -172,7 +172,7 @@ final class ShellSession {
                 return
             }
             let text = String(decoding: data, as: UTF8.self)
-            Task { @MainActor in self?.appendOutput(text) }
+            Task { @MainActor in self?.queueOutput(text) }
         }
         process.terminationHandler = { [weak self] finished in
             let status = finished.terminationStatus
@@ -199,6 +199,7 @@ final class ShellSession {
 
     private func finish(status: Int32, reason: Process.TerminationReason, pid: Int32) {
         guard let process, process.processIdentifier == pid else { return }
+        flushOutput()
         self.process = nil
         try? stdin?.fileHandleForWriting.close()
         stdin = nil
@@ -209,12 +210,49 @@ final class ShellSession {
         _ = status
     }
 
+    /// Вывод копится и попадает на экран не чаще 10 раз в секунду: иначе команда с потоком строк
+    /// (find /, yes, большой cat) перерисовывала бы журнал на каждую порцию и подвешивала окно.
+    @ObservationIgnored private var pendingOutput = ""
+    @ObservationIgnored private var flushScheduled = false
+
+    private func queueOutput(_ chunk: String) {
+        pendingOutput += chunk
+        // Совсем огромный поток: всё равно на экране останутся только последние строки.
+        if pendingOutput.utf8.count > 400_000 {
+            pendingOutput = String(pendingOutput.suffix(200_000))
+        }
+        guard !flushScheduled else { return }
+        flushScheduled = true
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(100))
+            self?.flushOutput()
+        }
+    }
+
+    private func flushOutput() {
+        flushScheduled = false
+        guard !pendingOutput.isEmpty else { return }
+        let chunk = pendingOutput
+        pendingOutput = ""
+        appendOutput(chunk)
+    }
+
+    /// Приложение закрывается: запущенная команда не должна остаться работать без окна.
+    func terminateRunning() {
+        guard let process, process.isRunning else { return }
+        process.terminate()
+    }
+
     private func appendOutput(_ chunk: String) {
         var parts = ShellText.stripANSI(chunk).components(separatedBy: "\n")
         if openOutput, let last = lines.indices.last, lines[last].kind == .output {
             lines[last].text += parts.removeFirst()
         }
-        for part in parts { add(.output, part) }
+        for part in parts {
+            lines.append(Line(id: nextID, kind: .output, text: part))
+            nextID += 1
+        }
+        if lines.count > Self.maxLines { lines.removeFirst(lines.count - Self.maxLines) }
         openOutput = true
     }
 

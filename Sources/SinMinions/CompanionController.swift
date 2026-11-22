@@ -6,12 +6,12 @@ import SinMinionsCore
 /// Связывает автомат поведения с окном персонажа, пузырём, таймерами и событиями системы.
 @MainActor
 final class CompanionController: NSObject {
-    private let prefs: Prefs
-    private var engine: BehaviorEngine
+    let prefs: Prefs
+    var engine: BehaviorEngine
     private var book = PhraseBook()
     private var bookCharacter = CompanionCharacter.f
     private let panel: NSPanel
-    private var view: CompanionView
+    private(set) var view: CompanionView
     private let bubble = BubblePanel()
     private let findPanel = FindPanel()
     private var tvPanel: TVPanel?
@@ -19,8 +19,8 @@ final class CompanionController: NSObject {
     private var collectionBehavior: NSWindow.CollectionBehavior = []
     private var playTask: Task<Void, Never>?
     private var searchTask: Task<Void, Never>?
-    private let console = ConsoleController()
-    private let analytics = AnalyticsWindow()
+    let console = ConsoleController()
+    let analytics = AnalyticsWindow()
     private var usage: UsageStore?
     private let portalA = PortalWindow(color: PortalWindow.blue)
     private let portalB = PortalWindow(color: PortalWindow.orange)
@@ -33,14 +33,20 @@ final class CompanionController: NSObject {
     private var consoleHome: CGPoint?
 
     private var timer: Timer?
-    private var ticks = 0
+    /// Когда в последний раз шагал автомат и проверялись питание и одежда.
+    private var lastEngineTick: Double = 0
+    private var lastSlowCheck: Double = 0
+    /// Курсор не двигается: таймер редкий, пока монитор событий не разбудит.
+    private var calmTimer = false
+    private var lastMoveAt: Double = 0
+    private var mouseMonitors: [Any] = []
     private var nextBlinkAt: Double = 0
     private var lastMouse: CGPoint?
     private var lastMouseTime: Double?
     private var flight: Flight?
     private var flightTimer: Timer?
     private var power: PowerState?
-    private var lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+    private(set) var lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
 
     /// Скрыт пунктом меню.
     private(set) var hiddenByUser = false
@@ -77,7 +83,7 @@ final class CompanionController: NSObject {
 
     var isSleeping: Bool { engine.mode == .sleeping }
     private var isVisible: Bool { !hiddenByUser && !suspendedBySystem }
-    private var now: Double { Date().timeIntervalSinceReferenceDate }
+    var now: Double { Date().timeIntervalSinceReferenceDate }
 
     init(prefs: Prefs) {
         self.prefs = prefs
@@ -135,6 +141,25 @@ final class CompanionController: NSObject {
 
         panel.orderFrontRegardless()
         startTimer()
+        installMouseMonitors()
+    }
+
+    /// Движение мыши будит редкий таймер сразу, без ожидания следующего тика.
+    /// Глобальный монитор движений мыши не требует «Универсального доступа».
+    private func installMouseMonitors() {
+        let wake: () -> Void = { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.lastMoveAt = self.now
+                if self.calmTimer { self.startTimer() }
+            }
+        }
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged], handler: { _ in wake() }) {
+            mouseMonitors.append(global)
+        }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged], handler: { event in wake(); return event }) {
+            mouseMonitors.append(local)
+        }
     }
 
     // MARK: - Команды меню и настроек
@@ -281,7 +306,26 @@ final class CompanionController: NSObject {
         }
     }
 
+    /// Настройки изменились. Пачку изменений подряд (переключатели, степперы) применяем один раз,
+    /// через 0,15 с после последнего: перестройка автомата и проверка рисунка — не на каждое касание.
     func prefsChanged() {
+        // Подписи на мониторе обновляем сразу — это дёшево, и отклик на «+»/«−» мгновенный.
+        refreshLLM()
+        refreshSpecial()
+        prefsTask?.cancel()
+        prefsTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled, let self else { return }
+            self.prefsTask = nil
+            self.applyPrefs()
+        }
+    }
+
+    private var prefsTask: Task<Void, Never>?
+
+    func applyPrefs() {
+        prefsTask?.cancel()
+        prefsTask = nil
         refreshLLM()
         refreshSpecial()
         if console.isOpen { refreshLimits() }
@@ -292,19 +336,16 @@ final class CompanionController: NSObject {
         engine.reconfigure(prefs.behaviorConfig(lowPower: lowPower), now: now)
     }
 
+    /// Выход из приложения: команда обычного терминала не остаётся работать без окна.
+    func prepareForQuit() {
+        console.model.shell.terminateRunning()
+    }
+
     func savePosition() {
         // Пока открыт терминал, призрак временно в центре — запоминаем его обычное место.
         let origin = consoleHome ?? panel.frame.origin
         UserDefaults.standard.set(Double(origin.x), forKey: Keys.x)
         UserDefaults.standard.set(Double(origin.y), forKey: Keys.y)
-    }
-
-    /// Для снимка в CI: открывает терминал и монитор независимо от выбранного режима.
-    func openConsoleForDemo() {
-        var config = prefs.behaviorConfig(lowPower: lowPower)
-        config.consoleEnabled = true
-        engine.reconfigure(config, now: now)
-        apply(engine.handle(.doubleClick, now: now))
     }
 
     /// Подключает чат терминала к клиенту нейросети.
@@ -322,25 +363,6 @@ final class CompanionController: NSObject {
             self.apply(self.engine.handle(.closeConsole, now: self.now))
             self.onOpenSettings(.llm)
         }
-    }
-
-    func showChatDemo() {
-        console.model.chat.loadDemo()
-        console.model.screen = .chat
-        console.activateForTyping()
-    }
-
-    func hideAnalyticsForDemo() { analytics.hide() }
-
-    /// Обычный терминал (zsh) с парой настоящих команд.
-    func shellForDemo(_ on: Bool) { console.shellForDemo(on) }
-
-    func closeConsoleForDemo() {
-        apply(engine.handle(.closeConsole, now: now))
-    }
-
-    func teleportForDemo() {
-        apply(engine.handle(.teleportNow, now: now))
     }
 
     // MARK: - Телепорт
@@ -560,55 +582,6 @@ final class CompanionController: NSObject {
         }
     }
 
-    /// Для CI: набирает текст настоящими событиями клавиатуры, как пользователь (в CI «Универсальный доступ» выдан).
-    /// Проверяет, что ввод в строку чата доходит до окна, которое не забирает фокус у других приложений.
-    func typeInConsoleForDemo(_ text: String) async {
-        for scalar in text.unicodeScalars {
-            var utf16 = Array(String(scalar).utf16)
-            for down in [true, false] {
-                guard let event = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: down) else { continue }
-                event.keyboardSetUnicodeString(stringLength: utf16.count, unicodeString: &utf16)
-                event.post(tap: .cghidEventTap)
-            }
-            try? await Task.sleep(for: .milliseconds(80))
-        }
-    }
-
-    func debugConsoleForDemo() -> String { console.debugState() }
-
-    func sendKeysForDemo(_ text: String) { console.sendKeysForDemo(text) }
-
-    /// Что сейчас в строке ввода чата (для проверки в CI).
-    var consoleInputForDemo: String { console.model.chat.input }
-
-    /// Для снимка в CI: в меню выполнена команда /help.
-    func showHelpForDemo() {
-        console.model.shellLog.append("> /help")
-        console.model.runSlash("/help", output: .shell)
-    }
-
-    /// Для снимков в CI: смена облика призрака.
-    /// Для демо: режим «кофе» (уровень 3 выносливости) или обычный.
-    func setCoffeeForDemo(_ on: Bool) {
-        prefs.endurance = on ? Endurance.coffeeLevel : 2
-        prefsChanged()
-    }
-
-    /// Для демо: переключает персонажа (как вкладка «F» и «ab» в настройках).
-    func setCharacterForDemo(_ character: CompanionCharacter) {
-        prefs.character = character
-    }
-
-    func setGhostStyleForDemo(_ level: Int) {
-        prefs.ghostStyleLevel = GhostStyle.clamp(level).rawValue
-        prefsChanged()
-    }
-
-    /// Для снимка в CI: окна разблокированы.
-    func unlockConsoleForDemo() {
-        console.setUnlocked(true)
-    }
-
     // MARK: - Окно
 
     private func wire(_ view: CompanionView) {
@@ -658,7 +631,7 @@ final class CompanionController: NSObject {
     /// Смена одежды по времени: раз в полминуты проверяем, не пора ли надеть пижаму или доспех.
     private func checkOutfit() {
         guard view.outfit != prefs.outfit else { return }
-        prefsChanged()
+        applyPrefs()
     }
 
     private func rebuildView() {
@@ -718,6 +691,7 @@ final class CompanionController: NSObject {
     private func updateVisibility() {
         if isVisible {
             panel.alphaValue = 1
+            view.setPaused(false)
             panel.orderFrontRegardless()
             view.startFloating()
             apply(engine.handle(.resumed, now: now))
@@ -729,24 +703,28 @@ final class CompanionController: NSObject {
             timer?.invalidate()
             timer = nil
             panel.orderOut(nil)
+            view.setPaused(true)
         }
         onStateChange()
     }
 
     // MARK: - Таймер
 
-    /// Один таймер на всё: 10 раз в секунду — мышь и глаза, раз в секунду — автомат (во сне вдвое реже).
-    private func startTimer() {
+    /// Один таймер на всё: 10 раз в секунду — мышь и глаза (во сне 5), раз в секунду — автомат.
+    /// Если курсор стоит больше 3 секунд, таймер редкий (2 раза в секунду, во сне раз в секунду),
+    /// а первое же движение мыши возвращает частый.
+    private func startTimer(calm: Bool = false) {
         timer?.invalidate()
+        timer = nil
+        calmTimer = calm
         guard isVisible else { return }
-        let interval = isSleeping ? 0.2 : 0.1
+        let interval = calm ? (isSleeping ? 1.0 : 0.5) : (isSleeping ? 0.2 : 0.1)
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.fastTick() }
         }
         timer.tolerance = interval * 0.3
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
-        ticks = 0
     }
 
     private func fastTick() {
@@ -771,6 +749,11 @@ final class CompanionController: NSObject {
             let near = view.mothFrame.offsetBy(dx: panel.frame.minX, dy: panel.frame.minY).insetBy(dx: -90, dy: -90)
             if near.contains(mouse) { apply(engine.handle(.reveal, now: time)) }
         }
+        // Запасной путь: движение над своими окнами монитор событий может не увидеть.
+        if let last = lastMouse, last != mouse {
+            lastMoveAt = time
+            if calmTimer { startTimer() }
+        }
         lastMouse = mouse
         lastMouseTime = time
         if !isSleeping {
@@ -780,12 +763,17 @@ final class CompanionController: NSObject {
                 nextBlinkAt = time + Double.random(in: 3...7)
             }
         }
-        ticks += 1
-        let perSecond = isSleeping ? 5 : 10
-        guard ticks % perSecond == 0 else { return }
+        // Курсор стоит, ничего не летит и не тащится — переходим на редкий таймер.
+        if lastMoveAt == 0 { lastMoveAt = time }
+        if !calmTimer, time - lastMoveAt > 3, flight == nil, !view.isDragging, engine.mode != .hiding {
+            startTimer(calm: true)
+        }
+        guard time - lastEngineTick >= 0.95 else { return }
+        lastEngineTick = time
         let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
         apply(engine.tick(now: time, idleSeconds: idle))
-        if ticks % (perSecond * 30) == 0 {
+        if time - lastSlowCheck >= 30 {
+            lastSlowCheck = time
             checkPower()
             checkOutfit()
         }
@@ -793,7 +781,7 @@ final class CompanionController: NSObject {
 
     // MARK: - Эффекты автомата
 
-    private func apply(_ effects: [Effect]) {
+    func apply(_ effects: [Effect]) {
         guard !effects.isEmpty else { return }
         let sleptBefore = isSleepingShown
         for effect in effects {
@@ -933,31 +921,12 @@ final class CompanionController: NSObject {
         bubble.hide()
     }
 
-    func singForDemo() { apply(engine.handle(.singNow, now: now)) }
-    func stopSingForDemo() { apply(engine.handle(.click, now: now)) }
-
     private func stopPlay() {
         playTask?.cancel()
         playTask = nil
         view.setPlaying(false)
         tvPanel?.hide()
         bubble.hide()
-    }
-
-    func playForDemo() { apply(engine.handle(.playNow, now: now)) }
-    func stopPlayForDemo() { apply(engine.handle(.click, now: now)) }
-    /// Для демо: пижама и колпак у стража (расписание «весь день»), затем обратно.
-    func setPajamasForDemo(_ on: Bool) {
-        prefs.pajamaFrom = 0
-        prefs.pajamaTo = 0
-        prefs.pajamaAuto = on
-    }
-
-    func cheerForDemo() { view.cheer() }
-    func sitForDemo(_ on: Bool) { view.setSleeping(on) }
-
-    func searchForDemo() {
-        apply(engine.handle(.searchNow, now: now))
     }
 
     private func say(_ kind: PhraseKind) {

@@ -247,6 +247,7 @@ struct AnalyticsView: View {
 @MainActor
 final class AnalyticsWindow {
     private var panel: NSPanel?
+    private var host: NSHostingView<AnalyticsView>?
 
     func show(store: UsageStore, limits: LimitsStore, connections: [LLMConnection], character: CompanionCharacter, near anchor: CGRect?) {
         // Остаток по ключу берём у тех же подключений, что и блок «Лимиты» на мониторе, и ещё у используемых в чате.
@@ -254,9 +255,15 @@ final class AnalyticsWindow {
         let view = AnalyticsView(store: store, limits: limits, connections: connections, character: character) { [weak self] in
             self?.panel?.orderOut(nil)
         }
-        let host = NSHostingView(rootView: view)
         let panel = self.panel ?? Self.makePanel()
-        panel.contentView = host
+        // Окно и его SwiftUI-иерархия создаются один раз; при повторном открытии меняются только данные.
+        if let host {
+            host.rootView = view
+        } else {
+            let host = NSHostingView(rootView: view)
+            panel.contentView = host
+            self.host = host
+        }
         panel.backgroundColor = NSColor(Term.background)
         if self.panel == nil || !panel.isVisible {
             let size = CGSize(width: 560, height: 470)
