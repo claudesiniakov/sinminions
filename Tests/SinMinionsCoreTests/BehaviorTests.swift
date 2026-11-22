@@ -518,6 +518,8 @@ final class SlashCommandTests: XCTestCase {
         XCTAssertEqual(SlashParser.parse("/кофе"), .command(.coffee))
         XCTAssertEqual(SlashParser.parse("/петь"), .command(.sing))
         XCTAssertEqual(SlashParser.parse("/аналитика"), .command(.analytics))
+        XCTAssertEqual(SlashParser.parse("/терминал"), .command(.shell))
+        XCTAssertEqual(SlashParser.parse("/usr/bin/ls"), .unknown("/usr/bin/ls"))
         XCTAssertEqual(SlashParser.parse("/?"), .command(.help))
     }
 

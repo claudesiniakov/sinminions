@@ -2,7 +2,7 @@ import Foundation
 
 /// Команды терминала, которые вводятся со «/».
 public enum SlashCommand: Equatable, Sendable, CaseIterable {
-    case help, nap, coffee, sing, analytics, hide, corner, unlock, lock, resetLayout, settings, clear, next, previous
+    case help, nap, coffee, sing, analytics, shell, hide, corner, unlock, lock, resetLayout, settings, clear, next, previous
 }
 
 public enum SlashParseResult: Equatable, Sendable {
@@ -20,6 +20,7 @@ public enum SlashParser {
         .coffee: ["/coffee", "/кофе"],
         .sing: ["/sing", "/петь"],
         .analytics: ["/analytics", "/stats", "/аналитика"],
+        .shell: ["/shell", "/zsh", "/терминал"],
         .hide: ["/hide", "/скрыть"],
         .corner: ["/corner", "/угол"],
         .unlock: ["/unlock", "/разблокировать"],
@@ -45,7 +46,7 @@ public enum SlashParser {
 
     /// Краткие описания для подсказок при вводе.
     static let summaries: [SlashCommand: String] = [
-        .help: "справка по командам", .nap: "усыпить на час", .coffee: "не давать ноутбуку уснуть (вкл/выкл)", .sing: "спеть гимн (стражу ab)", .analytics: "окно аналитики токенов по моделям", .hide: "скрыть призрака",
+        .help: "справка по командам", .nap: "усыпить на час", .coffee: "не давать ноутбуку уснуть (вкл/выкл)", .sing: "спеть гимн (стражу ab)", .analytics: "окно аналитики токенов по моделям", .shell: "обычный терминал zsh (вкл/выкл)", .hide: "скрыть призрака",
         .corner: "вернуть в угол", .unlock: "разблокировать окна", .lock: "заблокировать окна",
         .resetLayout: "сбросить раскладку", .settings: "открыть настройки", .clear: "очистить чат",
         .next: "следующее подключение", .previous: "предыдущее подключение",
@@ -93,6 +94,7 @@ public enum SlashParser {
         "/coffee — НЕ ДАВАТЬ НОУТБУКУ УСНУТЬ (ВКЛ/ВЫКЛ), У ПРИЗРАКА ЧАШКА КОФЕ",
         "/sing — СПЕТЬ ГИМН (ПОЁТ СТРАЖ ab)",
         "/analytics — ОКНО АНАЛИТИКИ ТОКЕНОВ ПО МОДЕЛЯМ",
+        "/shell — ОБЫЧНЫЙ ТЕРМИНАЛ ZSH (ВКЛ/ВЫКЛ), EXIT — НАЗАД",
         "/hide — СКРЫТЬ ПРИЗРАКА",
         "/corner — ВЕРНУТЬ В УГОЛ",
         "/unlock, /lock — РАЗБЛОКИРОВАТЬ И ЗАБЛОКИРОВАТЬ ОКНА",
@@ -100,6 +102,6 @@ public enum SlashParser {
         "/settings — ОТКРЫТЬ НАСТРОЙКИ",
         "/clear — ОЧИСТИТЬ ЧАТ",
         "/next, /prev — СЛЕДУЮЩЕЕ И ПРЕДЫДУЩЕЕ ПОДКЛЮЧЕНИЕ",
-        "РУССКИЕ НАЗВАНИЯ: /помощь /сон /кофе /петь /аналитика /скрыть /угол /разблокировать /заблокировать /сброс /настройки /очистить /след /пред",
+        "РУССКИЕ НАЗВАНИЯ: /помощь /сон /кофе /петь /аналитика /терминал /скрыть /угол /разблокировать /заблокировать /сброс /настройки /очистить /след /пред",
     ]
 }

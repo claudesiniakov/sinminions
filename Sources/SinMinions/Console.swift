@@ -298,7 +298,7 @@ final class ChatSession {
 @MainActor
 @Observable
 final class ConsoleModel {
-    enum Screen { case menu, chat }
+    enum Screen { case menu, chat, shell }
 
     var screen = Screen.menu {
         didSet { if screen != oldValue { onScreenChange() } }
@@ -306,6 +306,10 @@ final class ConsoleModel {
     /// Экран сменился: строка ввода новая, фокус надо поставить заново.
     @ObservationIgnored var onScreenChange: () -> Void = {}
     let chat = ChatSession()
+    /// Обычный терминал (zsh).
+    let shell = ShellSession()
+    /// Терминал открывается в режиме zsh; запоминается между запусками.
+    private(set) var shellMode = UserDefaults.standard.bool(forKey: "terminalShellMode")
     var selected = 0
     /// Строка ввода меню (команды со «/») и журнал ответов.
     var shellInput = ""
@@ -353,10 +357,20 @@ final class ConsoleModel {
     /// Выполняет команду со «/», которой нужны окна и призрак; возвращает строку-подтверждение.
     @ObservationIgnored var slashAction: (SlashCommand) -> String? = { _ in nil }
 
-    enum SlashOutput { case shell, chat }
+    enum SlashOutput { case shell, chat, zsh }
 
     init() {
         chat.onSlash = { [weak self] text in self?.runSlash(text, output: .chat) }
+        shell.onSlash = { [weak self] text in self?.runSlash(text, output: .zsh) }
+        shell.onExit = { [weak self] in self?.setShellMode(false) }
+    }
+
+    /// Переключатель «терминал компаньона / обычный терминал».
+    func setShellMode(_ on: Bool) {
+        shellMode = on
+        UserDefaults.standard.set(on, forKey: "terminalShellMode")
+        screen = on ? .shell : .menu
+        focusTick += 1
     }
 
     /// Enter в строке меню: пусто — выбранный пункт, «/…» — команда.
@@ -386,6 +400,7 @@ final class ConsoleModel {
             switch output {
             case .shell: shellLog.append(contentsOf: lines)
             case .chat: lines.forEach { chat.addInfo($0) }
+            case .zsh: lines.forEach { shell.addInfo($0) }
             }
             trimLog()
         }
@@ -399,8 +414,19 @@ final class ConsoleModel {
             case .help:
                 say(SlashParser.helpLines)
             case .clear:
-                chat.reset()
-                say(["ИСТОРИЯ ЧАТА ОЧИЩЕНА"])
+                if output == .zsh {
+                    shell.clear()
+                } else {
+                    chat.reset()
+                    say(["ИСТОРИЯ ЧАТА ОЧИЩЕНА"])
+                }
+            case .shell:
+                setShellMode(!shellMode)
+                if shellMode {
+                    shell.addInfo("Обычный терминал (zsh). exit или /shell — назад.")
+                } else if output == .chat {
+                    say(["ТЕРМИНАЛ КОМПАНЬОНА"])
+                }
             default:
                 if let reply = slashAction(command) { say([reply]) }
             }
@@ -449,7 +475,14 @@ private struct TerminalFrame<Content: View>: View {
     let title: String
     let window: ConsoleWindow
     var model: ConsoleModel
+    /// Обычный терминал: серый текст на тёмном фоне, без развёртки, свечения и украшений.
+    var plain = false
     @ViewBuilder var content: Content
+
+    private var fg: Color { plain ? PlainTerm.text : Term.green }
+    private var dimColor: Color { plain ? PlainTerm.dim : Term.dim }
+    private var lineColor: Color { plain ? PlainTerm.line : Term.dark }
+    private var back: Color { plain ? PlainTerm.background : Term.background }
 
     @State private var moving = false
     @State private var resizing = false
@@ -457,18 +490,21 @@ private struct TerminalFrame<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                if model.character == .ab {
+                if model.character == .ab, !plain {
                     Text("✠").font(Term.title).foregroundStyle(Term.green)
                 }
                 Text(title)
-                    .font(Term.title)
+                    .font(plain ? .system(size: 11, weight: .medium) : Term.title)
                     .tracking(1)
-                    .foregroundStyle(Term.dim)
+                    .foregroundStyle(dimColor)
                     .lineLimit(1)
                 Spacer(minLength: 4)
+                if window == .terminal {
+                    TerminalModeSwitch(model: model, plain: plain)
+                }
                 Text(model.unlocked ? "[ЗАМОК ВЫКЛ]" : "[ЗАМОК ВКЛ]")
                     .font(Term.small)
-                    .foregroundStyle(model.unlocked ? Term.green : Term.dim)
+                    .foregroundStyle(model.unlocked ? fg : dimColor)
                     .contentShape(Rectangle())
                     .onTapGesture { model.layoutEvent(window, .toggleLock) }
                     .help(model.unlocked ? "Заблокировать окна" : "Разблокировать: окна можно двигать и менять их размер")
@@ -478,14 +514,14 @@ private struct TerminalFrame<Content: View>: View {
             .contentShape(Rectangle())
             // Двигать окно можно только разблокированным и только за заголовок.
             .gesture(moveGesture, including: model.unlocked ? .all : .subviews)
-            Rectangle().fill(Term.dark).frame(height: 1)
+            Rectangle().fill(lineColor).frame(height: 1)
             content
                 .padding(12)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .background(Term.background.opacity(0.96))
+        .background(back.opacity(plain ? 0.98 : 0.96))
         .overlay {
-            if model.character == .ab {
+            if model.character == .ab, !plain {
                 // Двойная рамка с угловыми знаками, как на готической табличке.
                 ZStack {
                     Rectangle().strokeBorder(Term.dark, lineWidth: 1).padding(4)
@@ -502,19 +538,12 @@ private struct TerminalFrame<Content: View>: View {
             }
         }
         .overlay {
-            Canvas { context, size in
-                var y: CGFloat = 0
-                while y < size.height {
-                    context.fill(Path(CGRect(x: 0, y: y, width: size.width, height: 1)), with: .color(.black.opacity(0.22)))
-                    y += 3
-                }
-            }
-            .allowsHitTesting(false)
+            if !plain { scanlines }
         }
         .overlay(
             // Разблокированное окно обведено пунктиром.
             Rectangle().strokeBorder(
-                model.unlocked ? Term.green : Term.dim,
+                model.unlocked ? fg : dimColor,
                 style: StrokeStyle(lineWidth: 1, dash: model.unlocked ? [5, 3] : [])
             )
             .allowsHitTesting(false)
@@ -523,16 +552,28 @@ private struct TerminalFrame<Content: View>: View {
             if model.unlocked {
                 Text("◢")
                     .font(.system(size: 14, design: .monospaced))
-                    .foregroundStyle(Term.green)
+                    .foregroundStyle(fg)
                     .padding(4)
                     .contentShape(Rectangle())
                     .gesture(resizeGesture)
                     .help("Потяните, чтобы изменить размер")
             }
         }
-        .shadow(color: Term.green.opacity(0.35), radius: 8)
+        .shadow(color: plain ? .black.opacity(0.4) : Term.green.opacity(0.35), radius: 8)
         .padding(10)
         .id(model.character)
+    }
+
+    /// Строки развёртки старого монитора.
+    private var scanlines: some View {
+        Canvas { context, size in
+            var y: CGFloat = 0
+            while y < size.height {
+                context.fill(Path(CGRect(x: 0, y: y, width: size.width, height: 1)), with: .color(.black.opacity(0.22)))
+                y += 3
+            }
+        }
+        .allowsHitTesting(false)
     }
 
     private var moveGesture: some Gesture {
@@ -567,6 +608,10 @@ struct TerminalView: View {
         switch model.screen {
         case .menu: menu
         case .chat: ChatScreen(model: model)
+        case .shell:
+            TerminalFrame(title: "zsh — " + ShellText.abbreviate(model.shell.cwd, home: NSHomeDirectory()), window: .terminal, model: model, plain: true) {
+                PlainShellScreen(model: model)
+            }
         }
     }
 
@@ -1172,6 +1217,7 @@ final class ConsoleController: NSObject, NSWindowDelegate {
             switch self.model.screen {
             case .chat: self.model.chat.input += line
             case .menu: self.model.shellInput += line
+            case .shell: self.model.shell.input += line
             }
             self.model.focusTick += 1
             self.focusInput()
@@ -1248,6 +1294,11 @@ final class ConsoleController: NSObject, NSWindowDelegate {
     }
 
     /// Для CI: состояние фокуса окна терминала.
+    func shellForDemo(_ on: Bool) {
+        model.setShellMode(on)
+        if on { model.shell.runDemo() }
+    }
+
     func debugState() -> String {
         let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?"
         let responder = terminal.firstResponder.map { String(describing: type(of: $0)) } ?? "nil"
@@ -1335,7 +1386,7 @@ final class ConsoleController: NSObject, NSWindowDelegate {
 
     func open(terminalRect: CGRect, monitorRect: CGRect) {
         isOpen = true
-        model.screen = .menu
+        model.screen = model.shellMode ? .shell : .menu
         model.selected = 0
         model.shellInput = ""
         model.shellLog = []
@@ -1378,6 +1429,12 @@ final class ConsoleController: NSObject, NSWindowDelegate {
 
     private func handleKey(_ code: UInt16) -> Bool {
         guard isOpen else { return false }
+        // В обычном терминале клавиатуру получает строка ввода; Esc закрывает окна.
+        if model.screen == .shell {
+            guard code == 53 else { return false }
+            onDismiss()
+            return true
+        }
         // В чате клавиатуру получает строка ввода; Esc возвращает в меню.
         if model.screen == .chat {
             guard code == 53 else { return false }

@@ -332,6 +332,9 @@ final class CompanionController: NSObject {
 
     func hideAnalyticsForDemo() { analytics.hide() }
 
+    /// Обычный терминал (zsh) с парой настоящих команд.
+    func shellForDemo(_ on: Bool) { console.shellForDemo(on) }
+
     func closeConsoleForDemo() {
         apply(engine.handle(.closeConsole, now: now))
     }
@@ -552,7 +555,7 @@ final class CompanionController: NSObject {
             switchConnection(command == .next ? 1 : -1, announce: false)
             guard let active = prefs.connections.active else { return "ПОДКЛЮЧЕНИЙ НЕТ" }
             return "ПОДКЛЮЧЕНИЕ: " + active.name.uppercased() + " · " + active.model.uppercased()
-        case .help, .clear:
+        case .help, .clear, .shell:
             return nil
         }
     }

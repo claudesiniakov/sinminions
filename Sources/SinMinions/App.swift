@@ -126,6 +126,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             await wait(1.5)
             demoMark("unlock")
             await wait(4)
+            // Обычный терминал: переключатель MOTH | ZSH и настоящие команды.
+            controller.shellForDemo(true)
+            await wait(3.5)
+            demoMark("shell")
+            await wait(3)
+            controller.shellForDemo(false)
+            await wait(1)
             // Все облики призрака: снимок на каждый (окна терминала и монитора остаются открытыми).
             for level in 1...4 {
                 controller.setGhostStyleForDemo(level)
