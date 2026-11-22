@@ -74,8 +74,22 @@ final class Prefs {
     /// Облик призрака (P в S.P.E.C.I.A.L.): номер стиля отрисовки.
     var ghostStyleLevel: Int { didSet { store(ghostStyleLevel, "ghostStyle") } }
     var ghostStyle: GhostStyle { GhostStyle.clamp(ghostStyleLevel) }
-    /// Режим «кофе» (уровень 3 буквы E или команда /coffee): ноутбук не засыпает. После перезапуска выключен, чтобы не разряжать батарею втихую.
-    var coffee = false { didSet { if !applying { onChange() } } }
+    /// Режим «кофе» (уровень 3 буквы E или команда /coffee): ноутбук не засыпает.
+    /// После перезапуска выключен, чтобы не разряжать батарею втихую, — если не включено «Помнить кофе».
+    var coffee = false {
+        didSet {
+            if coffeeKeep { defaults.set(coffee, forKey: "coffee") }
+            if !applying { onChange() }
+        }
+    }
+    /// «Вечный кофе»: режим кофе сохраняется между запусками и при смене персонажа.
+    var coffeeKeep: Bool {
+        didSet {
+            defaults.set(coffeeKeep, forKey: "coffeeKeep")
+            defaults.set(coffeeKeep && coffee, forKey: "coffee")
+            if !applying { onChange() }
+        }
+    }
     var alwaysAsleep: Bool { didSet { store(alwaysAsleep, "alwaysAsleep") } }
     var hideSeekEnabled: Bool { didSet { store(hideSeekEnabled, "hideSeekEnabled") } }
     var searchEnabled: Bool { didSet { store(searchEnabled, "searchEnabled") } }
@@ -129,6 +143,8 @@ final class Prefs {
         talkFrequency = c.talkFrequency
         sleepMinutes = c.sleepMinutes
         hideInFullScreen = d.object(forKey: "hideInFullScreen") as? Bool ?? true
+        coffeeKeep = d.bool(forKey: "coffeeKeep")
+        coffee = coffeeKeep && d.bool(forKey: "coffee")
     }
 
     /// Загружает настройки активного персонажа в свойства (при переключении вкладки F и ab).
@@ -156,7 +172,7 @@ final class Prefs {
         talkEnabled = c.talkEnabled
         talkFrequency = c.talkFrequency
         sleepMinutes = c.sleepMinutes
-        coffee = false
+        coffee = coffeeKeep && defaults.bool(forKey: "coffee")
         applying = false
         onChange()
     }

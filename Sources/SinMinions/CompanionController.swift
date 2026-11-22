@@ -142,6 +142,8 @@ final class CompanionController: NSObject {
         panel.orderFrontRegardless()
         startTimer()
         installMouseMonitors()
+        // «Помнить кофе»: режим, включённый до перезапуска, снова не даёт ноутбуку уснуть.
+        updateCaffeine()
     }
 
     /// Движение мыши будит редкий таймер сразу, без ожидания следующего тика.

@@ -149,6 +149,8 @@ private struct GeneralSettings: View {
 
             Section("Система") {
                 Toggle("Скрывать в полноэкранных приложениях", isOn: $prefs.hideInFullScreen)
+                Toggle("Помнить режим «кофе» после перезапуска", isOn: $prefs.coffeeKeep)
+                    .help("Ноутбук не будет засыпать, пока режим кофе не выключат вручную (буква E или /coffee)")
                 Toggle("Запускать при входе в систему", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in
                         do {
