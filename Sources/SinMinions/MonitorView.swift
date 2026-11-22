@@ -246,7 +246,7 @@ struct MonitorView: View {
 
     var body: some View {
         let s = model.snapshot
-        TerminalFrame(title: "\(model.character.monitorName) // МОНИТОР", window: .monitor, model: model) {
+        TerminalFrame(title: model.character == .ab ? model.character.monitorName : "\(model.character.monitorName) // МОНИТОР", window: .monitor, model: model) {
             // Если окно сделали ниже содержимого, оно прокручивается.
             ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 9) {
