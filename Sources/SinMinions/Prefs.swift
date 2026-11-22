@@ -150,8 +150,9 @@ final class Prefs {
         talkFrequency = c.talkFrequency
         sleepMinutes = c.sleepMinutes
         hideInFullScreen = d.object(forKey: "hideInFullScreen") as? Bool ?? true
-        language = AppLanguage(rawValue: d.string(forKey: "language") ?? "") ?? .system
-        L10n.current = language.resolved()
+        let savedLanguage = AppLanguage(rawValue: d.string(forKey: "language") ?? "") ?? .system
+        language = savedLanguage
+        L10n.current = savedLanguage.resolved()
         coffeeKeep = d.bool(forKey: "coffeeKeep")
         coffee = coffeeKeep && d.bool(forKey: "coffee")
     }
