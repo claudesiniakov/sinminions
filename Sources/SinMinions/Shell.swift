@@ -29,8 +29,12 @@ final class ShellSession {
 
     @ObservationIgnored private let home = NSHomeDirectory()
     @ObservationIgnored private let user = NSUserName()
+    /// Имя Mac из ядра (gethostname): без сетевого запроса. `ProcessInfo.hostName` обращается
+    /// к сети и вызывает системный вопрос «Разрешить искать устройства в локальной сети?».
     @ObservationIgnored private let host: String = {
-        let name = ProcessInfo.processInfo.hostName
+        var buffer = [CChar](repeating: 0, count: 256)
+        guard gethostname(&buffer, buffer.count) == 0 else { return "mac" }
+        let name = String(cString: buffer)
         return name.split(separator: ".").first.map(String.init) ?? name
     }()
     @ObservationIgnored private var previousDir: String?

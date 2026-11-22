@@ -164,14 +164,18 @@ struct TerminalView: View {
     var model: ConsoleModel
 
     var body: some View {
-        switch model.screen {
-        case .menu: menu
-        case .chat: ChatScreen(model: model)
-        case .shell:
-            TerminalFrame(title: model.character.terminalName + " // ZSH " + ShellText.abbreviate(model.shell.cwd, home: NSHomeDirectory()), window: .terminal, model: model) {
-                PlainShellScreen(model: model)
+        Group {
+            switch model.screen {
+            case .menu: menu
+            case .chat: ChatScreen(model: model)
+            case .shell:
+                TerminalFrame(title: model.character.terminalName + " // ZSH " + ShellText.abbreviate(model.shell.cwd, home: NSHomeDirectory()), window: .terminal, model: model) {
+                    PlainShellScreen(model: model)
+                }
             }
         }
+        // Смена языка пересоздаёт экраны целиком: подписи берутся заново.
+        .id(model.language)
     }
 
     private var menu: some View {
