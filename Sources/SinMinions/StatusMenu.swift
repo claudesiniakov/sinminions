@@ -10,17 +10,17 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private let controller: CompanionController
     private let updater: Updater
     private let prefs: Prefs
-    private let modeItem = NSMenuItem(title: "Режим", action: nil, keyEquivalent: "")
+    private let modeItem = NSMenuItem(title: tr("Режим"), action: nil, keyEquivalent: "")
     private var modeItems: [(CompanionMode, NSMenuItem)] = []
     private let openSettings: () -> Void
 
-    private let hideItem = NSMenuItem(title: "Скрыть", action: #selector(StatusMenu.toggleHidden), keyEquivalent: "")
-    private let napItem = NSMenuItem(title: "Усыпить на 1 час", action: #selector(StatusMenu.toggleNap), keyEquivalent: "")
-    private let cornerItem = NSMenuItem(title: "Вернуть в угол", action: #selector(StatusMenu.returnToCorner), keyEquivalent: "")
+    private let hideItem = NSMenuItem(title: tr("Скрыть"), action: #selector(StatusMenu.toggleHidden), keyEquivalent: "")
+    private let napItem = NSMenuItem(title: tr("Усыпить на 1 час"), action: #selector(StatusMenu.toggleNap), keyEquivalent: "")
+    private let cornerItem = NSMenuItem(title: tr("Вернуть в угол"), action: #selector(StatusMenu.returnToCorner), keyEquivalent: "")
     private let versionItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let updateItem = NSMenuItem(title: "", action: #selector(StatusMenu.updateAction), keyEquivalent: "")
-    private let settingsItem = NSMenuItem(title: "Настройки…", action: #selector(StatusMenu.showSettings), keyEquivalent: ",")
-    private let quitItem = NSMenuItem(title: "Завершить SinMinions", action: #selector(StatusMenu.quit), keyEquivalent: "q")
+    private let settingsItem = NSMenuItem(title: tr("Настройки…"), action: #selector(StatusMenu.showSettings), keyEquivalent: ",")
+    private let quitItem = NSMenuItem(title: tr("Завершить SinMinions"), action: #selector(StatusMenu.quit), keyEquivalent: "q")
 
     init(controller: CompanionController, updater: Updater, prefs: Prefs, openSettings: @escaping () -> Void) {
         self.controller = controller
@@ -58,8 +58,14 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     /// Заголовки пунктов и значок по текущему состоянию.
     func refresh() {
-        hideItem.title = controller.hiddenByUser ? "Показать" : "Скрыть"
-        napItem.title = controller.isSleeping ? "Разбудить" : "Усыпить на 1 час"
+        // Подписи на текущем языке (язык меняется в настройках на ходу).
+        modeItem.title = tr("Режим")
+        cornerItem.title = tr("Вернуть в угол")
+        settingsItem.title = tr("Настройки…")
+        quitItem.title = tr("Завершить SinMinions")
+        for (mode, entry) in modeItems { entry.title = mode.title }
+        hideItem.title = controller.hiddenByUser ? tr("Показать") : tr("Скрыть")
+        napItem.title = controller.isSleeping ? tr("Разбудить") : tr("Усыпить на 1 час")
         napItem.isEnabled = !controller.hiddenByUser
         cornerItem.isEnabled = !controller.hiddenByUser
 
@@ -68,16 +74,16 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         versionItem.title = updater.statusLine
         switch updater.state {
         case .idle, .upToDate:
-            updateItem.title = "Проверить обновления…"
+            updateItem.title = tr("Проверить обновления…")
             updateItem.isEnabled = true
         case let .available(release):
-            updateItem.title = "Обновить до \(release.version)"
+            updateItem.title = trf("Обновить до %@", "\(release.version)")
             updateItem.isEnabled = true
         case .failed:
-            updateItem.title = "Повторить"
+            updateItem.title = tr("Повторить")
             updateItem.isEnabled = true
         case .checking, .downloading, .installing:
-            updateItem.title = "Обновление…"
+            updateItem.title = tr("Обновление…")
             updateItem.isEnabled = false
         }
         item.button?.image = Self.icon(dot: updater.needsAttention, character: prefs.character)

@@ -51,24 +51,24 @@ final class Updater {
     // MARK: - Строка в панели
 
     var statusLine: String {
-        let version = "Версия \(currentVersionString)"
+        let version = trf("Версия %@", "\(currentVersionString)")
         switch state {
         case .idle: return version
-        case .checking: return version + " · проверка…"
-        case .upToDate: return version + " · обновлений нет"
-        case let .available(release): return version + " · доступна \(release.version)"
-        case let .downloading(release, percent): return "Загрузка \(release.version)… \(percent) %"
-        case .installing: return "Перезапуск…"
+        case .checking: return version + tr(" · проверка…")
+        case .upToDate: return version + tr(" · обновлений нет")
+        case let .available(release): return version + trf(" · доступна %@", "\(release.version)")
+        case let .downloading(release, percent): return trf("Загрузка %@… %@ %", "\(release.version)", "\(percent)")
+        case .installing: return tr("Перезапуск…")
         case let .failed(message, _):
-            return "Не удалось обновить: " + (message.split(separator: "\n").first.map(String.init) ?? "")
+            return tr("Не удалось обновить: ") + (message.split(separator: "\n").first.map(String.init) ?? "")
         }
     }
 
     var actionTitle: String? {
         switch state {
-        case .idle, .upToDate: return "Проверить"
-        case .available: return "Обновить"
-        case .failed: return "Повторить"
+        case .idle, .upToDate: return tr("Проверить")
+        case .available: return tr("Обновить")
+        case .failed: return tr("Повторить")
         case .checking, .downloading, .installing: return nil
         }
     }
@@ -170,14 +170,14 @@ final class Updater {
     var installBlocker: String? {
         let bundle = Self.installURL
         if bundle.pathExtension != "app" || currentVersion == nil {
-            return "Приложение запущено не из собранного SinMinions.app"
+            return tr("Приложение запущено не из собранного SinMinions.app")
         }
         if bundle.path.contains("/AppTranslocation/") {
-            return "Перенесите SinMinions в «Программы» через Finder и запустите оттуда"
+            return tr("Перенесите SinMinions в «Программы» через Finder и запустите оттуда")
         }
         let folder = bundle.deletingLastPathComponent().path
         if !FileManager.default.isWritableFile(atPath: folder) {
-            return "Нет права записи в папку \(folder)"
+            return trf("Нет права записи в папку %@", "\(folder)")
         }
         return nil
     }
@@ -186,11 +186,11 @@ final class Updater {
         guard installTask == nil else { return }
         if let blocker = installBlocker {
             // Не уводим молча на сайт: показываем причину, страница релиза — по «Повторить».
-            UpdateLog.write("Установка невозможна: \(blocker); бандл \(Self.installURL.path)")
+            UpdateLog.write(trf("Установка невозможна: %@; бандл %@", "\(blocker)", "\(Self.installURL.path)"))
             if case .failed(_, .some) = state {
                 NSWorkspace.shared.open(release.pageURL)
             }
-            state = .failed(blocker + ". Кнопка «Повторить» откроет страницу релиза.", release)
+            state = .failed(blocker + tr(". Кнопка «Повторить» откроет страницу релиза."), release)
             return
         }
         installTask = Task {
@@ -200,7 +200,7 @@ final class Updater {
     }
 
     private func install(_ release: ReleaseInfo) async {
-        UpdateLog.write("— Обновление \(currentVersionString) → \(release.version), бандл \(Self.installURL.path)")
+        UpdateLog.write(trf("— Обновление %@ → %@, бандл %@", "\(currentVersionString)", "\(release.version)", "\(Self.installURL.path)"))
         state = .downloading(release, 0)
         let work = FileManager.default.temporaryDirectory
             .appendingPathComponent("SinMinions-update-\(UUID().uuidString)", isDirectory: true)
@@ -208,26 +208,26 @@ final class Updater {
             try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
             let archive = work.appendingPathComponent(ReleaseFeed.archiveName)
 
-            UpdateLog.write("Загрузка \(release.archiveURL.lastPathComponent)")
+            UpdateLog.write(trf("Загрузка %@", "\(release.archiveURL.lastPathComponent)"))
             let code = try await Self.download(release.archiveURL, to: archive) { [weak self] fraction in
                 Task { @MainActor in self?.report(fraction, for: release) }
             }
-            guard code == 200 else { throw UpdateError("Не удалось скачать обновление (HTTP \(code))") }
+            guard code == 200 else { throw UpdateError(trf("Не удалось скачать обновление (HTTP %@)", "\(code)")) }
             state = .downloading(release, 100)
 
             guard let sumURL = release.checksumURL else {
-                throw UpdateError("В релизе нет контрольной суммы — установка отменена")
+                throw UpdateError(tr("В релизе нет контрольной суммы — установка отменена"))
             }
             let (sumData, _) = try await UpdateNetwork.session.data(from: sumURL)
             guard let expected = UpdateVerifier.parseChecksum(String(decoding: sumData, as: UTF8.self)) else {
-                throw UpdateError("Некорректная контрольная сумма в релизе")
+                throw UpdateError(tr("Некорректная контрольная сумма в релизе"))
             }
             let actual = try await Self.background { try UpdateVerifier.sha256(of: archive) }
             guard actual == expected else {
-                throw UpdateError("Контрольная сумма архива не совпала — установка отменена")
+                throw UpdateError(tr("Контрольная сумма архива не совпала — установка отменена"))
             }
 
-            UpdateLog.write("Распаковка и проверка подписи")
+            UpdateLog.write(tr("Распаковка и проверка подписи"))
             let bundleID = Bundle.main.bundleIdentifier
             let newApp = try await Self.background { try Self.unpack(archive: archive, in: work) }
             try await Self.background { try Self.verify(newApp: newApp, expected: release.version, bundleID: bundleID) }
@@ -236,15 +236,15 @@ final class Updater {
             beforeRestart()
             try launchReplacement(newApp: newApp, log: UpdateLog.url)
             try? await Task.sleep(for: .milliseconds(300))
-            UpdateLog.write("Завершение приложения для замены")
+            UpdateLog.write(tr("Завершение приложения для замены"))
             NSApp.terminate(nil)
             // Если штатный выход не сработал — завершаемся сами: скрипт замены ждёт нашего PID.
             try? await Task.sleep(for: .seconds(3))
             exit(0)
         } catch {
-            UpdateLog.write("Ошибка: \(error.localizedDescription)")
+            UpdateLog.write(trf("Ошибка: %@", "\(error.localizedDescription)"))
             try? FileManager.default.removeItem(at: work)
-            state = .failed(error.localizedDescription + "\nЖурнал: ~/Library/Logs/SinMinions/update.log", release)
+            state = .failed(error.localizedDescription + tr("\nЖурнал: ~/Library/Logs/SinMinions/update.log"), release)
         }
     }
 
@@ -267,7 +267,7 @@ final class Updater {
                     return
                 }
                 guard let location else {
-                    continuation.resume(throwing: UpdateError("Загрузка не вернула файл"))
+                    continuation.resume(throwing: UpdateError(tr("Загрузка не вернула файл")))
                     return
                 }
                 do {
@@ -299,7 +299,7 @@ final class Updater {
         try run("/usr/bin/ditto", ["-x", "-k", archive.path, unpacked.path])
         let newApp = unpacked.appendingPathComponent("SinMinions.app")
         guard FileManager.default.fileExists(atPath: newApp.path) else {
-            throw UpdateError("В архиве не найдено приложение SinMinions")
+            throw UpdateError(tr("В архиве не найдено приложение SinMinions"))
         }
         return newApp
     }
@@ -307,11 +307,11 @@ final class Updater {
     nonisolated private static func verify(newApp: URL, expected: AppVersion, bundleID: String?) throws {
         guard let info = NSDictionary(contentsOf: newApp.appendingPathComponent("Contents/Info.plist")),
               info["CFBundleIdentifier"] as? String == bundleID else {
-            throw UpdateError("Архив содержит другое приложение")
+            throw UpdateError(tr("Архив содержит другое приложение"))
         }
         let version = (info["CFBundleShortVersionString"] as? String).flatMap(AppVersion.init)
         guard version == expected else {
-            throw UpdateError("Версия в архиве (\(version?.description ?? "?")) не совпадает с релизом \(expected)")
+            throw UpdateError(trf("Версия в архиве (%@) не совпадает с релизом %@", "\(version?.description ?? "?")", "\(expected)"))
         }
         try run("/usr/bin/codesign", ["--verify", "--deep", "--strict", newApp.path])
         _ = try? run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", newApp.path])
@@ -332,11 +332,11 @@ final class Updater {
         let name = (tool as NSString).lastPathComponent
         if done.wait(timeout: .now() + timeout) == .timedOut {
             p.terminate()
-            throw UpdateError("\(name) не ответил за \(Int(timeout)) с")
+            throw UpdateError(trf("%@ не ответил за %@ с", "\(name)", "\(Int(timeout))"))
         }
-        UpdateLog.write("\(name) → код \(p.terminationStatus)")
+        UpdateLog.write(trf("%@ → код %@", "\(name)", "\(p.terminationStatus)"))
         guard p.terminationStatus == 0 else {
-            throw UpdateError("\(name) завершился с кодом \(p.terminationStatus)")
+            throw UpdateError(trf("%@ завершился с кодом %@", "\(name)", "\(p.terminationStatus)"))
         }
         return p.terminationStatus
     }
@@ -382,7 +382,7 @@ final class Updater {
         p.standardOutput = FileHandle.nullDevice
         p.standardError = FileHandle.nullDevice
         try p.run()
-        UpdateLog.write("Скрипт замены запущен, PID \(p.processIdentifier)")
+        UpdateLog.write(trf("Скрипт замены запущен, PID %@", "\(p.processIdentifier)"))
     }
 }
 

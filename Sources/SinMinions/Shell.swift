@@ -188,7 +188,7 @@ final class ShellSession {
             try process.run()
         } catch {
             output.fileHandleForReading.readabilityHandler = nil
-            add(.output, "zsh: не удалось запустить: \(error.localizedDescription)")
+            add(.output, trf("zsh: не удалось запустить: %@", "\(error.localizedDescription)"))
             return
         }
         self.process = process
@@ -264,7 +264,7 @@ final class ShellSession {
 
     /// Для снимка в CI: пара настоящих команд.
     func runDemo() {
-        input = "echo привет из zsh && sw_vers"
+        input = tr("echo привет из zsh && sw_vers")
         submit()
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(1.2))
@@ -286,7 +286,7 @@ struct PlainShellScreen: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         if shell.lines.isEmpty {
-                            Text("ОБЫЧНЫЙ ТЕРМИНАЛ ZSH. EXIT ИЛИ /SHELL — НАЗАД К \(model.character.terminalName).")
+                            Text(trf("ОБЫЧНЫЙ ТЕРМИНАЛ ZSH. EXIT ИЛИ /SHELL — НАЗАД К %@.", "\(model.character.terminalName)"))
                                 .foregroundStyle(Term.dim)
                         } else {
                             Text(transcript(shell))
@@ -321,7 +321,7 @@ struct PlainShellScreen: View {
                         }
                     }
             }
-            Text(shell.isRunning ? "ВЫПОЛНЯЕТСЯ… CTRL+C ПРЕРВАТЬ · CTRL+D КОНЕЦ ВВОДА" : "↑↓ ИСТОРИЯ · CTRL+L ОЧИСТИТЬ · EXIT НАЗАД · ESC ЗАКРЫТЬ")
+            Text(shell.isRunning ? tr("ВЫПОЛНЯЕТСЯ… CTRL+C ПРЕРВАТЬ · CTRL+D КОНЕЦ ВВОДА") : tr("↑↓ ИСТОРИЯ · CTRL+L ОЧИСТИТЬ · EXIT НАЗАД · ESC ЗАКРЫТЬ"))
                 .foregroundStyle(Term.dim)
         }
         .font(Term.small)
@@ -353,12 +353,12 @@ struct TerminalModeSwitch: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            segment(model.character == .ab ? "КОГИТАТОР" : "MOTH", active: !model.shellMode) { model.setShellMode(false) }
+            segment(model.character == .ab ? tr("КОГИТАТОР") : "MOTH", active: !model.shellMode) { model.setShellMode(false) }
             segment("ZSH", active: model.shellMode) { model.setShellMode(true) }
         }
         .font(.system(size: 10, design: .monospaced))
         .overlay(Rectangle().strokeBorder(Term.dark, lineWidth: 1))
-        .help("Обычный терминал (zsh) или терминал компаньона. Команда: /shell")
+        .help(tr("Обычный терминал (zsh) или терминал компаньона. Команда: /shell"))
     }
 
     private func segment(_ title: String, active: Bool, action: @escaping () -> Void) -> some View {

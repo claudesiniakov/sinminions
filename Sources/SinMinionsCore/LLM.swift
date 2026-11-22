@@ -26,15 +26,15 @@ public enum LLMError: LocalizedError, Equatable, Sendable {
     private static func describeDirect(_ status: Int, _ detail: String?) -> String {
         let base: String
         switch status {
-        case 400: base = "Некорректный запрос"
-        case 401: base = "Ключ API не подходит"
-        case 402: base = "Недостаточно средств на балансе"
-        case 404: base = "Модель или адрес не найдены"
-        case 422: base = "Сервер отклонил параметры запроса"
-        case 429: base = "Слишком много запросов"
-        case 500: base = "Ошибка на стороне сервиса"
-        case 503: base = "Сервис перегружен, попробуйте позже"
-        default: base = "Ошибка \(status)"
+        case 400: base = tr("Некорректный запрос")
+        case 401: base = tr("Ключ API не подходит")
+        case 402: base = tr("Недостаточно средств на балансе")
+        case 404: base = tr("Модель или адрес не найдены")
+        case 422: base = tr("Сервер отклонил параметры запроса")
+        case 429: base = tr("Слишком много запросов")
+        case 500: base = tr("Ошибка на стороне сервиса")
+        case 503: base = tr("Сервис перегружен, попробуйте позже")
+        default: base = trf("Ошибка %@", "\(status)")
         }
         return detail.map { "\(base) — \($0)" } ?? base
     }
@@ -42,50 +42,50 @@ public enum LLMError: LocalizedError, Equatable, Sendable {
     /// Короткое пояснение для узких мест интерфейса (строки лимитов на мониторе).
     public var shortDescription: String {
         switch self {
-        case .noCredentials: return "нет ключа"
+        case .noCredentials: return tr("нет ключа")
         case let .http(status, _, _):
             switch status {
-            case 401: return "ключ не принят"
-            case 402: return "нет средств"
-            case 403: return "недоступно"
-            case 429: return "много запросов"
-            case 500...599: return "сбой сервиса"
-            default: return "ошибка \(status)"
+            case 401: return tr("ключ не принят")
+            case 402: return tr("нет средств")
+            case 403: return tr("недоступно")
+            case 429: return tr("много запросов")
+            case 500...599: return tr("сбой сервиса")
+            default: return trf("ошибка %@", "\(status)")
             }
-        case .network: return "нет связи"
-        case .invalidResponse, .emptyAnswer: return "нет данных"
-        case .refused: return "отказ"
+        case .network: return tr("нет связи")
+        case .invalidResponse, .emptyAnswer: return tr("нет данных")
+        case .refused: return tr("отказ")
         }
     }
 
     public var errorDescription: String? {
         switch self {
         case .noCredentials:
-            return "Ключ GigaChat не задан"
+            return tr("Ключ GigaChat не задан")
         case let .http(status, detail, stage):
             if stage == .direct { return Self.describeDirect(status, detail) }
             let base: String
             switch status {
-            case 400: base = stage == .token ? "Запрос токена отклонён, проверьте ключ" : "Некорректный запрос"
-            case 401: base = stage == .token ? "Ключ авторизации не подходит: проверьте ключ и область доступа" : "Токен не принят"
-            case 402: base = "Токены закончились"
-            case 403: base = "Доступ запрещён"
-            case 404: base = "Модель не найдена: выберите другую в настройках"
-            case 413: base = "Слишком длинный запрос"
-            case 422: base = "Сервер отклонил запрос"
-            case 429: base = "Слишком много запросов: ключ физлица принимает один запрос за раз"
-            case 500...599: base = "Сервис GigaChat недоступен (\(status))"
-            default: base = "Ошибка \(status)"
+            case 400: base = stage == .token ? tr("Запрос токена отклонён, проверьте ключ") : tr("Некорректный запрос")
+            case 401: base = stage == .token ? tr("Ключ авторизации не подходит: проверьте ключ и область доступа") : tr("Токен не принят")
+            case 402: base = tr("Токены закончились")
+            case 403: base = tr("Доступ запрещён")
+            case 404: base = tr("Модель не найдена: выберите другую в настройках")
+            case 413: base = tr("Слишком длинный запрос")
+            case 422: base = tr("Сервер отклонил запрос")
+            case 429: base = tr("Слишком много запросов: ключ физлица принимает один запрос за раз")
+            case 500...599: base = trf("Сервис GigaChat недоступен (%@)", "\(status)")
+            default: base = trf("Ошибка %@", "\(status)")
             }
             return detail.map { "\(base) — \($0)" } ?? base
         case let .network(text):
             return text
         case .invalidResponse:
-            return "Сервер вернул неожиданный ответ"
+            return tr("Сервер вернул неожиданный ответ")
         case .emptyAnswer:
-            return "Модель вернула пустой ответ"
+            return tr("Модель вернула пустой ответ")
         case .refused:
-            return "Модель отказалась отвечать на этот запрос"
+            return tr("Модель отказалась отвечать на этот запрос")
         }
     }
 }
@@ -268,8 +268,8 @@ public enum TokenFormat {
             return text.hasSuffix(",0") ? String(text.dropLast(2)) : text
         }
         let v = Double(value)
-        if value >= 1_000_000 { return trimmed(v / 1_000_000) + " МЛН" }
-        if value >= 1_000 { return trimmed(v / 1_000) + " ТЫС" }
+        if value >= 1_000_000 { return trimmed(v / 1_000_000) + tr(" МЛН") }
+        if value >= 1_000 { return trimmed(v / 1_000) + tr(" ТЫС") }
         return String(value)
     }
 }

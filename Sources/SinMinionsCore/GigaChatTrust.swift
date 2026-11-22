@@ -38,7 +38,7 @@ public final class GigaChatTrust: NSObject, URLSessionDelegate, @unchecked Senda
               let trust = space.serverTrust,
               GigaChatAPI.trustedHosts.contains(space.host) else { return (.performDefaultHandling, nil) }
         guard !anchors.isEmpty else {
-            Self.record("встроенный сертификат Минцифры не прочитан")
+            Self.record(tr("встроенный сертификат Минцифры не прочитан"))
             return (.performDefaultHandling, nil)
         }
         _ = SecTrustSetAnchorCertificates(trust, anchors as CFArray)
@@ -46,10 +46,10 @@ public final class GigaChatTrust: NSObject, URLSessionDelegate, @unchecked Senda
         _ = SecTrustSetAnchorCertificatesOnly(trust, false)
         var error: CFError?
         if SecTrustEvaluateWithError(trust, &error) {
-            Self.record("\(space.host): проверка пройдена")
+            Self.record(trf("%@: проверка пройдена", "\(space.host)"))
             return (.useCredential, URLCredential(trust: trust))
         }
-        let reason = error.map { CFErrorCopyDescription($0) as String } ?? "причина неизвестна"
+        let reason = error.map { CFErrorCopyDescription($0) as String } ?? tr("причина неизвестна")
         // Запасной путь: имя хоста, срок действия и цепочка до встроенного корня остаются обязательными,
         // но отзыв сертификата по сети не проверяется и ничего из сети не подгружается
         // (сервер сам присылает промежуточный сертификат). Так недоступный сервер отзыва не блокирует чат.
@@ -57,11 +57,11 @@ public final class GigaChatTrust: NSObject, URLSessionDelegate, @unchecked Senda
         SecTrustSetPolicies(trust, SecPolicyCreateSSL(true, space.host as CFString))
         var fallbackError: CFError?
         if SecTrustEvaluateWithError(trust, &fallbackError) {
-            Self.record("\(space.host): пройдена без проверки отзыва; первая попытка не прошла: \(reason)")
+            Self.record(trf("%@: пройдена без проверки отзыва; первая попытка не прошла: %@", "\(space.host)", "\(reason)"))
             return (.useCredential, URLCredential(trust: trust))
         }
-        let fallbackReason = fallbackError.map { CFErrorCopyDescription($0) as String } ?? "причина неизвестна"
-        Self.record("\(space.host): отказ — \(reason); без отзыва — \(fallbackReason); цепочка из \(SecTrustGetCertificateCount(trust)) сертификатов")
+        let fallbackReason = fallbackError.map { CFErrorCopyDescription($0) as String } ?? tr("причина неизвестна")
+        Self.record(trf("%@: отказ — %@; без отзыва — %@; цепочка из %@ сертификатов", "\(space.host)", "\(reason)", "\(fallbackReason)", "\(SecTrustGetCertificateCount(trust))"))
         // Не прошла и наша проверка: пусть система сама откажет с понятной ошибкой сертификата.
         return (.performDefaultHandling, nil)
     }

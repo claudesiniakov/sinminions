@@ -9,7 +9,7 @@ struct KeychainError: LocalizedError {
     let status: OSStatus
 
     var errorDescription: String? {
-        (SecCopyErrorMessageString(status, nil) as String?) ?? "Ошибка Связки ключей (\(status))"
+        (SecCopyErrorMessageString(status, nil) as String?) ?? trf("Ошибка Связки ключей (%@)", "\(status)")
     }
 }
 

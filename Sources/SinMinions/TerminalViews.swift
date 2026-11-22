@@ -61,12 +61,12 @@ struct TerminalFrame<Content: View>: View {
                 if window == .terminal {
                     TerminalModeSwitch(model: model)
                 }
-                Text(model.unlocked ? "[ЗАМОК ВЫКЛ]" : "[ЗАМОК ВКЛ]")
+                Text(model.unlocked ? tr("[ЗАМОК ВЫКЛ]") : tr("[ЗАМОК ВКЛ]"))
                     .font(Term.small)
                     .foregroundStyle(model.unlocked ? fg : dimColor)
                     .contentShape(Rectangle())
                     .onTapGesture { model.layoutEvent(window, .toggleLock) }
-                    .help(model.unlocked ? "Заблокировать окна" : "Разблокировать: окна можно двигать и менять их размер")
+                    .help(model.unlocked ? tr("Заблокировать окна") : tr("Разблокировать: окна можно двигать и менять их размер"))
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
@@ -115,12 +115,12 @@ struct TerminalFrame<Content: View>: View {
                     .padding(4)
                     .contentShape(Rectangle())
                     .gesture(resizeGesture)
-                    .help("Потяните, чтобы изменить размер")
+                    .help(tr("Потяните, чтобы изменить размер"))
             }
         }
         .shadow(color: Term.green.opacity(0.35), radius: 8)
         .padding(10)
-        .id(model.character)
+        .id(model.character.rawValue + model.language.rawValue)
     }
 
     /// Строки развёртки старого монитора.
@@ -175,7 +175,7 @@ struct TerminalView: View {
     }
 
     private var menu: some View {
-        TerminalFrame(title: "\(model.character.terminalName) // ТЕРМИНАЛ", window: .terminal, model: model) {
+        TerminalFrame(title: trf("%@ // ТЕРМИНАЛ", "\(model.character.terminalName)"), window: .terminal, model: model) {
             ShellScreen(model: model)
         }
     }
@@ -216,7 +216,7 @@ struct ShellScreen: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 3) {
                         if model.shellLog.isEmpty {
-                            Text("КОМАНДЫ НАЧИНАЮТСЯ СО «/». ВВЕДИТЕ /HELP — СПИСОК.")
+                            Text(tr("КОМАНДЫ НАЧИНАЮТСЯ СО «/». ВВЕДИТЕ /HELP — СПИСОК."))
                                 .foregroundStyle(Term.dim)
                         }
                         ForEach(Array(model.shellLog.enumerated()), id: \.offset) { _, line in
@@ -270,7 +270,7 @@ struct ShellScreen: View {
             }
             .font(Term.small)
             .foregroundStyle(Term.green)
-            Text("↑↓ ВЫБОР · TAB ДОПИСАТЬ · /HELP · ESC ВЫХОД")
+            Text(tr("↑↓ ВЫБОР · TAB ДОПИСАТЬ · /HELP · ESC ВЫХОД"))
                 .font(Term.small)
                 .foregroundStyle(Term.dim)
         }
@@ -287,13 +287,13 @@ struct ChatScreen: View {
 
     var body: some View {
         @Bindable var chat = model.chat
-        TerminalFrame(title: model.character.terminalName + " // " + ([model.llmName, model.llmModelName].compactMap { $0 }.joined(separator: " · ").nonEmpty ?? "НЕЙРОСЕТЬ").uppercased(), window: .terminal, model: model) {
+        TerminalFrame(title: model.character.terminalName + " // " + ([model.llmName, model.llmModelName].compactMap { $0 }.joined(separator: " · ").nonEmpty ?? tr("НЕЙРОСЕТЬ")).uppercased(), window: .terminal, model: model) {
             VStack(alignment: .leading, spacing: 8) {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(alignment: .leading, spacing: 8) {
                             if chat.entries.isEmpty {
-                                Text("ВВЕДИТЕ СООБЩЕНИЕ. /clear — ОЧИСТИТЬ ИСТОРИЮ.")
+                                Text(tr("ВВЕДИТЕ СООБЩЕНИЕ. /clear — ОЧИСТИТЬ ИСТОРИЮ."))
                                     .foregroundStyle(Term.dim)
                             }
                             if !chat.entries.isEmpty {
@@ -303,7 +303,7 @@ struct ChatScreen: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             if chat.isSending {
-                                Text("ОЖИДАНИЕ ОТВЕТА…").foregroundStyle(Term.dim)
+                                Text(tr("ОЖИДАНИЕ ОТВЕТА…")).foregroundStyle(Term.dim)
                             }
                             Color.clear.frame(height: 1).id("end")
                         }
@@ -321,7 +321,7 @@ struct ChatScreen: View {
                         .onSubmit { chat.submit() }
                 }
                 .foregroundStyle(Term.green)
-                Text("ENTER ОТПРАВИТЬ · /HELP · ESC НАЗАД")
+                Text(tr("ENTER ОТПРАВИТЬ · /HELP · ESC НАЗАД"))
                     .foregroundStyle(Term.dim)
             }
             .font(Term.small)
@@ -344,7 +344,7 @@ struct ChatScreen: View {
                 line = AttributedString((entry.speaker ?? "LLM") + ": " + entry.text)
                 line.foregroundColor = Term.green
             case .error:
-                line = AttributedString("ОШИБКА: " + entry.text)
+                line = AttributedString(tr("ОШИБКА: ") + entry.text)
                 line.foregroundColor = Term.amber
             case .info:
                 line = AttributedString(entry.text)

@@ -109,24 +109,24 @@ public enum MetricFormat {
     /// «12,4 ГБ», «810 МБ», «15 КБ».
     public static func bytes(_ bytes: UInt64) -> String {
         let b = Double(bytes)
-        if b >= 1e9 { return number(b / 1e9) + " ГБ" }
-        if b >= 1e6 { return String(Int((b / 1e6).rounded())) + " МБ" }
-        return String(Int((b / 1e3).rounded())) + " КБ"
+        if b >= 1e9 { return number(b / 1e9) + tr(" ГБ") }
+        if b >= 1e6 { return String(Int((b / 1e6).rounded())) + tr(" МБ") }
+        return String(Int((b / 1e3).rounded())) + tr(" КБ")
     }
 
     /// Скорость: «1,2 МБ/с», «340 КБ/с», «0 КБ/с».
     public static func rate(_ bytesPerSecond: Double) -> String {
         let b = max(bytesPerSecond, 0)
-        if b >= 1e6 { return number(b / 1e6) + " МБ/с" }
-        return String(Int((b / 1e3).rounded())) + " КБ/с"
+        if b >= 1e6 { return number(b / 1e6) + tr(" МБ/с") }
+        return String(Int((b / 1e3).rounded())) + tr(" КБ/с")
     }
 
     /// Время работы: «3д 04ч», «4ч 12м», «12м».
     public static func uptime(_ seconds: Double) -> String {
         let total = Int(max(seconds, 0))
         let days = total / 86400, hours = total % 86400 / 3600, minutes = total % 3600 / 60
-        if days > 0 { return "\(days)д " + String(format: "%02d", hours) + "ч" }
-        if hours > 0 { return "\(hours)ч " + String(format: "%02d", minutes) + "м" }
-        return "\(minutes)м"
+        if days > 0 { return trf("%@д ", "\(days)") + String(format: "%02d", hours) + tr("ч") }
+        if hours > 0 { return trf("%@ч ", "\(hours)") + String(format: "%02d", minutes) + tr("м") }
+        return trf("%@м", "\(minutes)")
     }
 }

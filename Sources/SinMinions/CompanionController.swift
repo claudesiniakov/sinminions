@@ -217,18 +217,18 @@ final class CompanionController: NSObject {
         console.model.outfit = prefs.outfit
         console.model.special = SpecialState(
             scaleLevel: scales.firstIndex(of: prefs.scale) ?? 1,
-            scaleLabel: "РАЗМЕР " + scaleText,
+            scaleLabel: tr("РАЗМЕР ") + scaleText,
             perceptionLevel: prefs.ghostStyle.rawValue,
-            perceptionLabel: "ОБЛИК: " + prefs.ghostStyle.title,
+            perceptionLabel: tr("ОБЛИК: ") + prefs.ghostStyle.title,
             agilityLevel: prefs.agility,
-            agilityLabel: "СКОРОСТЬ ПОЛЁТА: " + Agility.title(level: prefs.agility),
+            agilityLabel: tr("СКОРОСТЬ ПОЛЁТА: ") + Agility.title(level: prefs.agility),
             enduranceLevel: prefs.endurance,
             enduranceLabel: prefs.character == .ab && prefs.endurance == 0
-                ? "СПИТ В ПИЖАМЕ"
+                ? tr("СПИТ В ПИЖАМЕ")
                 : Endurance.title(level: prefs.endurance, sleepMinutes: prefs.sleepMinutes),
             charismaLevel: prefs.charisma,
-            charismaLabel: "РЕПЛИКИ: " + Charisma.title(level: prefs.charisma),
-            intelligenceLabel: prefs.connections.active.map { "ПОДКЛЮЧЕНИЕ: " + $0.name.uppercased() } ?? "НЕТ ПОДКЛЮЧЕНИЙ",
+            charismaLabel: tr("РЕПЛИКИ: ") + Charisma.title(level: prefs.charisma),
+            intelligenceLabel: prefs.connections.active.map { tr("ПОДКЛЮЧЕНИЕ: ") + $0.name.uppercased() } ?? tr("НЕТ ПОДКЛЮЧЕНИЙ"),
             intelligenceCount: prefs.connections.chatItems.count
         )
     }
@@ -268,7 +268,7 @@ final class CompanionController: NSObject {
             for type in [kIOPMAssertionTypePreventUserIdleSystemSleep, kIOPMAssertionTypePreventUserIdleDisplaySleep] {
                 var id = IOPMAssertionID(0)
                 let result = IOPMAssertionCreateWithName(type as CFString, IOPMAssertionLevel(kIOPMAssertionLevelOn),
-                                                         "SinMinions: кофе" as CFString, &id)
+                                                         tr("SinMinions: кофе") as CFString, &id)
                 if result == kIOReturnSuccess { caffeineAssertions.append(id) }
             }
         } else if !prefs.coffee, !caffeineAssertions.isEmpty {
@@ -304,7 +304,7 @@ final class CompanionController: NSObject {
         prefs.connections = list
         refreshLLM()
         if announce, !console.model.chat.entries.isEmpty {
-            console.model.chat.addInfo("ПОДКЛЮЧЕНИЕ: " + active.name.uppercased())
+            console.model.chat.addInfo(tr("ПОДКЛЮЧЕНИЕ: ") + active.name.uppercased())
         }
     }
 
@@ -312,6 +312,7 @@ final class CompanionController: NSObject {
     /// через 0,15 с после последнего: перестройка автомата и проверка рисунка — не на каждое касание.
     func prefsChanged() {
         // Подписи на мониторе обновляем сразу — это дёшево, и отклик на «+»/«−» мгновенный.
+        console.model.language = L10n.current
         refreshLLM()
         refreshSpecial()
         prefsTask?.cancel()
@@ -537,12 +538,12 @@ final class CompanionController: NSObject {
         switch command {
         case .nap:
             nap(seconds: 3600)
-            return "ПРИЗРАК УСНУЛ НА 1 ЧАС"
+            return tr("ПРИЗРАК УСНУЛ НА 1 ЧАС")
         case .coffee:
             prefs.coffee.toggle()
-            return prefs.coffee ? "КОФЕ: НОУТБУК НЕ ЗАСНЁТ, ПОКА ВКЛЮЧЕНО" : "КОФЕ ДОПИТ: НОУТБУК СНОВА МОЖЕТ ЗАСНУТЬ"
+            return prefs.coffee ? tr("КОФЕ: НОУТБУК НЕ ЗАСНЁТ, ПОКА ВКЛЮЧЕНО") : tr("КОФЕ ДОПИТ: НОУТБУК СНОВА МОЖЕТ ЗАСНУТЬ")
         case .sing:
-            guard prefs.character == .ab else { return "ПОЁТ ТОЛЬКО СТРАЖ: ПЕРЕКЛЮЧИТЕ ПЕРСОНАЖА НА ab В НАСТРОЙКАХ" }
+            guard prefs.character == .ab else { return tr("ПОЁТ ТОЛЬКО СТРАЖ: ПЕРЕКЛЮЧИТЕ ПЕРСОНАЖА НА ab В НАСТРОЙКАХ") }
             apply(engine.handle(.closeConsole, now: now))
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(700))
@@ -552,7 +553,7 @@ final class CompanionController: NSObject {
             return nil
         case .analytics:
             showAnalytics()
-            return "АНАЛИТИКА ТОКЕНОВ ОТКРЫТА В ОТДЕЛЬНОМ ОКНЕ"
+            return tr("АНАЛИТИКА ТОКЕНОВ ОТКРЫТА В ОТДЕЛЬНОМ ОКНЕ")
         case .hide:
             setHidden(true)
             return nil
@@ -564,21 +565,21 @@ final class CompanionController: NSObject {
             return nil
         case .unlock:
             console.setUnlocked(true)
-            return "ОКНА РАЗБЛОКИРОВАНЫ: ДВИГАЙТЕ ЗА ЗАГОЛОВОК, РАЗМЕР — ЗА УГОЛОК ◢"
+            return tr("ОКНА РАЗБЛОКИРОВАНЫ: ДВИГАЙТЕ ЗА ЗАГОЛОВОК, РАЗМЕР — ЗА УГОЛОК ◢")
         case .lock:
             console.setUnlocked(false)
-            return "ОКНА ЗАБЛОКИРОВАНЫ"
+            return tr("ОКНА ЗАБЛОКИРОВАНЫ")
         case .resetLayout:
             console.resetLayout()
-            return "РАСКЛАДКА ОКОН СБРОШЕНА"
+            return tr("РАСКЛАДКА ОКОН СБРОШЕНА")
         case .settings:
             apply(engine.handle(.closeConsole, now: now))
             onOpenSettings(nil)
             return nil
         case .next, .previous:
             switchConnection(command == .next ? 1 : -1, announce: false)
-            guard let active = prefs.connections.active else { return "ПОДКЛЮЧЕНИЙ НЕТ" }
-            return "ПОДКЛЮЧЕНИЕ: " + active.name.uppercased() + " · " + active.model.uppercased()
+            guard let active = prefs.connections.active else { return tr("ПОДКЛЮЧЕНИЙ НЕТ") }
+            return tr("ПОДКЛЮЧЕНИЕ: ") + active.name.uppercased() + " · " + active.model.uppercased()
         case .help, .clear, .shell:
             return nil
         }
@@ -627,6 +628,7 @@ final class CompanionController: NSObject {
         }
         console.model.character = prefs.character
         bubble.character = prefs.character
+        console.model.language = L10n.current
     }
 
 

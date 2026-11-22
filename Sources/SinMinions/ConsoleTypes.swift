@@ -12,8 +12,8 @@ enum ConsoleCommand: Int, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .spotlight: return "ПОИСК SPOTLIGHT"
-        case .chat: return "ЧАТ С ИИ"
+        case .spotlight: return tr("ПОИСК SPOTLIGHT")
+        case .chat: return tr("ЧАТ С ИИ")
         }
     }
 }
@@ -152,7 +152,7 @@ enum SpecialStat: Int, CaseIterable, Identifiable {
     var id: Int { rawValue }
     var letter: String { ["S", "P", "E", "C", "I", "A", "L"][rawValue] }
     var title: String {
-        ["СИЛА", "ВОСПРИЯТИЕ", "ВЫНОСЛИВОСТЬ", "ХАРИЗМА", "ИНТЕЛЛЕКТ", "ЛОВКОСТЬ", "УДАЧА"][rawValue]
+        [tr("СИЛА"), tr("ВОСПРИЯТИЕ"), tr("ВЫНОСЛИВОСТЬ"), tr("ХАРИЗМА"), tr("ИНТЕЛЛЕКТ"), tr("ЛОВКОСТЬ"), tr("УДАЧА")][rawValue]
     }
     var isActive: Bool { self == .strength || self == .perception || self == .endurance || self == .intelligence || self == .agility || self == .charisma }
 }
@@ -160,15 +160,15 @@ enum SpecialStat: Int, CaseIterable, Identifiable {
 /// Значения характеристик для экрана S.P.E.C.I.A.L.
 struct SpecialState: Equatable {
     var scaleLevel = 1
-    var scaleLabel = "РАЗМЕР 1,5×"
+    var scaleLabel = tr("РАЗМЕР 1,5×")
     var perceptionLevel = 0
-    var perceptionLabel = "ОБЛИК: КЛАССИЧЕСКИЙ"
+    var perceptionLabel = tr("ОБЛИК: КЛАССИЧЕСКИЙ")
     var agilityLevel = Agility.defaultLevel
-    var agilityLabel = "ОБЫЧНО"
+    var agilityLabel = tr("ОБЫЧНО")
     var enduranceLevel = 1
-    var enduranceLabel = "ЗАСЫПАЕТ ЧЕРЕЗ 5 МИН"
+    var enduranceLabel = tr("ЗАСЫПАЕТ ЧЕРЕЗ 5 МИН")
     var charismaLevel = Charisma.defaultLevel
-    var charismaLabel = "ОБЫЧНО (2–5 МИН)"
+    var charismaLabel = tr("ОБЫЧНО (2–5 МИН)")
     var intelligenceLabel = "—"
     var intelligenceCount = 0
 }

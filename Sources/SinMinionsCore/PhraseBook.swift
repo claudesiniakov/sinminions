@@ -153,6 +153,7 @@ public struct PhraseBook {
         let phrase = deck.removeLast()
         decks[key] = deck
         last = phrase
-        return phrase
+        // Реплики хранятся по-русски; на экран — на языке интерфейса.
+        return tr(phrase)
     }
 }

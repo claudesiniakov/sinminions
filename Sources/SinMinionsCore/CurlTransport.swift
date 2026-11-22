@@ -106,7 +106,7 @@ public enum CurlTransport {
         do {
             file = try caFile()
         } catch {
-            throw Failure(exitCode: -1, message: "не удалось подготовить сертификат: " + error.localizedDescription)
+            throw Failure(exitCode: -1, message: tr("не удалось подготовить сертификат: ") + error.localizedDescription)
         }
         let config = config(for: request, caFile: file.path)
         let box = ProcessBox()
@@ -132,7 +132,7 @@ public enum CurlTransport {
         do {
             try process.run()
         } catch {
-            throw Failure(exitCode: -1, message: "curl не запустился: " + error.localizedDescription)
+            throw Failure(exitCode: -1, message: tr("curl не запустился: ") + error.localizedDescription)
         }
         box.set(process)
         try? input.fileHandleForWriting.write(contentsOf: Data(config.utf8))
@@ -141,10 +141,10 @@ public enum CurlTransport {
         let errorText = String(data: errors.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
-            let line = errorText.split(separator: "\n").first.map(String.init) ?? "без пояснения"
+            let line = errorText.split(separator: "\n").first.map(String.init) ?? tr("без пояснения")
             throw Failure(exitCode: process.terminationStatus, message: line)
         }
-        guard let parsed = parse(data) else { throw Failure(exitCode: -2, message: "неожиданный вывод curl") }
+        guard let parsed = parse(data) else { throw Failure(exitCode: -2, message: tr("неожиданный вывод curl")) }
         return (parsed.body, parsed.status)
     }
 }

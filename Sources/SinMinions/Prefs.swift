@@ -8,9 +8,9 @@ enum Frequency: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .rare: return "Редко"
-        case .normal: return "Обычно"
-        case .often: return "Часто"
+        case .rare: return tr("Редко")
+        case .normal: return tr("Обычно")
+        case .often: return tr("Часто")
         }
     }
 
@@ -41,8 +41,8 @@ enum CompanionMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .minimal: return "Минимальный — Spotlight по двойному щелчку"
-        case .medium: return "Средний — терминал и монитор по двойному щелчку"
+        case .minimal: return tr("Минимальный — Spotlight по двойному щелчку")
+        case .medium: return tr("Средний — терминал и монитор по двойному щелчку")
         }
     }
 }
@@ -56,6 +56,13 @@ final class Prefs {
     static let sleepOptions: [Int] = [1, 5, 15, 0]
 
     var mode: CompanionMode { didSet { storeGlobal(mode.rawValue, "mode") } }
+    /// Язык интерфейса и реплик; «как в системе» — по языку macOS.
+    var language: AppLanguage {
+        didSet {
+            L10n.current = language.resolved()
+            storeGlobal(language.rawValue, "language")
+        }
+    }
     var connections: LLMConnections { didSet { storeGlobal(connections.json() ?? Data(), "llmConnections") } }
     /// Активный персонаж: на экране показан он, а настройки поведения ниже относятся к нему.
     var character: CompanionCharacter {
@@ -143,6 +150,8 @@ final class Prefs {
         talkFrequency = c.talkFrequency
         sleepMinutes = c.sleepMinutes
         hideInFullScreen = d.object(forKey: "hideInFullScreen") as? Bool ?? true
+        language = AppLanguage(rawValue: d.string(forKey: "language") ?? "") ?? .system
+        L10n.current = language.resolved()
         coffeeKeep = d.bool(forKey: "coffeeKeep")
         coffee = coffeeKeep && d.bool(forKey: "coffee")
     }

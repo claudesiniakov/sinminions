@@ -66,7 +66,7 @@ public enum DeepSeekAPI {
             return "\(total) \(currency)"
         }
         guard !amounts.isEmpty else { return nil }
-        let text = "баланс " + amounts.joined(separator: ", ")
-        return (json["is_available"] as? Bool) == false ? text + " (недостаточно для запросов)" : text
+        let text = tr("баланс ") + amounts.joined(separator: ", ")
+        return (json["is_available"] as? Bool) == false ? text + tr(" (недостаточно для запросов)") : text
     }
 }

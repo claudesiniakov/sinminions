@@ -11,15 +11,22 @@ final class ChatSession {
     static func systemPrompt(for character: CompanionCharacter) -> String {
         switch character {
         case .f:
-            return "Ты — Moth, призрак-компаньон на рабочем столе Mac. Отвечай по-русски, кратко (1–4 предложения), в духе терминала Fallout, без эмодзи."
+            return tr("Ты — Moth, призрак-компаньон на рабочем столе Mac. Отвечай по-русски, кратко (1–4 предложения), в духе терминала Fallout, без эмодзи.")
         case .ab:
-            return "Ты — золотой страж, коренастый воин в золочёном доспехе, компаньон на рабочем столе Mac. Отвечай по-русски, кратко (1–4 предложения), в суровом готическом тоне торжественного караульного. Без отсылок к Fallout и без эмодзи."
+            return tr("Ты — золотой страж, коренастый воин в золочёном доспехе, компаньон на рабочем столе Mac. Отвечай по-русски, кратко (1–4 предложения), в суровом готическом тоне торжественного караульного. Без отсылок к Fallout и без эмодзи.")
         }
     }
     static var systemPrompt: String { systemPrompt(for: .f) }
     private(set) var character: CompanionCharacter = .f
 
     /// Смена персонажа меняет тон ответов: обновляем системное сообщение, историю беседы оставляем.
+    /// Сменился язык: модель отвечает на новом языке, история беседы остаётся.
+    func refreshPrompt() {
+        if let first = history.first, first.role == .system {
+            history[0] = ChatMessage(.system, Self.systemPrompt(for: character))
+        }
+    }
+
     func setCharacter(_ new: CompanionCharacter) {
         guard new != character else { return }
         character = new
@@ -53,7 +60,7 @@ final class ChatSession {
             return
         }
         guard hasCredentials() else {
-            entries.append(ChatEntry(kind: .info, text: "НЕТ ПОДКЛЮЧЕНИЯ С КЛЮЧОМ — ОТКРЫВАЮ НАСТРОЙКИ"))
+            entries.append(ChatEntry(kind: .info, text: tr("НЕТ ПОДКЛЮЧЕНИЯ С КЛЮЧОМ — ОТКРЫВАЮ НАСТРОЙКИ")))
             needCredentials()
             return
         }
@@ -94,7 +101,7 @@ final class ChatSession {
         task = nil
         history.removeLast()
         isSending = false
-        entries.append(ChatEntry(kind: .info, text: "ЗАПРОС ПРЕРВАН"))
+        entries.append(ChatEntry(kind: .info, text: tr("ЗАПРОС ПРЕРВАН")))
     }
 
     func reset() {
@@ -109,10 +116,10 @@ final class ChatSession {
     /// Для снимка в CI: готовая переписка без обращения к сети.
     func loadDemo() {
         entries = [
-            ChatEntry(kind: .user, text: "привет, как дела?"),
-            ChatEntry(kind: .assistant, text: "всё под контролем, периметр чист. текст можно выделить мышью и скопировать по ⌘C.", speaker: "GIGACHAT"),
-            ChatEntry(kind: .user, text: "а если без шуток?"),
-            ChatEntry(kind: .error, text: "Сервис GigaChat недоступен (503)"),
+            ChatEntry(kind: .user, text: tr("привет, как дела?")),
+            ChatEntry(kind: .assistant, text: tr("всё под контролем, периметр чист. текст можно выделить мышью и скопировать по ⌘C."), speaker: "GIGACHAT"),
+            ChatEntry(kind: .user, text: tr("а если без шуток?")),
+            ChatEntry(kind: .error, text: tr("Сервис GigaChat недоступен (503)")),
         ]
     }
 }
@@ -166,6 +173,10 @@ final class ConsoleModel {
     }
     var coffee = false
     var outfit: Outfit = .armor
+    /// Язык интерфейса: при смене окна терминала и монитора перерисовываются целиком.
+    var language: AppLanguage = .ru {
+        didSet { if language != oldValue { chat.refreshPrompt() } }
+    }
     /// Выбранная буква S.P.E.C.I.A.L. в мониторе: её уровень меняют большие «−» и «+».
     var selectedStat: SpecialStat = .intelligence
     var llmConnections: [LLMConnectionRow] = []
@@ -207,7 +218,7 @@ final class ConsoleModel {
         if text.hasPrefix("/") {
             runSlash(text, output: .shell)
         } else {
-            shellLog.append("КОМАНДЫ НАЧИНАЮТСЯ СО «/». /HELP — СПИСОК.")
+            shellLog.append(tr("КОМАНДЫ НАЧИНАЮТСЯ СО «/». /HELP — СПИСОК."))
         }
         trimLog()
     }
@@ -230,7 +241,7 @@ final class ConsoleModel {
         case .notACommand:
             return
         case let .unknown(name):
-            say(["НЕИЗВЕСТНАЯ КОМАНДА \(name.uppercased()) — /HELP ПОКАЖЕТ СПИСОК"])
+            say([trf("НЕИЗВЕСТНАЯ КОМАНДА %@ — /HELP ПОКАЖЕТ СПИСОК", "\(name.uppercased())")])
         case let .command(command):
             switch command {
             case .help:
@@ -240,14 +251,14 @@ final class ConsoleModel {
                     shell.clear()
                 } else {
                     chat.reset()
-                    say(["ИСТОРИЯ ЧАТА ОЧИЩЕНА"])
+                    say([tr("ИСТОРИЯ ЧАТА ОЧИЩЕНА")])
                 }
             case .shell:
                 setShellMode(!shellMode)
                 if shellMode {
-                    shell.addInfo("ОБЫЧНЫЙ ТЕРМИНАЛ ZSH. EXIT ИЛИ /SHELL — НАЗАД.")
+                    shell.addInfo(tr("ОБЫЧНЫЙ ТЕРМИНАЛ ZSH. EXIT ИЛИ /SHELL — НАЗАД."))
                 } else if output == .chat {
-                    say(["ТЕРМИНАЛ КОМПАНЬОНА"])
+                    say([tr("ТЕРМИНАЛ КОМПАНЬОНА")])
                 }
             default:
                 if let reply = slashAction(command) { say([reply]) }

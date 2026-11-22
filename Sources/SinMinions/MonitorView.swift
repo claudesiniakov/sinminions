@@ -67,10 +67,10 @@ struct MonitorView: View {
 
     private var thermal: String {
         switch model.snapshot.thermal {
-        case .nominal: return "НОРМА"
-        case .fair: return "ПОВЫШЕН"
-        case .serious: return "ВЫСОКИЙ"
-        case .critical: return "КРИТИЧЕСКИЙ"
+        case .nominal: return tr("НОРМА")
+        case .fair: return tr("ПОВЫШЕН")
+        case .serious: return tr("ВЫСОКИЙ")
+        case .critical: return tr("КРИТИЧЕСКИЙ")
         @unknown default: return "—"
         }
     }
@@ -133,7 +133,7 @@ struct MonitorView: View {
                 }
                 VStack(spacing: 1) {
                     if isIntelligence {
-                        Text((model.llmName ?? "НЕТ ПОДКЛЮЧЕНИЙ").uppercased())
+                        Text((model.llmName ?? tr("НЕТ ПОДКЛЮЧЕНИЙ")).uppercased())
                             .lineLimit(1)
                             .truncationMode(.tail)
                         if let modelName = model.llmModelName {
@@ -150,7 +150,7 @@ struct MonitorView: View {
                             .multilineTextAlignment(.center)
                             .lineLimit(2)
                             .minimumScaleFactor(0.8)
-                        Text("УРОВЕНЬ \(level) ИЗ \(max(levels - 1, 0))").foregroundStyle(Term.dim)
+                        Text(trf("УРОВЕНЬ %@ ИЗ %@", "\(level)", "\(max(levels - 1, 0))")).foregroundStyle(Term.dim)
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -175,9 +175,9 @@ struct MonitorView: View {
     /// Выбранное подключение подсвечено; длинный список прокручивается.
     private var limitsBlock: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("ЛИМИТЫ").foregroundStyle(Term.green).bold()
+            Text(tr("ЛИМИТЫ")).foregroundStyle(Term.green).bold()
             if model.llmConnections.isEmpty {
-                Text("ПОДКЛЮЧЕНИЙ НЕТ").foregroundStyle(Term.dim)
+                Text(tr("ПОДКЛЮЧЕНИЙ НЕТ")).foregroundStyle(Term.dim)
             } else {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 5) {
@@ -197,7 +197,7 @@ struct MonitorView: View {
         case .loading: text = "…"
         case let .value(value): text = value
         case let .failed(reason): text = reason; warning = true
-        case .noKey: text = "нет ключа"; warning = true
+        case .noKey: text = tr("нет ключа"); warning = true
         case .unsupported: text = "—"
         }
         return VStack(alignment: .leading, spacing: 0) {
@@ -246,28 +246,28 @@ struct MonitorView: View {
 
     var body: some View {
         let s = model.snapshot
-        TerminalFrame(title: model.character == .ab ? model.character.monitorName : "\(model.character.monitorName) // МОНИТОР", window: .monitor, model: model) {
+        TerminalFrame(title: model.character == .ab ? model.character.monitorName : trf("%@ // МОНИТОР", "\(model.character.monitorName)"), window: .monitor, model: model) {
             // Если окно сделали ниже содержимого, оно прокручивается.
             ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 9) {
                 intelligence
                 Rectangle().fill(Term.dark).frame(height: 1)
-                gauge("ЦП", s.cpu.map { Gauge.percent($0) } ?? "…", s.cpu ?? 0)
-                gauge("ПАМЯТЬ", "\(MetricFormat.bytes(s.memoryUsed)) / \(MetricFormat.bytes(s.memoryTotal))",
+                gauge(tr("ЦП"), s.cpu.map { Gauge.percent($0) } ?? "…", s.cpu ?? 0)
+                gauge(tr("ПАМЯТЬ"), "\(MetricFormat.bytes(s.memoryUsed)) / \(MetricFormat.bytes(s.memoryTotal))",
                       fraction(s.memoryUsed, s.memoryTotal))
-                gauge("ДИСК", "\(MetricFormat.bytes(s.diskUsed)) / \(MetricFormat.bytes(s.diskTotal))",
+                gauge(tr("ДИСК"), "\(MetricFormat.bytes(s.diskUsed)) / \(MetricFormat.bytes(s.diskTotal))",
                       fraction(s.diskUsed, s.diskTotal))
                 if let battery = s.battery {
-                    gauge(s.onAC ? "БАТАРЕЯ ⚡" : "БАТАРЕЯ", "\(battery)%", Double(battery) / 100)
+                    gauge(s.onAC ? tr("БАТАРЕЯ ⚡") : tr("БАТАРЕЯ"), "\(battery)%", Double(battery) / 100)
                 }
                 Rectangle().fill(Term.dark).frame(height: 1)
-                line("СЕТЬ ↓", MetricFormat.rate(s.netDown))
-                line("СЕТЬ ↑", MetricFormat.rate(s.netUp))
-                line("НАГРЕВ", thermal)
-                line("В РАБОТЕ", MetricFormat.uptime(s.uptime))
+                line(tr("СЕТЬ ↓"), MetricFormat.rate(s.netDown))
+                line(tr("СЕТЬ ↑"), MetricFormat.rate(s.netUp))
+                line(tr("НАГРЕВ"), thermal)
+                line(tr("В РАБОТЕ"), MetricFormat.uptime(s.uptime))
                 if model.coffee {
                     // Режим «кофе»: система и экран не засыпают, пока он включён.
-                    line("КОФЕ", "ВКЛ · ЭКРАН НЕ ГАСНЕТ")
+                    line(tr("КОФЕ"), tr("ВКЛ · ЭКРАН НЕ ГАСНЕТ"))
                         .foregroundStyle(Term.green)
                         .bold()
                 }

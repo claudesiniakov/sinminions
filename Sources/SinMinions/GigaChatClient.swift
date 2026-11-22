@@ -95,7 +95,7 @@ actor GigaChatClient {
                     UserDefaults.standard.set(preferCurl, forKey: Self.preferCurlKey)
                     return result
                 } catch let other as TransportFailure {
-                    throw TransportFailure(text: failure.text + "; запасной путь: " + other.text, canFallBack: false)
+                    throw TransportFailure(text: failure.text + tr("; запасной путь: ") + other.text, canFallBack: false)
                 }
             }
         } catch let failure as TransportFailure {
@@ -121,7 +121,7 @@ actor GigaChatClient {
                 if Task.isCancelled { throw CancellationError() }
                 let canFallBack = failure.exitCode < 0 || CurlTransport.tlsExitCodes.contains(failure.exitCode)
                 throw TransportFailure(
-                    text: "curl: \(failure.message) (код \(failure.exitCode))", canFallBack: canFallBack
+                    text: trf("curl: %@ (код %@)", "\(failure.message)", "\(failure.exitCode)"), canFallBack: canFallBack
                 )
             }
         }
@@ -138,21 +138,21 @@ actor GigaChatClient {
     private static func describe(_ error: URLError) -> String {
         // Вложенные коды системы: по ним видно, на каком шаге оборвалось соединение.
         let ns = error as NSError
-        var codes = ["код \(error.code.rawValue)"]
-        if let stream = ns.userInfo["_kCFStreamErrorCodeKey"] as? Int { codes.append("поток \(stream)") }
-        if let inner = (ns.userInfo[NSUnderlyingErrorKey] as? NSError)?.code { codes.append("вложенная \(inner)") }
+        var codes = [trf("код %@", "\(error.code.rawValue)")]
+        if let stream = ns.userInfo["_kCFStreamErrorCodeKey"] as? Int { codes.append(trf("поток %@", "\(stream)")) }
+        if let inner = (ns.userInfo[NSUnderlyingErrorKey] as? NSError)?.code { codes.append(trf("вложенная %@", "\(inner)")) }
         let suffix = " (" + codes.joined(separator: ", ") + ")"
-        let trust = GigaChatTrust.lastNote.map { ". Проверка доверия: " + $0 } ?? ""
+        let trust = GigaChatTrust.lastNote.map { tr(". Проверка доверия: ") + $0 } ?? ""
         switch error.code {
-        case .notConnectedToInternet, .networkConnectionLost: return "Нет подключения к сети" + suffix
-        case .timedOut: return "Сервер не ответил вовремя" + suffix
+        case .notConnectedToInternet, .networkConnectionLost: return tr("Нет подключения к сети") + suffix
+        case .timedOut: return tr("Сервер не ответил вовремя") + suffix
         case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed:
-            return "Не удалось связаться с сервером GigaChat" + suffix
+            return tr("Не удалось связаться с сервером GigaChat") + suffix
         case .secureConnectionFailed:
-            return "Встроенный клиент не установил защищённое соединение" + suffix + trust
+            return tr("Встроенный клиент не установил защищённое соединение") + suffix + trust
         case .serverCertificateUntrusted, .serverCertificateHasBadDate, .serverCertificateHasUnknownRoot,
              .serverCertificateNotYetValid:
-            return "Не удалось проверить сертификат сервера GigaChat" + suffix + trust
+            return tr("Не удалось проверить сертификат сервера GigaChat") + suffix + trust
         default:
             return error.localizedDescription + suffix
         }

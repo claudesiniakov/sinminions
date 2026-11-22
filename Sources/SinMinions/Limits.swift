@@ -80,11 +80,11 @@ final class LimitsStore {
         }
         do {
             let text = try await fetch(connection, key)
-            set(connection, signature, text.map { State.value($0) } ?? .failed("нет данных"))
+            set(connection, signature, text.map { State.value($0) } ?? .failed(tr("нет данных")))
         } catch is CancellationError {
             return
         } catch {
-            set(connection, signature, .failed((error as? LLMError)?.shortDescription ?? "ошибка"))
+            set(connection, signature, .failed((error as? LLMError)?.shortDescription ?? tr("ошибка")))
         }
     }
 
@@ -94,7 +94,7 @@ final class LimitsStore {
 
     /// Для снимков в CI: готовые значения без обращения к сети.
     private func loadDemo(_ connections: [LLMConnection]) {
-        let values = ["100,5 ТЫС", "3 МЛН", "110.00 CNY"]
+        let values = [tr("100,5 ТЫС"), tr("3 МЛН"), "110.00 CNY"]
         for (index, connection) in connections.enumerated() {
             set(connection, Self.signature(connection), .value(values[index % values.count]))
         }

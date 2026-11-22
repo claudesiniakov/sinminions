@@ -29,14 +29,14 @@ public enum CompanionCharacter: String, CaseIterable, Sendable, Identifiable {
     public var terminalName: String {
         switch self {
         case .f: return "MOTH-OS"
-        case .ab: return "КОГИТАТОР"
+        case .ab: return tr("КОГИТАТОР")
         }
     }
 
     public var monitorName: String {
         switch self {
-        case .f: return "СИСТЕМА"
-        case .ab: return "АУСПЕКС"
+        case .f: return tr("СИСТЕМА")
+        case .ab: return tr("АУСПЕКС")
         }
     }
 }

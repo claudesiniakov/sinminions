@@ -56,9 +56,9 @@ public enum ReleaseFeedError: LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .invalidResponse: return "Сервер обновлений вернул неожиданный ответ"
-        case .noArchive: return "В релизе нет архива SinMinions.zip"
-        case let .badVersion(tag): return "Не удалось разобрать номер версии «\(tag)»"
+        case .invalidResponse: return tr("Сервер обновлений вернул неожиданный ответ")
+        case .noArchive: return tr("В релизе нет архива SinMinions.zip")
+        case let .badVersion(tag): return trf("Не удалось разобрать номер версии «%@»", "\(tag)")
         }
     }
 }

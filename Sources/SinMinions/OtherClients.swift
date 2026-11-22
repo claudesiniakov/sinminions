@@ -22,15 +22,15 @@ enum HTTPTransport {
     }
 
     private static func describe(_ error: URLError, service: String) -> String {
-        let suffix = " (код \(error.code.rawValue))"
+        let suffix = trf(" (код %@)", "\(error.code.rawValue)")
         switch error.code {
-        case .notConnectedToInternet, .networkConnectionLost: return "Нет подключения к сети" + suffix
-        case .timedOut: return "Сервер не ответил вовремя" + suffix
+        case .notConnectedToInternet, .networkConnectionLost: return tr("Нет подключения к сети") + suffix
+        case .timedOut: return tr("Сервер не ответил вовремя") + suffix
         case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed:
-            return "Не удалось связаться с сервером \(service)" + suffix
+            return trf("Не удалось связаться с сервером %@", "\(service)") + suffix
         case .secureConnectionFailed, .serverCertificateUntrusted, .serverCertificateHasBadDate,
              .serverCertificateHasUnknownRoot, .serverCertificateNotYetValid:
-            return "Не удалось установить защищённое соединение с \(service)" + suffix
+            return trf("Не удалось установить защищённое соединение с %@", "\(service)") + suffix
         default: return error.localizedDescription + suffix
         }
     }
@@ -39,7 +39,7 @@ enum HTTPTransport {
     static func modelCount(_ data: Data) -> String? {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let items = json["data"] as? [Any] else { return nil }
-        return "моделей: \(items.count)"
+        return trf("моделей: %@", "\(items.count)")
     }
 }
 

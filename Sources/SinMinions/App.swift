@@ -90,6 +90,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 prefs.connections.setActive(prefs.connections.items[1].id)
             }
+            // Снимки — на русском (в CI язык системы английский).
+            prefs.language = .ru
             await wait(2)
             controller.announce(.ambient, force: true)
             await wait(1)
@@ -114,7 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             demoMark("chat")
             await wait(4)
             // Ввод в чат: набираем текст настоящими событиями клавиатуры и смотрим, что попало в строку.
-            await controller.typeInConsoleForDemo("привет")
+            await controller.typeInConsoleForDemo(tr("привет"))
             await wait(1)
             fputs("DEMO input after system typing: [\(controller.consoleInputForDemo)] \(controller.debugConsoleForDemo())\n", stderr)
             controller.sendKeysForDemo("ab")
@@ -126,6 +128,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             await wait(1.5)
             demoMark("unlock")
             await wait(4)
+            // Язык интерфейса: терминал и монитор на английском.
+            prefs.language = .en
+            controller.showHelpForDemo()
+            await wait(2)
+            demoMark("lang_en")
+            await wait(3)
+            prefs.language = .ru
+            await wait(1)
             // Обычный терминал: переключатель MOTH | ZSH и настоящие команды.
             controller.shellForDemo(true)
             await wait(3.5)
@@ -232,20 +242,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let main = NSMenu()
         main.addItem(NSMenuItem())
         let editItem = NSMenuItem()
-        let edit = NSMenu(title: "Правка")
-        edit.addItem(withTitle: "Отменить", action: Selector(("undo:")), keyEquivalent: "z")
-        let redo = edit.addItem(withTitle: "Повторить", action: Selector(("redo:")), keyEquivalent: "z")
+        let edit = NSMenu(title: tr("Правка"))
+        edit.addItem(withTitle: tr("Отменить"), action: Selector(("undo:")), keyEquivalent: "z")
+        let redo = edit.addItem(withTitle: tr("Повторить"), action: Selector(("redo:")), keyEquivalent: "z")
         redo.keyEquivalentModifierMask = [.command, .shift]
         edit.addItem(.separator())
-        edit.addItem(withTitle: "Вырезать", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        edit.addItem(withTitle: "Копировать", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        edit.addItem(withTitle: "Вставить", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        edit.addItem(withTitle: "Выбрать всё", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        edit.addItem(withTitle: tr("Вырезать"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: tr("Копировать"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: tr("Вставить"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: tr("Выбрать всё"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         editItem.submenu = edit
         main.addItem(editItem)
         let windowItem = NSMenuItem()
-        let window = NSMenu(title: "Окно")
-        window.addItem(withTitle: "Закрыть", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        let window = NSMenu(title: tr("Окно"))
+        window.addItem(withTitle: tr("Закрыть"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         windowItem.submenu = window
         main.addItem(windowItem)
         NSApp.mainMenu = main

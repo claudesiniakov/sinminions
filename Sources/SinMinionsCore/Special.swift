@@ -19,7 +19,7 @@ public enum Agility {
     }
 
     public static func title(level: Int) -> String {
-        ["МЕДЛЕННО", "ОБЫЧНО", "БЫСТРО", "МОЛНИЕНОСНО"][clamp(level)]
+        [tr("МЕДЛЕННО"), tr("ОБЫЧНО"), tr("БЫСТРО"), tr("МОЛНИЕНОСНО")][clamp(level)]
     }
 }
 
@@ -49,10 +49,10 @@ public enum Endurance {
 
     public static func title(level: Int, sleepMinutes: Int) -> String {
         switch clamp(level) {
-        case 0: return "СПИТ"
-        case 1: return "ЗАСЫПАЕТ ЧЕРЕЗ \(sleepMinutes > 0 ? sleepMinutes : defaultMinutes) МИН"
-        case coffeeLevel: return "КОФЕ: НЕ ДАЁТ НОУТБУКУ УСНУТЬ"
-        default: return "НЕ ЗАСЫПАЕТ"
+        case 0: return tr("СПИТ")
+        case 1: return trf("ЗАСЫПАЕТ ЧЕРЕЗ %@ МИН", "\(sleepMinutes > 0 ? sleepMinutes : defaultMinutes)")
+        case coffeeLevel: return tr("КОФЕ: НЕ ДАЁТ НОУТБУКУ УСНУТЬ")
+        default: return tr("НЕ ЗАСЫПАЕТ")
         }
     }
 }
@@ -65,7 +65,7 @@ public enum Charisma {
     public static func clamp(_ level: Int) -> Int { min(max(level, 0), levels - 1) }
 
     public static func title(level: Int) -> String {
-        ["МОЛЧИТ", "РЕДКО (5–15 МИН)", "ОБЫЧНО (2–5 МИН)", "ЧАСТО (8–14 С)"][clamp(level)]
+        [tr("МОЛЧИТ"), tr("РЕДКО (5–15 МИН)"), tr("ОБЫЧНО (2–5 МИН)"), tr("ЧАСТО (8–14 С)")][clamp(level)]
     }
 }
 
@@ -82,11 +82,11 @@ public enum GhostStyle: Int, CaseIterable, Sendable {
 
     public var title: String {
         switch self {
-        case .classic: return "КЛАССИЧЕСКИЙ"
-        case .detailed: return "ДЕТАЛЬНЫЙ"
-        case .warden: return "СМОТРИТЕЛЬ"
-        case .terminal: return "ТЕРМИНАЛ"
-        case .radiation: return "РАДИАЦИЯ"
+        case .classic: return tr("КЛАССИЧЕСКИЙ")
+        case .detailed: return tr("ДЕТАЛЬНЫЙ")
+        case .warden: return tr("СМОТРИТЕЛЬ")
+        case .terminal: return tr("ТЕРМИНАЛ")
+        case .radiation: return tr("РАДИАЦИЯ")
         }
     }
 

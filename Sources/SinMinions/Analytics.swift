@@ -69,7 +69,7 @@ struct AnalyticsView: View {
             header
             if keys.isEmpty {
                 Spacer()
-                Text("ДАННЫХ ПОКА НЕТ.\nЗАДАЙТЕ ВОПРОС В ЧАТЕ — РАСХОД ТОКЕНОВ ПРИДЁТ В ОТВЕТЕ API.")
+                Text(tr("ДАННЫХ ПОКА НЕТ.\nЗАДАЙТЕ ВОПРОС В ЧАТЕ — РАСХОД ТОКЕНОВ ПРИДЁТ В ОТВЕТЕ API."))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(Term.dim)
                     .frame(maxWidth: .infinity)
@@ -90,10 +90,10 @@ struct AnalyticsView: View {
     private var header: some View {
         HStack(spacing: 8) {
             if character == .ab { Text("✠").font(Term.title) }
-            Text(character == .ab ? "ЛЕТОПИСЬ ТОКЕНОВ" : "АНАЛИТИКА ТОКЕНОВ")
+            Text(character == .ab ? tr("ЛЕТОПИСЬ ТОКЕНОВ") : tr("АНАЛИТИКА ТОКЕНОВ"))
                 .font(Term.title).tracking(1).foregroundStyle(Term.dim)
             Spacer()
-            Button("[ЗАКРЫТЬ]", action: onClose)
+            Button(tr("[ЗАКРЫТЬ]"), action: onClose)
                 .buttonStyle(.plain)
                 .font(Term.small)
                 .foregroundStyle(Term.dim)
@@ -134,20 +134,20 @@ struct AnalyticsView: View {
                     .bold()
                     .lineLimit(1)
                 Spacer(minLength: 4)
-                Text("ПОСЛЕДНИЙ: " + entry.lastUsed.formatted(.dateTime.day().month(.twoDigits).hour().minute()))
+                Text(tr("ПОСЛЕДНИЙ: ") + entry.lastUsed.formatted(.dateTime.day().month(.twoDigits).hour().minute()))
                     .font(Term.small)
                     .foregroundStyle(Term.dim)
             }
             HStack(spacing: 8) {
-                tile("СЕГОДНЯ", ledger.totals(key, lastDays: 1, now: now))
-                tile("7 ДНЕЙ", ledger.totals(key, lastDays: 7, now: now))
-                tile("30 ДНЕЙ", ledger.totals(key, lastDays: 30, now: now))
-                tile("ВСЕГО", all)
+                tile(tr("СЕГОДНЯ"), ledger.totals(key, lastDays: 1, now: now))
+                tile(tr("7 ДНЕЙ"), ledger.totals(key, lastDays: 7, now: now))
+                tile(tr("30 ДНЕЙ"), ledger.totals(key, lastDays: 30, now: now))
+                tile(tr("ВСЕГО"), all)
             }
             chart(ledger.series(key, days: 14, now: now))
             VStack(alignment: .leading, spacing: 3) {
-                row("СРЕДНЕЕ НА ЗАПРОС", UsageLedger.short(all.perRequest) + " ТОК.")
-                row("ДОЛЯ ОТВЕТА", all.total == 0 ? "—" : "\(all.output * 100 / all.total)%")
+                row(tr("СРЕДНЕЕ НА ЗАПРОС"), UsageLedger.short(all.perRequest) + tr(" ТОК."))
+                row(tr("ДОЛЯ ОТВЕТА"), all.total == 0 ? "—" : "\(all.output * 100 / all.total)%")
                 balance(entry)
             }
             .font(Term.small)
@@ -163,7 +163,7 @@ struct AnalyticsView: View {
                 .foregroundStyle(Term.dim)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-            Text("ЗАПРОСОВ: \(totals.requests)")
+            Text(trf("ЗАПРОСОВ: %@", "\(totals.requests)"))
                 .font(.system(size: 9.5, design: .monospaced))
                 .foregroundStyle(Term.dim)
         }
@@ -183,17 +183,17 @@ struct AnalyticsView: View {
         let bars = series.flatMap { item -> [Bar] in
             let label = String(item.day.suffix(5).split(separator: "-").reversed().joined(separator: "."))
             return [
-                Bar(id: item.day + "in", day: label, part: "ВХОД", value: item.totals.input),
-                Bar(id: item.day + "out", day: label, part: "ОТВЕТ", value: item.totals.output),
+                Bar(id: item.day + "in", day: label, part: tr("ВХОД"), value: item.totals.input),
+                Bar(id: item.day + "out", day: label, part: tr("ОТВЕТ"), value: item.totals.output),
             ]
         }
         return VStack(alignment: .leading, spacing: 4) {
-            Text("ТОКЕНЫ ПО ДНЯМ · 14 ДНЕЙ").font(Term.small).foregroundStyle(Term.dim)
+            Text(tr("ТОКЕНЫ ПО ДНЯМ · 14 ДНЕЙ")).font(Term.small).foregroundStyle(Term.dim)
             Chart(bars) { bar in
-                BarMark(x: .value("День", bar.day), y: .value("Токены", bar.value))
-                    .foregroundStyle(by: .value("Часть", bar.part))
+                BarMark(x: .value(tr("День"), bar.day), y: .value(tr("Токены"), bar.value))
+                    .foregroundStyle(by: .value(tr("Часть"), bar.part))
             }
-            .chartForegroundStyleScale(["ВХОД": Term.dim, "ОТВЕТ": Term.green])
+            .chartForegroundStyleScale([tr("ВХОД"): Term.dim, tr("ОТВЕТ"): Term.green])
             .chartLegend(position: .top, alignment: .trailing)
             .chartXAxis {
                 AxisMarks { _ in
@@ -228,17 +228,17 @@ struct AnalyticsView: View {
         let connection = connections.first { $0.provider == entry.provider && $0.model == entry.model }
             ?? connections.first { $0.provider == entry.provider }
         if !entry.provider.supportsLimits {
-            row("ОСТАТОК (API)", "СЕРВИС НЕ ОТДАЁТ ПО КЛЮЧУ")
+            row(tr("ОСТАТОК (API)"), tr("СЕРВИС НЕ ОТДАЁТ ПО КЛЮЧУ"))
         } else if let connection {
             switch limits.state(for: connection) ?? .loading {
-            case .loading: row("ОСТАТОК (API)", "…")
-            case let .value(value): row("ОСТАТОК (API)", value.uppercased())
-            case let .failed(reason): row("ОСТАТОК (API)", reason.uppercased()).foregroundStyle(Term.amber)
-            case .noKey: row("ОСТАТОК (API)", "НЕТ КЛЮЧА").foregroundStyle(Term.amber)
-            case .unsupported: row("ОСТАТОК (API)", "—")
+            case .loading: row(tr("ОСТАТОК (API)"), "…")
+            case let .value(value): row(tr("ОСТАТОК (API)"), value.uppercased())
+            case let .failed(reason): row(tr("ОСТАТОК (API)"), reason.uppercased()).foregroundStyle(Term.amber)
+            case .noKey: row(tr("ОСТАТОК (API)"), tr("НЕТ КЛЮЧА")).foregroundStyle(Term.amber)
+            case .unsupported: row(tr("ОСТАТОК (API)"), "—")
             }
         } else {
-            row("ОСТАТОК (API)", "ПОДКЛЮЧЕНИЕ УДАЛЕНО")
+            row(tr("ОСТАТОК (API)"), tr("ПОДКЛЮЧЕНИЕ УДАЛЕНО"))
         }
     }
 }
@@ -293,7 +293,7 @@ final class AnalyticsWindow {
         )
         panel.titlebarAppearsTransparent = true
         panel.titleVisibility = .hidden
-        panel.title = "Аналитика токенов"
+        panel.title = tr("Аналитика токенов")
         panel.appearance = NSAppearance(named: .darkAqua)
         panel.level = .floating
         panel.isMovableByWindowBackground = true

@@ -2,7 +2,11 @@ import Foundation
 
 /// Гимн стража: строки, которые он поёт по очереди.
 public enum Anthem {
-    public static let lines: [String] = [
+    /// Строки на текущем языке интерфейса.
+    public static var lines: [String] { original.map(tr) }
+
+    /// Авторский текст.
+    public static let original: [String] = [
         "Мы не просим наград, мы не просим венца,",
         "нам не нужно ни звёзд, ни щедрот, ни дворца,",
         "мы живём за одно — за движенье лица,",
