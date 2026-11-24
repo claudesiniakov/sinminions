@@ -65,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         timer.tolerance = 300
         RunLoop.main.add(timer, forMode: .common)
         checkTimer = timer
+        Updater.confirmUpdatedLaunch()
 
         if ProcessInfo.processInfo.environment["SINMINIONS_DEMO"] != nil { runDemo(controller) }
     }
@@ -220,6 +221,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             await wait(3)
             controller.stopPlayForDemo()
             await wait(1)
+            controller.setCharacterForDemo(.v)
+            await wait(1)
+            controller.announce(.charging, force: true)
+            demoMark("v_dialog")
+            await wait(3)
+            controller.view.setWalking(true)
+            demoMark("v_walk")
+            await wait(3)
+            controller.view.setWalking(false)
+            controller.view.hop()
+            demoMark("v_wave")
+            await wait(3)
+            controller.view.spin()
+            demoMark("v_stars")
+            await wait(3)
+            controller.apply([.showFind])
+            demoMark("v_find")
+            await wait(3)
             controller.setCharacterForDemo(.f)
             await wait(1)
             controller.closeConsoleForDemo()

@@ -313,7 +313,8 @@ final class Updater {
         guard version == expected else {
             throw UpdateError(trf("Версия в архиве (%@) не совпадает с релизом %@", "\(version?.description ?? "?")", "\(expected)"))
         }
-        try run("/usr/bin/codesign", ["--verify", "--deep", "--strict", newApp.path])
+        try run("/usr/bin/codesign", ["--verify", "--deep", "--strict",
+                                    #"-R=certificate leaf = H"6AF0CB9419CE2D6A8AFD7F5460F1EA51DA557FAE""#, newApp.path])
         _ = try? run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", newApp.path])
     }
 
@@ -341,6 +342,19 @@ final class Updater {
         return p.terminationStatus
     }
 
+    private static func launchMarker(_ token: UUID) -> URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("SinMinions-started-" + token.uuidString)
+    }
+
+    static func confirmUpdatedLaunch() {
+        guard let value = ProcessInfo.processInfo.environment["SINMINIONS_UPDATE_TOKEN"],
+              let token = UUID(uuidString: value) else { return }
+        // Проверяем, что цикл событий продолжает работать после инициализации окон.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            FileManager.default.createFile(atPath: launchMarker(token).path, contents: Data())
+        }
+    }
+
     /// Скрипт ждёт выхода приложения (не дольше 30 с), меняет бандл с откатом при ошибке
     /// и запускает новую версию. Весь вывод — в журнал обновлений.
     private func launchReplacement(newApp: URL, log: URL) throws {
@@ -356,28 +370,37 @@ final class Updater {
           if [ $i -gt 150 ]; then echo "приложение не вышло за 30 с — завершаю"; kill -9 "$PID"; sleep 1; fi
           sleep 0.2
         done
-        BACKUP="$OLD.sinminions-previous"
-        rm -rf "$BACKUP"
-        if mv "$OLD" "$BACKUP"; then
-          if mv "$NEW" "$OLD" || ditto "$NEW" "$OLD"; then
-            rm -rf "$BACKUP"
-            xattr -dr com.apple.quarantine "$OLD" 2>/dev/null
-            echo "$(date '+%F %T') скрипт: новая версия установлена"
-          else
-            echo "$(date '+%F %T') скрипт: замена не удалась, возвращаю прежнюю версию"
-            rm -rf "$OLD"; mv "$BACKUP" "$OLD"
-          fi
-        else
-          echo "$(date '+%F %T') скрипт: не удалось убрать старую версию"
+        # Отдельная папка на том же томе: переименование старого бандла атомарно.
+        STORE=$(mktemp -d "$OLD.rollback.XXXXXX") || { open "$OLD"; exit 1; }
+        BACKUP="$STORE/SinMinions.app"
+        mv "$OLD" "$BACKUP" || { rmdir "$STORE"; open "$OLD"; exit 1; }
+        if ditto "$NEW" "$OLD"; then
+          SINMINIONS_UPDATE_TOKEN="$5" "$OLD/Contents/MacOS/SinMinions" &
+          CHILD=$!
+          i=0
+          while kill -0 "$CHILD" 2>/dev/null && [ "$i" -lt 150 ]; do
+            if [ -f "$6" ]; then
+              rm -rf "$STORE"
+              rm -f "$6"
+              exit 0
+            fi
+            sleep 0.2
+            i=$((i+1))
+          done
+          kill -KILL "$CHILD" 2>/dev/null || true
+          wait "$CHILD" 2>/dev/null || true
         fi
-        open "$OLD"
+        echo "Новая версия не подтвердила запуск, восстанавливаю прежнюю"
+        rm -rf "$OLD"
+        mv "$BACKUP" "$OLD" && rmdir "$STORE" && open "$OLD"
         """
         let scriptURL = newApp.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("install.sh")
         try script.write(to: scriptURL, atomically: true, encoding: .utf8)
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/sh")
+        let token = UUID()
         p.arguments = [scriptURL.path, String(ProcessInfo.processInfo.processIdentifier),
-                       Self.installURL.path, newApp.path, log.path]
+                       Self.installURL.path, newApp.path, log.path, token.uuidString, Self.launchMarker(token).path]
         p.standardInput = FileHandle.nullDevice
         p.standardOutput = FileHandle.nullDevice
         p.standardError = FileHandle.nullDevice

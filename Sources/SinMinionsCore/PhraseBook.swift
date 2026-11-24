@@ -130,7 +130,15 @@ public struct PhraseBook {
             case .shooed: return ["увидимся после перерыва"]
             case .scared: return ["вот это резкий рост!"]
             case .searching: return ["где же мой бриф?", "ищу зацепки для кампании…", "проверю, что тут есть"]
-            default: return ["кому это будет полезно?", "проверим гипотезу?", "а что говорят цифры?"]
+            case .charging: return ["питание подключено", "заряд растёт"]
+            case .lowBattery: return ["заряда маловато", "пора искать розетку"]
+            case .updateAvailable: return ["есть обновление — загляни в меню"]
+            case .needAccess, .spotlightOff: return byKind[kind] ?? []
+            case .teleport: return ["а вот и я"]
+            case .curious: return ["что тут у тебя?"]
+            case .boo: return ["бу!"]
+            case .playing: return ["есть!"]
+            case .ambient: return ["кому это будет полезно?", "проверим гипотезу?", "а что говорят цифры?"]
             }
         }
         if character == .ab {

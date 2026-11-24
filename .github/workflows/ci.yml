@@ -70,10 +70,15 @@ jobs:
           SINMINIONS_DEMO=1 SINMINIONS_SHOT_DIR="$PWD/build" build/SinMinions.app/Contents/MacOS/SinMinions > smoke.log 2>&1 &
           PID=$!
           # Приложение само проходит сцены и перед каждой ставит метку <сцена>.ready — по ней делается снимок.
-          for scene in screen settings llm console chat typing unlock lang_en shell style1 style2 style3 style4 analytics coffee ab ab_shell ab_cup ab_cheer ab_sit ab_pajama ab_sing ab_find ab_play search find teleport; do
+          for scene in screen settings llm console chat typing unlock lang_en shell style1 style2 style3 style4 analytics coffee ab ab_shell ab_cup ab_cheer ab_sit ab_pajama ab_sing ab_find ab_play v_dialog v_walk v_wave v_stars v_find search find teleport; do
             for i in $(seq 1 120); do [ -f "build/$scene.ready" ] && break; sleep 0.5; done
-            sleep 0.5
-            screencapture -x "build/$scene.png" || true
+            if [ ! -f "build/$scene.ready" ]; then
+              cat smoke.log
+              echo "::error::Сцена $scene не подтвердила готовность"
+              exit 1
+            fi
+            screencapture -x "build/$scene.png"
+            test -s "build/$scene.png"
             rm -f "build/$scene.ready"
           done
           if kill -0 $PID 2>/dev/null; then
@@ -118,6 +123,7 @@ jobs:
             build/ab_sing.png
             build/ab_find.png
             build/ab_play.png
+            build/v_*.png
             build/search.png
             build/find.png
             build/chat.png

@@ -55,8 +55,8 @@ final class ChatSession {
     func submit() {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !isSending else { return }
-        input = ""
         if text.hasPrefix("/") {
+            input = ""
             entries.append(ChatEntry(kind: .user, text: text))
             onSlash(text)
             return
@@ -67,6 +67,7 @@ final class ChatSession {
             return
         }
         entries.append(ChatEntry(kind: .user, text: text))
+        input = ""
         history.append(ChatMessage(.user, text))
         isSending = true
         let snapshot = history

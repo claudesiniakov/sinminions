@@ -60,6 +60,9 @@ if [ "$IDENTITY" != "-" ] && ! grep -q "certificate leaf" build/requirement.txt;
   exit 1
 fi
 rm build/requirement.txt
+if [[ "$IDENTITY" != "-" || "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+  codesign --verify --deep --strict '-R=certificate leaf = H"6AF0CB9419CE2D6A8AFD7F5460F1EA51DA557FAE"' "$APP"
+fi
 
 ditto -c -k --keepParent "$APP" build/SinMinions.zip
 # Контрольная сумма для проверки обновления внутри приложения.
