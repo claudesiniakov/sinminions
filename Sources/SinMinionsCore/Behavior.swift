@@ -2,7 +2,7 @@ import Foundation
 
 /// Повод для реплики.
 public enum PhraseKind: String, Sendable, CaseIterable {
-    case ambient, click, charging, lowBattery, wake, updateAvailable, needAccess, spotlightOff, teleport, scared, curious, boo, shooed, searching, playing
+    case ambient, click, charging, lowBattery, wake, updateAvailable, teleport, scared, curious, boo, shooed, searching, playing
 }
 
 public struct BehaviorConfig: Equatable, Sendable {
@@ -18,9 +18,6 @@ public struct BehaviorConfig: Equatable, Sendable {
     public var sleepAfter: Double? = 300
     /// После перетаскивания компаньон остаётся на месте не меньше этого времени.
     public var holdAfterDrag: Double = 60
-    public var spotlightEnabled = true
-    /// Средний режим: двойной щелчок открывает терминал и монитор вместо Spotlight.
-    public var consoleEnabled = false
     /// Телепорты через порталы; в настройках приложения включены по умолчанию.
     public var teleportEnabled = false
     /// Пауза между телепортами, секунды.
@@ -79,7 +76,6 @@ public enum Effect: Equatable, Sendable {
     case say(PhraseKind), hideBubble
     case fallAsleep, wakeUp
     case hop
-    case openSpotlight
     case openConsole, closeConsole
     case startTeleport, stopTeleport
     case shake, startChase
@@ -300,11 +296,8 @@ public struct BehaviorEngine {
             if mode == .console { return closeConsole(now: now) }
             let effects = interrupt()
             postpone(now: now)
-            if config.consoleEnabled {
-                mode = .console
-                return effects + [.openConsole]
-            }
-            return effects + (config.spotlightEnabled ? [.openSpotlight] : [])
+            mode = .console
+            return effects + [.openConsole]
 
         case .arrived:
             guard mode == .wandering else { return [] }

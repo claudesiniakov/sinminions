@@ -54,13 +54,14 @@ final class ChatSession {
 
     func submit() {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !isSending else { return }
+        guard !text.isEmpty else { return }
         if text.hasPrefix("/") {
             input = ""
             entries.append(ChatEntry(kind: .user, text: text))
             onSlash(text)
             return
         }
+        guard !isSending else { return }
         guard hasCredentials() else {
             entries.append(ChatEntry(kind: .info, text: tr("НЕТ ПОДКЛЮЧЕНИЯ С КЛЮЧОМ — ОТКРЫВАЮ НАСТРОЙКИ")))
             needCredentials()
@@ -130,9 +131,9 @@ final class ChatSession {
 @MainActor
 @Observable
 final class ConsoleModel {
-    enum Screen { case menu, chat, shell }
+    enum Screen { case chat, shell }
 
-    var screen = Screen.menu {
+    var screen = Screen.chat {
         didSet { if screen != oldValue { onScreenChange() } }
     }
     /// Экран сменился: строка ввода новая, фокус надо поставить заново.
@@ -140,12 +141,7 @@ final class ConsoleModel {
     let chat = ChatSession()
     /// Обычный терминал (zsh).
     let shell = ShellSession()
-    /// Терминал открывается в режиме zsh; запоминается между запусками.
-    private(set) var shellMode = UserDefaults.standard.bool(forKey: "terminalShellMode")
-    var selected = 0
-    /// Строка ввода меню (команды со «/») и журнал ответов.
-    var shellInput = ""
-    var shellLog: [String] = []
+    var shellMode: Bool { screen == .shell }
     /// Экран S.P.E.C.I.A.L.: значения и выбранная строка.
     var special = SpecialState()
     @ObservationIgnored var adjustSpecial: (SpecialStat, Int) -> Void = { _, _ in }
@@ -189,11 +185,10 @@ final class ConsoleModel {
     @ObservationIgnored var layoutEvent: (ConsoleWindow, LayoutEvent) -> Void = { _, _ in }
     @ObservationIgnored var switchConnection: (Int) -> Void = { _ in }
     var snapshot = SystemSnapshot()
-    @ObservationIgnored var run: (ConsoleCommand) -> Void = { _ in }
     /// Выполняет команду со «/», которой нужны окна и призрак; возвращает строку-подтверждение.
     @ObservationIgnored var slashAction: (SlashCommand) -> String? = { _ in nil }
 
-    enum SlashOutput { case shell, chat, zsh }
+    enum SlashOutput { case chat, zsh }
 
     init() {
         chat.onSlash = { [weak self] text in self?.runSlash(text, output: .chat) }
@@ -203,42 +198,17 @@ final class ConsoleModel {
 
     /// Переключатель «терминал компаньона / обычный терминал».
     func setShellMode(_ on: Bool) {
-        shellMode = on
-        UserDefaults.standard.set(on, forKey: "terminalShellMode")
-        screen = on ? .shell : .menu
+        screen = on ? .shell : .chat
         focusTick += 1
-    }
-
-    /// Enter в строке меню: пусто — выбранный пункт, «/…» — команда.
-    func submitShell() {
-        let text = shellInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        shellInput = ""
-        if text.isEmpty {
-            runSelected()
-            return
-        }
-        shellLog.append("> " + text)
-        if text.hasPrefix("/") {
-            runSlash(text, output: .shell)
-        } else {
-            shellLog.append(tr("КОМАНДЫ НАЧИНАЮТСЯ СО «/». /HELP — СПИСОК."))
-        }
-        trimLog()
-    }
-
-    private func trimLog() {
-        if shellLog.count > 80 { shellLog.removeFirst(shellLog.count - 80) }
     }
 
     /// Команда со «/» из меню или чата; ответ выводится туда же, откуда команда пришла.
     func runSlash(_ text: String, output: SlashOutput) {
         func say(_ lines: [String]) {
             switch output {
-            case .shell: shellLog.append(contentsOf: lines)
             case .chat: lines.forEach { chat.addInfo($0) }
             case .zsh: lines.forEach { shell.addInfo($0) }
             }
-            trimLog()
         }
         switch SlashParser.parse(text) {
         case .notACommand:
@@ -269,12 +239,4 @@ final class ConsoleModel {
         }
     }
 
-    func move(_ delta: Int) {
-        let count = ConsoleCommand.allCases.count
-        selected = (selected + delta + count) % count
-    }
-
-    func runSelected() {
-        if let command = ConsoleCommand(rawValue: selected) { run(command) }
-    }
 }

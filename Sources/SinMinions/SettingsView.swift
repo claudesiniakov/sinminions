@@ -59,11 +59,8 @@ private struct GeneralSettings: View {
         }
     }
 
-    @State private var hasAccess = SpotlightLauncher.hasAccess
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var loginError: String?
-    @State private var resetFailed = false
-    private let accessTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
     var body: some View {
         Form {
@@ -143,34 +140,6 @@ private struct GeneralSettings: View {
                 .disabled(prefs.alwaysAsleep)
             }
 
-            Section("Spotlight") {
-                LabeledContent(tr("Универсальный доступ")) {
-                    if hasAccess {
-                        Text(tr("разрешён")).foregroundStyle(.secondary)
-                    } else {
-                        Button(tr("Выдать…")) {
-                            SpotlightLauncher.requestAccess()
-                            SpotlightLauncher.openAccessSettings()
-                        }
-                    }
-                }
-                if !hasAccess {
-                    Text(tr("Без этого разрешения приложение не может нажать сочетание клавиш Spotlight. Остальное работает и без него."))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    LabeledContent(tr("Разрешение выдано, но не действует")) {
-                        Button(tr("Сбросить и запросить заново")) {
-                            resetFailed = !SpotlightLauncher.resetAccess()
-                        }
-                    }
-                    Text(resetFailed
-                        ? tr("Сбросить не удалось. Удалите SinMinions из списка «Универсальный доступ» кнопкой «−» и добавьте снова.")
-                        : tr("Так бывает после обновления: система помнит разрешение прежней сборки. Сброс удаляет старую запись, после чего разрешение нужно выдать ещё раз."))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
             Section(tr("Система")) {
                 Picker(tr("Язык"), selection: $prefs.language) {
                     ForEach(AppLanguage.allCases) { language in
@@ -195,7 +164,6 @@ private struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
-        .onReceive(accessTimer) { _ in hasAccess = SpotlightLauncher.hasAccess }
     }
 }
 
@@ -519,7 +487,7 @@ private struct AboutSettings: View {
             Section(tr("О программе")) {
                 LabeledContent(tr("Версия"), value: updater.currentVersionString)
                 Link(tr("Репозиторий на GitHub"), destination: URL(string: "https://github.com/claudesiniakov/sinminions")!)
-                Text(tr("SinMinions — компаньон для macOS: призрак Moth живёт на рабочем столе, двойной щелчок открывает Spotlight или терминал с монитором и чатом с нейросетью. Персонаж взят из claudesiniakov/summary."))
+                Text(tr("SinMinions — компаньоны для рабочего стола Mac. Двойной щелчок открывает чат с ИИ и монитор."))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

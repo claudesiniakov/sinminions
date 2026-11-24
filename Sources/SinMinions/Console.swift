@@ -88,7 +88,6 @@ final class ConsoleController: NSObject, NSWindowDelegate {
     /// Где окно терминала на экране (nil — закрыто): рядом с ним ставим окно аналитики.
     var terminalFrame: CGRect? { isOpen && terminal.isVisible ? terminal.frame : nil }
 
-    var onCommand: (ConsoleCommand) -> Void = { _ in }
     /// Команды со «/»: возвращает подтверждение для журнала.
     var onSlash: (SlashCommand) -> String? = { _ in nil }
     /// «+» и «−» на экране S.P.E.C.I.A.L.
@@ -138,13 +137,11 @@ final class ConsoleController: NSObject, NSWindowDelegate {
             let line = text.replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "\r", with: " ")
             switch self.model.screen {
             case .chat: self.model.chat.input += line
-            case .menu: self.model.shellInput += line
             case .shell: self.model.shell.input += line
             }
             self.model.focusTick += 1
             self.focusInput()
         }
-        model.run = { [weak self] command in self?.onCommand(command) }
         model.slashAction = { [weak self] command in self?.onSlash(command) }
         model.layoutEvent = { [weak self] window, event in self?.handleLayout(window, event) }
         model.adjustSpecial = { [weak self] stat, delta in self?.onAdjustSpecial(stat, delta) }
@@ -308,10 +305,7 @@ final class ConsoleController: NSObject, NSWindowDelegate {
 
     func open(terminalRect: CGRect, monitorRect: CGRect) {
         isOpen = true
-        model.screen = model.shellMode ? .shell : .menu
-        model.selected = 0
-        model.shellInput = ""
-        model.shellLog = []
+        model.setShellMode(false)
         model.unlocked = false
         session = nil
         sampler.reset()
@@ -350,28 +344,8 @@ final class ConsoleController: NSObject, NSWindowDelegate {
     }
 
     private func handleKey(_ code: UInt16) -> Bool {
-        guard isOpen else { return false }
-        // В обычном терминале клавиатуру получает строка ввода; Esc закрывает окна.
-        if model.screen == .shell {
-            guard code == 53 else { return false }
-            onDismiss()
-            return true
-        }
-        // В чате клавиатуру получает строка ввода; Esc возвращает в меню.
-        if model.screen == .chat {
-            guard code == 53 else { return false }
-            model.screen = .menu
-            return true
-        }
-        switch code {
-        case 126: model.move(-1)
-        case 125: model.move(1)
-        case 36, 76: model.runSelected()
-        case 24, 69: model.switchConnection(1)
-        case 27, 78: model.switchConnection(-1)
-        case 53: onDismiss()
-        default: return false
-        }
+        guard isOpen, code == 53 else { return false }
+        onDismiss()
         return true
     }
 

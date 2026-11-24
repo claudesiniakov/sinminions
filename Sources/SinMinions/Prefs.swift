@@ -31,22 +31,6 @@ enum Frequency: String, CaseIterable, Identifiable {
     }
 }
 
-/// Режим компаньона: что происходит по двойному щелчку.
-enum CompanionMode: String, CaseIterable, Identifiable {
-    /// Двойной щелчок открывает Spotlight.
-    case minimal
-    /// Двойной щелчок: призрак в центре экрана, под ним терминал, справа монитор.
-    case medium
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .minimal: return tr("Минимальный — Spotlight по двойному щелчку")
-        case .medium: return tr("Средний — терминал и монитор по двойному щелчку")
-        }
-    }
-}
-
 /// Настройки пользователя; хранятся в UserDefaults.
 @MainActor
 @Observable
@@ -55,7 +39,6 @@ final class Prefs {
     /// Минуты до сна; 0 — никогда.
     static let sleepOptions: [Int] = [1, 5, 15, 0]
 
-    var mode: CompanionMode { didSet { storeGlobal(mode.rawValue, "mode") } }
     /// Язык интерфейса и реплик; «как в системе» — по языку macOS.
     var language: AppLanguage {
         didSet {
@@ -124,7 +107,6 @@ final class Prefs {
 
     init() {
         let d = UserDefaults.standard
-        mode = CompanionMode(rawValue: d.string(forKey: "mode") ?? "") ?? .medium
         connections = LLMConnections.decode(d.data(forKey: "llmConnections")) ?? Self.legacyConnections(d)
         vikchaWindowWalk = d.bool(forKey: "v.windowWalk")
         let active = CompanionCharacter(rawValue: d.string(forKey: "character") ?? "") ?? .f
@@ -281,7 +263,6 @@ final class Prefs {
         config.talkInterval = talkFrequency.talkInterval
         config.sleepAfter = sleepMinutes > 0 && !coffee ? Double(sleepMinutes) * 60 : nil
         config.sleepsAlways = alwaysAsleep
-        config.consoleEnabled = mode == .medium
         return config
     }
 }

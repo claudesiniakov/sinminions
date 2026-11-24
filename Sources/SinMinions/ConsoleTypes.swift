@@ -5,19 +5,6 @@ import IOKit.ps
 import SinMinionsCore
 
 // Типы терминала и монитора: пункты меню, замеры системы, события окон, S.P.E.C.I.A.L., записи чата.
-/// Пункты меню терминала. Остальные команды вводятся со «/» (см. `SlashCommand`, «/help»).
-enum ConsoleCommand: Int, CaseIterable, Identifiable {
-    case spotlight, chat
-    var id: Int { rawValue }
-
-    var title: String {
-        switch self {
-        case .spotlight: return tr("ПОИСК SPOTLIGHT")
-        case .chat: return tr("ЧАТ С ИИ")
-        }
-    }
-}
-
 /// Замер состояния Mac для окна мониторинга.
 struct SystemSnapshot: Equatable {
     var cpu: Double?

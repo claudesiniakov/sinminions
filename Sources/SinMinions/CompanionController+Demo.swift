@@ -5,8 +5,7 @@ import SinMinionsCore
 extension CompanionController {
     /// Для снимка в CI: открывает терминал и монитор независимо от выбранного режима.
     func openConsoleForDemo() {
-        var config = prefs.behaviorConfig(lowPower: lowPower)
-        config.consoleEnabled = true
+        let config = prefs.behaviorConfig(lowPower: lowPower)
         engine.reconfigure(config, now: now)
         apply(engine.handle(.doubleClick, now: now))
     }
@@ -53,8 +52,7 @@ extension CompanionController {
 
     /// Для снимка в CI: в меню выполнена команда /help.
     func showHelpForDemo() {
-        console.model.shellLog.append("> /help")
-        console.model.runSlash("/help", output: .shell)
+        console.model.runSlash("/help", output: .chat)
     }
 
     /// Для демо: режим «кофе» (уровень 3 выносливости) или обычный.

@@ -116,7 +116,6 @@ final class CompanionController: NSObject {
             guard let self else { return }
             self.apply(self.engine.handle(.closeConsole, now: self.now))
         }
-        console.onCommand = { [weak self] command in self?.run(command) }
         console.model.switchConnection = { [weak self] delta in self?.switchConnection(delta) }
         console.onSlash = { [weak self] command in self?.perform(command) }
         console.onAdjustSpecial = { [weak self] stat, delta in self?.adjustSpecial(stat, delta) }
@@ -518,21 +517,6 @@ final class CompanionController: NSObject {
         onStateChange()
     }
 
-    private func run(_ command: ConsoleCommand) {
-        switch command {
-        case .spotlight:
-            apply(engine.handle(.closeConsole, now: now))
-            // Даём терминалу отдать клавиатуру, затем нажимаем сочетание Spotlight.
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .milliseconds(200))
-                self?.openSpotlight()
-            }
-        case .chat:
-            console.model.screen = .chat
-            console.activateForTyping()
-        }
-    }
-
     /// Команды со «/» из терминала и чата. Возвращает строку-подтверждение для журнала.
     private func perform(_ command: SlashCommand) -> String? {
         switch command {
@@ -846,7 +830,6 @@ final class CompanionController: NSObject {
                 view.setSleeping(true)
             case .wakeUp: view.setSleeping(false)
             case .hop: view.hop()
-            case .openSpotlight: openSpotlight()
             case .openConsole: openConsole()
             case .closeConsole: closeConsole(returnHome: !view.isDragging)
             case .startTeleport: startTeleport()
@@ -976,14 +959,6 @@ final class CompanionController: NSObject {
         // Над головой оставляем место под парение.
         let lifted = CGRect(x: moth.minX, y: moth.minY, width: moth.width, height: moth.height + 11 * view.scale)
         bubble.show(text, over: lifted, in: area)
-    }
-
-    private func openSpotlight() {
-        switch SpotlightLauncher.open() {
-        case .sent: break
-        case .needAccess: announce(.needAccess, force: true)
-        case .disabled: announce(.spotlightOff, force: true)
-        }
     }
 
     // MARK: - Перелёт

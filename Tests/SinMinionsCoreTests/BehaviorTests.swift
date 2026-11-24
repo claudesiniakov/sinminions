@@ -58,23 +58,11 @@ final class BehaviorEngineTests: XCTestCase {
         XCTAssertEqual(engine.mode, .idle)
     }
 
-    func testDoubleClickOpensSpotlightFromAnyState() {
+    func testDoubleClickInterruptsWanderToOpenChat() {
         var engine = makeEngine()
-        XCTAssertEqual(engine.handle(.doubleClick, now: 1), [.openSpotlight])
-
         _ = engine.tick(now: 60, idleSeconds: 1)
-        XCTAssertEqual(engine.mode, .wandering)
-        XCTAssertEqual(engine.handle(.doubleClick, now: 61), [.stopWander, .openSpotlight])
-        XCTAssertEqual(engine.mode, .idle)
-
-        _ = engine.tick(now: 62, idleSeconds: 400)
-        XCTAssertEqual(engine.mode, .sleeping)
-        XCTAssertEqual(engine.handle(.doubleClick, now: 63), [.wakeUp, .openSpotlight])
-    }
-
-    func testDoubleClickDoesNothingWhenSpotlightDisabled() {
-        var engine = makeEngine { $0.spotlightEnabled = false }
-        XCTAssertEqual(engine.handle(.doubleClick, now: 1), [])
+        XCTAssertEqual(engine.handle(.doubleClick, now: 61), [.stopWander, .openConsole])
+        XCTAssertEqual(engine.mode, .console)
     }
 
     func testClickHopsAndSpeaks() {
@@ -143,11 +131,10 @@ final class BehaviorEngineTests: XCTestCase {
 final class ConsoleModeTests: XCTestCase {
     private func makeEngine() -> BehaviorEngine {
         var config = BehaviorConfig()
-        config.consoleEnabled = true
         return BehaviorEngine(config: config, now: 0, random: { $0.lowerBound })
     }
 
-    func testDoubleClickOpensConsoleInsteadOfSpotlight() {
+    func testDoubleClickOpensConsole() {
         var engine = makeEngine()
         XCTAssertEqual(engine.handle(.doubleClick, now: 1), [.openConsole])
         XCTAssertEqual(engine.mode, .console)
@@ -1259,7 +1246,6 @@ final class NewBehaviorsTests: XCTestCase {
         console = {
             var config = BehaviorConfig()
             config.scareEnabled = true
-            config.consoleEnabled = true
             return BehaviorEngine(config: config, now: 0, random: { $0.lowerBound })
         }()
         _ = console.handle(.doubleClick, now: 1)
@@ -1473,35 +1459,6 @@ final class PhraseBookTests: XCTestCase {
         XCTAssertEqual(PhraseBook.timeOfDay(hour: 14), PhraseBook.day)
         XCTAssertEqual(PhraseBook.timeOfDay(hour: 20), PhraseBook.evening)
         XCTAssertEqual(PhraseBook.timeOfDay(hour: 2), PhraseBook.night)
-    }
-}
-
-final class SpotlightHotkeyTests: XCTestCase {
-    private func table(enabled: Bool, parameters: [Int]) -> [String: Any] {
-        ["64": ["enabled": enabled, "value": ["parameters": parameters, "type": "standard"]]]
-    }
-
-    func testDefaultsToCommandSpaceWhenNothingStored() {
-        XCTAssertEqual(SpotlightHotkey.resolve(symbolicHotKeys: nil), .hotkey(Hotkey(keyCode: 49, flags: 0x100000)))
-        XCTAssertEqual(SpotlightHotkey.resolve(symbolicHotKeys: [:]), .hotkey(SpotlightHotkey.standard))
-    }
-
-    func testReadsCustomHotkey() {
-        // ⌃⌥Пробел
-        let custom = table(enabled: true, parameters: [32, 49, 786432])
-        XCTAssertEqual(
-            SpotlightHotkey.resolve(symbolicHotKeys: custom),
-            .hotkey(Hotkey(keyCode: 49, flags: SpotlightHotkey.control | SpotlightHotkey.option))
-        )
-    }
-
-    func testDisabledHotkey() {
-        XCTAssertEqual(SpotlightHotkey.resolve(symbolicHotKeys: table(enabled: false, parameters: [32, 49, 1048576])), .disabled)
-    }
-
-    func testBrokenEntryFallsBackToStandard() {
-        XCTAssertEqual(SpotlightHotkey.resolve(symbolicHotKeys: table(enabled: true, parameters: [32])), .hotkey(SpotlightHotkey.standard))
-        XCTAssertEqual(SpotlightHotkey.resolve(symbolicHotKeys: table(enabled: true, parameters: [65535, 65535, 0])), .hotkey(SpotlightHotkey.standard))
     }
 }
 

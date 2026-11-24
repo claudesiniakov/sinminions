@@ -10,8 +10,6 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private let controller: CompanionController
     private let updater: Updater
     private let prefs: Prefs
-    private let modeItem = NSMenuItem(title: tr("Режим"), action: nil, keyEquivalent: "")
-    private var modeItems: [(CompanionMode, NSMenuItem)] = []
     private let openSettings: () -> Void
 
     private let hideItem = NSMenuItem(title: tr("Скрыть"), action: #selector(StatusMenu.toggleHidden), keyEquivalent: "")
@@ -32,16 +30,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         menu.autoenablesItems = false
         menu.delegate = self
         versionItem.isEnabled = false
-        let modes = NSMenu()
-        for mode in CompanionMode.allCases {
-            let entry = NSMenuItem(title: mode.title, action: #selector(StatusMenu.selectMode(_:)), keyEquivalent: "")
-            entry.target = self
-            entry.representedObject = mode.rawValue
-            modes.addItem(entry)
-            modeItems.append((mode, entry))
-        }
-        modeItem.submenu = modes
-        for entry in [hideItem, napItem, cornerItem, .separator(), modeItem, .separator(), versionItem, updateItem, .separator(), settingsItem, quitItem] {
+        for entry in [hideItem, napItem, cornerItem, .separator(), versionItem, updateItem, .separator(), settingsItem, quitItem] {
             entry.target = self
             menu.addItem(entry)
         }
@@ -59,17 +48,14 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     /// Заголовки пунктов и значок по текущему состоянию.
     func refresh() {
         // Подписи на текущем языке (язык меняется в настройках на ходу).
-        modeItem.title = tr("Режим")
         cornerItem.title = tr("Вернуть в угол")
         settingsItem.title = tr("Настройки…")
         quitItem.title = tr("Завершить SinMinions")
-        for (mode, entry) in modeItems { entry.title = mode.title }
         hideItem.title = controller.hiddenByUser ? tr("Показать") : tr("Скрыть")
         napItem.title = controller.isSleeping ? tr("Разбудить") : tr("Усыпить на 1 час")
         napItem.isEnabled = !controller.hiddenByUser
         cornerItem.isEnabled = !controller.hiddenByUser
 
-        for (mode, entry) in modeItems { entry.state = prefs.mode == mode ? .on : .off }
 
         versionItem.title = updater.statusLine
         switch updater.state {
@@ -129,12 +115,6 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     @objc private func returnToCorner() {
         controller.returnToCorner()
-    }
-
-    @objc private func selectMode(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String, let mode = CompanionMode(rawValue: raw) else { return }
-        prefs.mode = mode
-        refresh()
     }
 
     @objc private func updateAction() {

@@ -75,9 +75,7 @@ API-ключ создаётся на platform.deepseek.com/api_keys. Запро�
 API-ключ — на aistudio.google.com/apikey. Запросы идут на OpenAI-совместимый адрес Google. Остаток не отдаётся: лимиты смотрите в AI Studio. Нужной модели нет в списке — выберите «Другая…».	API key — at aistudio.google.com/apikey. Requests go to Google’s OpenAI-compatible endpoint. The balance is not reported: check limits in AI Studio. Model not listed? Choose “Other…”.	API-Schlüssel – unter aistudio.google.com/apikey. Anfragen gehen an die OpenAI-kompatible Adresse von Google. Kein Guthaben abrufbar: Limits sehen Sie in AI Studio. Modell nicht in der Liste? Wählen Sie „Andere…“.	Clave API: en aistudio.google.com/apikey. Las solicitudes van a la dirección compatible con OpenAI de Google. No se informa del saldo: consulte los límites en AI Studio. ¿No está el modelo? Elija «Otro…».
 API-ключ — на console.x.ai/team/default/api-keys. Остаток по обычному ключу xAI не отдаёт (он доступен через отдельный ключ управления). Нужной модели нет в списке — выберите «Другая…».	API key — at console.x.ai/team/default/api-keys. xAI does not report the balance for a regular key (it is available via a separate management key). Model not listed? Choose “Other…”.	API-Schlüssel – unter console.x.ai/team/default/api-keys. xAI meldet für einen normalen Schlüssel kein Guthaben (nur über einen separaten Verwaltungsschlüssel). Modell nicht in der Liste? Wählen Sie „Andere…“.	Clave API: en console.x.ai/team/default/api-keys. xAI no informa del saldo con una clave normal (está disponible con una clave de gestión aparte). ¿No está el modelo? Elija «Otro…».
 API-ключ — на platform.openai.com/api-keys. Системная подсказка уходит как developer, как требуют новые модели. Остаток по ключу OpenAI не отдаёт: смотрите в личном кабинете. Нужной модели нет в списке — выберите «Другая…».	API key — at platform.openai.com/api-keys. The system prompt is sent as developer, as new models require. OpenAI does not report the balance for a key: check your account dashboard. Model not listed? Choose “Other…”.	API-Schlüssel – unter platform.openai.com/api-keys. Die Systemanweisung wird als developer gesendet, wie neue Modelle es verlangen. OpenAI meldet kein Guthaben pro Schlüssel: siehe Ihr Konto. Modell nicht in der Liste? Wählen Sie „Andere…“.	Clave API: en platform.openai.com/api-keys. La instrucción del sistema se envía como developer, como exigen los modelos nuevos. OpenAI no informa del saldo por clave: consúltelo en su cuenta. ¿No está el modelo? Elija «Otro…».
-ENTER ОТПРАВИТЬ · /HELP · ESC НАЗАД	ENTER SEND · /HELP · ESC BACK	ENTER SENDEN · /HELP · ESC ZURÜCK	ENTER ENVIAR · /HELP · ESC VOLVER
 F: призрак Moth, терминал и монитор в стиле Fallout.	F: Moth the ghost, Fallout-style terminal and monitor.	F: der Geist Moth, Terminal und Monitor im Fallout-Stil.	F: el fantasma Moth, terminal y monitor al estilo Fallout.
-SinMinions — компаньон для macOS: призрак Moth живёт на рабочем столе, двойной щелчок открывает Spotlight или терминал с монитором и чатом с нейросетью. Персонаж взят из claudesiniakov/summary.	SinMinions is a macOS companion: Moth the ghost lives on your desktop; a double click opens Spotlight or a terminal with a monitor and an AI chat. The character comes from claudesiniakov/summary.	SinMinions ist ein Begleiter für macOS: Der Geist Moth lebt auf dem Schreibtisch, ein Doppelklick öffnet Spotlight oder ein Terminal mit Monitor und KI-Chat. Die Figur stammt aus claudesiniakov/summary.	SinMinions es un compañero para macOS: el fantasma Moth vive en el escritorio; un doble clic abre Spotlight o un terminal con monitor y chat con IA. El personaje viene de claudesiniakov/summary.
 SinMinions: кофе	SinMinions: coffee	SinMinions: Kaffee	SinMinions: café
 [ЗАКРЫТЬ]	[CLOSE]	[SCHLIESSEN]	[CERRAR]
 [ЗАМОК ВКЛ]	[LOCK ON]	[SPERRE AN]	[BLOQUEO SÍ]
@@ -97,7 +95,6 @@ zsh: не удалось запустить: %@	zsh: failed to start: %@	zsh: St
 БАТАРЕЯ	BATTERY	AKKU	BATERÍA
 БАТАРЕЯ ⚡	BATTERY ⚡	AKKU ⚡	BATERÍA ⚡
 БЫСТРО	FAST	SCHNELL	RÁPIDO
-Без этого разрешения приложение не может нажать сочетание клавиш Spotlight. Остальное работает и без него.	Without this permission the app cannot press the Spotlight shortcut. Everything else works without it.	Ohne diese Berechtigung kann die App das Spotlight-Kürzel nicht drücken. Alles andere funktioniert auch ohne.	Sin este permiso la aplicación no puede pulsar el atajo de Spotlight. Lo demás funciona sin él.
 В РАБОТЕ	UPTIME	LAUFZEIT	EN MARCHA
 В архиве не найдено приложение SinMinions	The SinMinions app was not found in the archive	Im Archiv wurde keine SinMinions-App gefunden	No se encontró la aplicación SinMinions en el archivo
 В релизе нет архива SinMinions.zip	The release has no SinMinions.zip archive	Das Release enthält kein Archiv SinMinions.zip	La versión no incluye el archivo SinMinions.zip
@@ -180,7 +177,6 @@ zsh: не удалось запустить: %@	zsh: failed to start: %@	zsh: St
 МЕДЛЕННО	SLOW	LANGSAM	LENTO
 МОЛНИЕНОСНО	LIGHTNING	BLITZSCHNELL	RELÁMPAGO
 МОЛЧИТ	SILENT	SCHWEIGT	CALLADO
-Минимальный — Spotlight по двойному щелчку	Minimal — Spotlight on double click	Minimal — Spotlight per Doppelklick	Mínimo: Spotlight con doble clic
 Модель	Model	Modell	Modelo
 Модель вернула пустой ответ	The model returned an empty answer	Das Modell lieferte eine leere Antwort	El modelo devolvió una respuesta vacía
 Модель или адрес не найдены	Model or address not found	Modell oder Adresse nicht gefunden	Modelo o dirección no encontrados
@@ -254,7 +250,6 @@ zsh: не удалось запустить: %@	zsh: failed to start: %@	zsh: St
 ПОДКЛЮЧЕНИЕ УДАЛЕНО	CONNECTION REMOVED	VERBINDUNG ENTFERNT	CONEXIÓN ELIMINADA
 ПОДКЛЮЧЕНИЕ: 	CONNECTION: 	VERBINDUNG: 	CONEXIÓN: 
 ПОДКЛЮЧЕНИЙ НЕТ	NO CONNECTIONS	KEINE VERBINDUNGEN	SIN CONEXIONES
-ПОИСК SPOTLIGHT	SPOTLIGHT SEARCH	SPOTLIGHT-SUCHE	BÚSQUEDA SPOTLIGHT
 ПОСЛЕДНИЙ: 	LAST: 	ZULETZT: 	ÚLTIMO: 
 ПРИЗРАК УСНУЛ НА 1 ЧАС	THE GHOST IS ASLEEP FOR 1 HOUR	DER GEIST SCHLÄFT 1 STUNDE	EL FANTASMA DUERME 1 HORA
 Перезапуск…	Restarting…	Neustart…	Reiniciando…
@@ -495,7 +490,6 @@ zsh: не удалось запустить: %@	zsh: failed to start: %@	zsh: St
 привет!	hi!	hallo!	¡hola!
 ой	oops	huch	ay
 что	what	was	¿qué?
-два щелчка — и будет поиск	two clicks — and there’s search	zwei Klicks — und die Suche ist da	dos clics y aparece la búsqueda
 о, питание	oh, power	oh, Strom	oh, corriente
 энергия пошла	energy is flowing	die Energie fließt	llega la energía
 ядерная батарея на месте	the nuclear battery is in place	die Atombatterie ist da	la batería nuclear está en su sitio
@@ -510,7 +504,6 @@ zsh: не удалось запустить: %@	zsh: failed to start: %@	zsh: St
 меня можно обновить	I can be updated	man kann mich aktualisieren	me pueden actualizar
 для поиска нужен «Универсальный доступ»	search needs “Accessibility”	für die Suche braucht es „Bedienungshilfen“	la búsqueda necesita «Accesibilidad»
 нет доступа. если он выдан — сбрось его в настройках	no access. if it’s granted — reset it in settings	kein Zugriff. wenn erteilt — in den Einstellungen zurücksetzen	sin acceso. si está concedido, restablécelo en los ajustes
-сочетание Spotlight выключено в настройках системы	the Spotlight shortcut is turned off in System Settings	das Spotlight-Kürzel ist in den Systemeinstellungen aus	el atajo de Spotlight está desactivado en Ajustes del Sistema
 АА!	AAH!	AAH!	¡AAH!
 слишком быстро!	too fast!	zu schnell!	¡demasiado rápido!
 осторожнее!	careful!	vorsichtig!	¡cuidado!
@@ -681,5 +674,8 @@ V — vikcha piccha, аниме-девочка-маркетолог.	V — vikch
 подвинусь. здесь тебе хватит места?	I'll move over. Is that enough room?	ich rücke zur Seite. Hast du so genug Platz?	me aparto. ¿así tienes espacio?
 ой, чуть карандаш не уронила!	whoa, I almost dropped my pencil!	huch, fast wäre mir der Bleistift runtergefallen!	¡uy, casi se me cae el lápiz!
 нашлось место, где меня никто не ждал!	found a spot where nobody expected me!	hier hat wohl niemand mit mir gerechnet!	¡encontré un sitio donde nadie me esperaba!
+SinMinions — компаньоны для рабочего стола Mac. Двойной щелчок открывает чат с ИИ и монитор.	SinMinions are desktop companions for Mac. Double-click to open the AI chat and monitor.	SinMinions sind Begleiter für den Mac-Schreibtisch. Ein Doppelklick öffnet KI-Chat und Monitor.	SinMinions son compañeros de escritorio para Mac. Un doble clic abre el chat de IA y el monitor.
+два щелчка — и откроется чат	double-click to open chat	mit einem Doppelklick öffnet sich der Chat	dos clics y se abre el chat
+ENTER ОТПРАВИТЬ · /HELP · ESC ЗАКРЫТЬ	ENTER SEND · /HELP · ESC CLOSE	ENTER SENDEN · /HELP · ESC SCHLIESSEN	ENTER ENVIAR · /HELP · ESC CERRAR
 """#
 }

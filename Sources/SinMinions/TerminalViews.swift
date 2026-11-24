@@ -166,7 +166,6 @@ struct TerminalView: View {
     var body: some View {
         Group {
             switch model.screen {
-            case .menu: menu
             case .chat: ChatScreen(model: model)
             case .shell:
                 TerminalFrame(title: model.character.terminalName + " // ZSH " + ShellText.abbreviate(model.shell.cwd, home: NSHomeDirectory()), window: .terminal, model: model) {
@@ -178,110 +177,6 @@ struct TerminalView: View {
         .id(model.language)
     }
 
-    private var menu: some View {
-        TerminalFrame(title: trf("%@ // ТЕРМИНАЛ", "\(model.character.terminalName)"), window: .terminal, model: model) {
-            ShellScreen(model: model)
-        }
-    }
-}
-
-/// Экран меню: два пункта, журнал ответов на команды и строка ввода («/help» — список команд).
-struct ShellScreen: View {
-    var model: ConsoleModel
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        @Bindable var model = model
-        VStack(alignment: .leading, spacing: 2) {
-            ForEach(ConsoleCommand.allCases) { command in
-                let active = model.selected == command.rawValue
-                HStack(spacing: 8) {
-                    Text(active ? ">" : " ")
-                    Text(command.title)
-                    Spacer(minLength: 0)
-                }
-                .font(Term.font)
-                .foregroundStyle(active ? Term.background : Term.green)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 4)
-                .background(active ? Term.green : Color.clear)
-                .shadow(color: active ? .clear : Term.green.opacity(0.5), radius: 3)
-                .contentShape(Rectangle())
-                .onHover { inside in
-                    if inside { model.selected = command.rawValue }
-                }
-                .onTapGesture {
-                    model.selected = command.rawValue
-                    model.runSelected()
-                }
-            }
-            Rectangle().fill(Term.dark).frame(height: 1).padding(.vertical, 6)
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 3) {
-                        if model.shellLog.isEmpty {
-                            Text(tr("КОМАНДЫ НАЧИНАЮТСЯ СО «/». ВВЕДИТЕ /HELP — СПИСОК."))
-                                .foregroundStyle(Term.dim)
-                        }
-                        ForEach(Array(model.shellLog.enumerated()), id: \.offset) { _, line in
-                            Text(line).foregroundStyle(line.hasPrefix(">") ? Term.green : Term.dim)
-                        }
-                        Color.clear.frame(height: 1).id("end")
-                    }
-                    .font(Term.small)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .onChange(of: model.shellLog.count) { proxy.scrollTo("end", anchor: .bottom) }
-            }
-            Rectangle().fill(Term.dark).frame(height: 1)
-            // Подсказки команд по вводу: Tab дописывает, щелчок подставляет.
-            let hints = SlashParser.hints(for: model.shellInput)
-            if !hints.isEmpty {
-                VStack(alignment: .leading, spacing: 1) {
-                    ForEach(hints.prefix(6), id: \.name) { hint in
-                        HStack(spacing: 8) {
-                            Text(hint.name)
-                            Text(hint.summary).foregroundStyle(Term.dim)
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture { model.shellInput = hint.name; model.focusTick += 1 }
-                    }
-                }
-                .font(Term.small)
-                .foregroundStyle(Term.green)
-            }
-            HStack(spacing: 6) {
-                Text(">")
-                TextField("", text: $model.shellInput)
-                    .textFieldStyle(.plain)
-                    .focused($focused)
-                    .onSubmit { model.submitShell() }
-                    // Стрелки выбирают пункт меню, а не двигают курсор в строке.
-                    .onKeyPress(.upArrow) { model.move(-1); return .handled }
-                    .onKeyPress(.downArrow) { model.move(1); return .handled }
-                    .onKeyPress(.tab) {
-                        guard let done = SlashParser.completion(for: model.shellInput) else { return .handled }
-                        model.shellInput = done
-                        return .handled
-                    }
-                    // «+» и «−» в пустой строке переключают подключение к нейросети.
-                    .onKeyPress(characters: CharacterSet(charactersIn: "+-=")) { press in
-                        guard model.shellInput.isEmpty else { return .ignored }
-                        model.switchConnection(press.characters == "-" ? -1 : 1)
-                        return .handled
-                    }
-            }
-            .font(Term.small)
-            .foregroundStyle(Term.green)
-            Text(tr("↑↓ ВЫБОР · TAB ДОПИСАТЬ · /HELP · ESC ВЫХОД"))
-                .font(Term.small)
-                .foregroundStyle(Term.dim)
-        }
-        .tint(Term.green)
-        .onAppear { focused = true }
-        .onChange(of: model.focusTick) { focused = true }
-    }
 }
 
 /// Экран чата: журнал, строка ввода, подсказка.
@@ -317,15 +212,33 @@ struct ChatScreen: View {
                     .onChange(of: chat.isSending) { scroll(proxy, chat) }
                 }
                 Rectangle().fill(Term.dark).frame(height: 1)
+                let hints = SlashParser.hints(for: chat.input)
+                ForEach(hints.prefix(6), id: \.name) { hint in
+                    Button {
+                        chat.input = hint.name
+                        focused = true
+                    } label: {
+                        HStack {
+                            Text(hint.name)
+                            Text(hint.summary).foregroundStyle(Term.dim)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
                 HStack(spacing: 6) {
                     Text(">")
                     TextField("", text: $chat.input)
                         .textFieldStyle(.plain)
                         .focused($focused)
                         .onSubmit { chat.submit() }
+                        .onKeyPress(.tab) {
+                            guard let name = SlashParser.completion(for: chat.input) else { return .ignored }
+                            chat.input = name
+                            return .handled
+                        }
                 }
                 .foregroundStyle(Term.green)
-                Text(tr("ENTER ОТПРАВИТЬ · /HELP · ESC НАЗАД"))
+                Text(tr("ENTER ОТПРАВИТЬ · /HELP · ESC ЗАКРЫТЬ"))
                     .foregroundStyle(Term.dim)
             }
             .font(Term.small)
