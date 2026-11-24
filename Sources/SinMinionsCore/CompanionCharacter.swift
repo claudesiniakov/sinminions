@@ -6,6 +6,7 @@ public enum CompanionCharacter: String, CaseIterable, Sendable, Identifiable {
     case f
     /// Второй персонаж: золотой страж, стиль терминала в духе Вархаммера.
     case ab
+    case v
 
     public var id: String { rawValue }
 
@@ -14,6 +15,7 @@ public enum CompanionCharacter: String, CaseIterable, Sendable, Identifiable {
         switch self {
         case .f: return "F"
         case .ab: return "ab"
+        case .v: return "V"
         }
     }
 
@@ -22,6 +24,7 @@ public enum CompanionCharacter: String, CaseIterable, Sendable, Identifiable {
         switch self {
         case .f: return ""
         case .ab: return "ab."
+        case .v: return "v."
         }
     }
 
@@ -30,6 +33,7 @@ public enum CompanionCharacter: String, CaseIterable, Sendable, Identifiable {
         switch self {
         case .f: return "MOTH-OS"
         case .ab: return tr("КОГИТАТОР")
+        case .v: return "VIKCHA PICCHA"
         }
     }
 
@@ -37,6 +41,7 @@ public enum CompanionCharacter: String, CaseIterable, Sendable, Identifiable {
         switch self {
         case .f: return tr("СИСТЕМА")
         case .ab: return tr("АУСПЕКС")
+        case .v: return tr("МЕТРИКИ")
         }
     }
 }

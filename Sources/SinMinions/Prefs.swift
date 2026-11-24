@@ -270,7 +270,7 @@ final class Prefs {
         config.chaseEnabled = chaseEnabled
         config.hideSeekEnabled = hideSeekEnabled
         config.shooEnabled = shooEnabled
-        config.searchEnabled = searchEnabled
+        config.searchEnabled = searchEnabled && character != .v
         config.playEnabled = playEnabled && character == .ab
         config.singEnabled = singEnabled && character == .ab
         config.singDuration = Anthem.duration

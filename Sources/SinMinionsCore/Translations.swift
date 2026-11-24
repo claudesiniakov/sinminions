@@ -619,5 +619,16 @@ zsh: не удалось запустить: %@	zsh: failed to start: %@	zsh: St
 за одну полутень на лице. До конца.	for one half-shadow on a face. To the end.	für einen Halbschatten im Gesicht. Bis zum Schluss.	por una media sombra en el rostro. Hasta el final.
 За улыбку! За знак! За молчанье — в бой!	For a smile! For a sign! For silence — to battle!	Für ein Lächeln! Für ein Zeichen! Fürs Schweigen — in die Schlacht!	¡Por una sonrisa! ¡Por una señal! ¡Por el silencio, a la batalla!
 Как в системе	Same as system	Wie im System	Como en el sistema
+МЕТРИКИ	METRICS	METRIKEN	MÉTRICAS
+V — vikcha piccha, аниме-девочка-маркетолог.	V — vikcha piccha, an anime-style marketer.	V — vikcha piccha, eine Marketingexpertin im Anime-Stil.	V — vikcha piccha, una especialista en marketing de estilo anime.
+Ты — vikcha piccha, энергичная аниме-девочка-маркетолог и компаньон на рабочем столе Mac. Отвечай по-русски, кратко и дружелюбно. В вопросах маркетинга учитывай аудиторию, цель и измеримый результат.	You are vikcha piccha, an energetic anime-style marketer and Mac desktop companion. Reply in English, briefly and warmly. For marketing questions, consider the audience, the goal and a measurable result.	Du bist vikcha piccha, eine energiegeladene Marketingexpertin im Anime-Stil und Begleiterin auf dem Mac-Desktop. Antworte kurz und freundlich auf Deutsch. Berücksichtige bei Marketingfragen die Zielgruppe, das Ziel und ein messbares Ergebnis.	Eres vikcha piccha, una enérgica especialista en marketing de estilo anime y compañera del escritorio del Mac. Responde en español, con brevedad y amabilidad. En cuestiones de marketing, ten en cuenta al público, el objetivo y un resultado medible.
+я на связи!	I’m here!	Ich bin da!	¡Aquí estoy!
+есть минутка на идею?	Got a minute for an idea?	Hast du kurz Zeit für eine Idee?	¿Tienes un minuto para una idea?
+снова в эфире!	Back on air!	Wieder auf Sendung!	¡De vuelta al aire!
+увидимся после перерыва	See you after the break.	Bis nach der Pause.	Nos vemos después de la pausa.
+вот это резкий рост!	Now that’s a spike!	Das nenne ich einen Sprung!	¡Menudo subidón!
+кому это будет полезно?	Who would benefit from this?	Wem würde das helfen?	¿A quién le serviría esto?
+проверим гипотезу?	Shall we test the hypothesis?	Testen wir die Hypothese?	¿Probamos la hipótesis?
+а что говорят цифры?	What do the numbers say?	Was sagen die Zahlen?	¿Qué dicen los números?
 """#
 }

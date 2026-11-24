@@ -123,6 +123,15 @@ public struct PhraseBook {
     ]
 
     public static func pool(_ kind: PhraseKind, hour: Int, character: CompanionCharacter = .f) -> [String] {
+        if character == .v {
+            switch kind {
+            case .click: return ["я на связи!", "есть минутка на идею?"]
+            case .wake: return ["снова в эфире!"]
+            case .shooed: return ["увидимся после перерыва"]
+            case .scared: return ["вот это резкий рост!"]
+            default: return ["кому это будет полезно?", "проверим гипотезу?", "а что говорят цифры?"]
+            }
+        }
         if character == .ab {
             // У стража свой набор целиком: реплики призрака с отсылками к Fallout сюда не попадают.
             if kind == .ambient { return guardAmbient + guardTimeOfDay(hour: hour) }

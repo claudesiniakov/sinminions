@@ -43,6 +43,14 @@ struct SettingsView: View {
 private struct GeneralSettings: View {
     @Bindable var prefs: Prefs
 
+    private var characterDescription: String {
+        switch prefs.character {
+        case .f: return tr("F: призрак Moth, терминал и монитор в стиле Fallout.")
+        case .ab: return tr("ab: золотой страж, терминал и монитор в стиле Вархаммера.")
+        case .v: return tr("V — vikcha piccha, аниме-девочка-маркетолог.")
+        }
+    }
+
     @State private var hasAccess = SpotlightLauncher.hasAccess
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var loginError: String?
@@ -59,9 +67,7 @@ private struct GeneralSettings: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                Text(prefs.character == .f
-                    ? tr("F: призрак Moth, терминал и монитор в стиле Fallout.")
-                    : tr("ab: золотой страж, терминал и монитор в стиле Вархаммера."))
+                Text(characterDescription)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 Picker(tr("Размер"), selection: $prefs.scale) {
@@ -79,7 +85,9 @@ private struct GeneralSettings: View {
                     .disabled(!prefs.wanderEnabled)
                 Toggle(tr("Пугается быстрого курсора"), isOn: $prefs.scareEnabled)
                 Toggle(tr("Отлетает в сторону, если щёлкнуть правой кнопкой"), isOn: $prefs.shooEnabled)
-                Toggle(prefs.character == .ab ? tr("Ищет реликвии Империума и находит их") : tr("Что-нибудь ищет и находит (водяной чип и другое)"), isOn: $prefs.searchEnabled)
+                if prefs.character != .v {
+                    Toggle(prefs.character == .ab ? tr("Ищет реликвии Империума и находит их") : tr("Что-нибудь ищет и находит (водяной чип и другое)"), isOn: $prefs.searchEnabled)
+                }
                 if prefs.character == .ab {
                     Toggle(tr("Играет на приставке рядом с телевизором"), isOn: $prefs.playEnabled)
                     Toggle(tr("Иногда поёт гимн"), isOn: $prefs.singEnabled)

@@ -1166,7 +1166,7 @@ final class NewBehaviorsTests: XCTestCase {
     }
 
     func testCompanionCharacters() {
-        XCTAssertEqual(CompanionCharacter.allCases.map(\.tabTitle), ["F", "ab"])
+        XCTAssertEqual(CompanionCharacter.allCases.map(\.tabTitle), ["F", "ab", "V"])
         XCTAssertEqual(CompanionCharacter.f.keyPrefix, "")
         XCTAssertEqual(CompanionCharacter.ab.keyPrefix, "ab.")
         XCTAssertNotEqual(CompanionCharacter.f.terminalName, CompanionCharacter.ab.terminalName)

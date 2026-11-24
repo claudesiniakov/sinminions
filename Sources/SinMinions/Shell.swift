@@ -357,7 +357,7 @@ struct TerminalModeSwitch: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            segment(model.character == .ab ? tr("КОГИТАТОР") : "MOTH", active: !model.shellMode) { model.setShellMode(false) }
+            segment(model.character == .f ? "MOTH" : model.character.terminalName, active: !model.shellMode) { model.setShellMode(false) }
             segment("ZSH", active: model.shellMode) { model.setShellMode(true) }
         }
         .font(.system(size: 10, design: .monospaced))

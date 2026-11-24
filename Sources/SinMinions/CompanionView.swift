@@ -95,7 +95,7 @@ final class CompanionView: NSView {
         self.coffee = coffee
         self.character = character
         self.outfit = outfit
-        art = character == .ab ? GoldenArt(scale: scale, coffee: coffee, outfit: outfit) : GhostArt(style: style, scale: scale, coffee: coffee)
+        art = character.makeArt(style: style, scale: scale, coffee: coffee, outfit: outfit)
         moth = art.root
         body = art.body
         eyes = art.eyes

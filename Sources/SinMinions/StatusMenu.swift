@@ -155,7 +155,20 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     /// Силуэт Moth как шаблонное изображение 18×18; точка в углу — есть обновление.
     static func icon(dot: Bool, character: CompanionCharacter = .f) -> NSImage {
         let image = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { _ in
-            let path = character == .ab ? guardPath() : mothPath()
+            let path: NSBezierPath
+            switch character {
+            case .f: path = mothPath()
+            case .ab: path = guardPath()
+            case .v:
+                path = NSBezierPath()
+                path.move(to: NSPoint(x: 2, y: 3))
+                path.line(to: NSPoint(x: 5, y: 3))
+                path.line(to: NSPoint(x: 9, y: 11))
+                path.line(to: NSPoint(x: 13, y: 3))
+                path.line(to: NSPoint(x: 16, y: 3))
+                path.line(to: NSPoint(x: 9, y: 16))
+                path.close()
+            }
             NSColor.black.setFill()
             path.fill()
 

@@ -50,7 +50,7 @@ final class GhostFigureHost: NSView {
 
     private func rebuild() {
         layer?.sublayers?.forEach { $0.removeFromSuperlayer() }
-        let art: any CompanionArt = character == .ab ? GoldenArt(scale: 1.5, coffee: coffee, outfit: outfit) : GhostArt(style: style, scale: 1.5, coffee: coffee)
+        let art: any CompanionArt = character.makeArt(style: style, scale: 1.5, coffee: coffee, outfit: outfit)
         art.root.frame = CGRect(x: 0, y: 0, width: 72, height: 84)
         art.body.shadowRadius = 6 * art.glowScale
         art.body.shadowOpacity = 0.6

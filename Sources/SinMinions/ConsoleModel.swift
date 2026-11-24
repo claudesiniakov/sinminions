@@ -12,6 +12,8 @@ final class ChatSession {
         switch character {
         case .f:
             return tr("Ты — Moth, призрак-компаньон на рабочем столе Mac. Отвечай по-русски, кратко (1–4 предложения), в духе терминала Fallout, без эмодзи.")
+        case .v:
+            return tr("Ты — vikcha piccha, энергичная аниме-девочка-маркетолог и компаньон на рабочем столе Mac. Отвечай по-русски, кратко и дружелюбно. В вопросах маркетинга учитывай аудиторию, цель и измеримый результат.")
         case .ab:
             return tr("Ты — золотой страж, коренастый воин в золочёном доспехе, компаньон на рабочем столе Mac. Отвечай по-русски, кратко (1–4 предложения), в суровом готическом тоне торжественного караульного. Без отсылок к Fallout и без эмодзи.")
         }
@@ -163,13 +165,13 @@ final class ConsoleModel {
         didSet {
             Term.theme = character
             chat.setCharacter(character)
-            if character == .ab, selectedStat == .perception { selectedStat = .intelligence }
+            if character != .f, selectedStat == .perception { selectedStat = .intelligence }
         }
     }
 
     /// Доступна ли буква: у золотого стража один облик, поэтому «P» неактивна.
     func isActive(_ stat: SpecialStat) -> Bool {
-        stat.isActive && !(character == .ab && stat == .perception)
+        stat.isActive && !(character != .f && stat == .perception)
     }
     var coffee = false
     var outfit: Outfit = .armor

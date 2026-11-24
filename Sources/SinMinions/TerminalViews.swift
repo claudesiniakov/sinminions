@@ -21,10 +21,10 @@ enum Term {
     /// Предупреждения и ошибки: янтарь у Moth, багрянец у стража.
     static var amber: Color { gothic ? Color(nsColor: CompanionView.Palette.rgb(0xff6b57)) : Color(red: 1, green: 0.69, blue: 0.2) }
     // У стража: тёплый пергамент для текста и рамок, кровавый багрянец для линий и разделителей, чёрно-красный фон.
-    static var green: Color { gothic ? Color(nsColor: CompanionView.Palette.rgb(0xf0d58c)) : Color(nsColor: CompanionView.Palette.green) }
-    static var dim: Color { gothic ? Color(nsColor: CompanionView.Palette.rgb(0xb59a62)) : Color(nsColor: CompanionView.Palette.greenDim) }
-    static var dark: Color { gothic ? Color(nsColor: CompanionView.Palette.rgb(0x7a2222)) : Color(nsColor: CompanionView.Palette.greenDark) }
-    static var background: Color { gothic ? Color(nsColor: CompanionView.Palette.rgb(0x0e0808)) : Color(nsColor: CompanionView.Palette.rgb(0x0b0f0a)) }
+    static var green: Color { theme == .v ? Color(nsColor: CompanionView.Palette.rgb(0xf8ade3)) : gothic ? Color(nsColor: CompanionView.Palette.rgb(0xf0d58c)) : Color(nsColor: CompanionView.Palette.green) }
+    static var dim: Color { theme == .v ? Color(nsColor: CompanionView.Palette.rgb(0xbf8dbd)) : gothic ? Color(nsColor: CompanionView.Palette.rgb(0xb59a62)) : Color(nsColor: CompanionView.Palette.greenDim) }
+    static var dark: Color { theme == .v ? Color(nsColor: CompanionView.Palette.rgb(0x614363)) : gothic ? Color(nsColor: CompanionView.Palette.rgb(0x7a2222)) : Color(nsColor: CompanionView.Palette.greenDark) }
+    static var background: Color { theme == .v ? Color(nsColor: CompanionView.Palette.rgb(0x190f22)) : gothic ? Color(nsColor: CompanionView.Palette.rgb(0x0e0808)) : Color(nsColor: CompanionView.Palette.rgb(0x0b0f0a)) }
     static var font: Font { Font.system(size: 13, design: .monospaced) }
     static var small: Font { Font.system(size: 11, design: .monospaced) }
     /// Заголовки окон: у стража — готический засечный шрифт.
