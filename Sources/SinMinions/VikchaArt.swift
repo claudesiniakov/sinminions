@@ -22,6 +22,13 @@ final class VikchaArt: CompanionArt {
     let eyesHome: CGPoint
     let glowScale: CGFloat = 0.65
 
+    private let leftLeg = CALayer()
+    private let rightLeg = CALayer()
+    private let leftArm = CALayer()
+    private let rightArm = CALayer()
+    private let rightEye = CALayer()
+    private let sparks = CAShapeLayer()
+
     // Координаты рисунка отсчитываются от верхнего левого угла рамки 48 × 56.
     private enum Segment {
         case move(CGFloat, CGFloat)
@@ -71,6 +78,18 @@ final class VikchaArt: CompanionArt {
         eyes.bounds = bounds
         eyes.anchorPoint = CGPoint(x: 0.5, y: eyesHome.y / size.height)
         eyes.position = eyesHome
+
+        func position(_ layer: CALayer, x: CGFloat, y: CGFloat) {
+            layer.bounds = bounds
+            layer.anchorPoint = CGPoint(x: x / 48, y: 1 - y / 56)
+            layer.position = CGPoint(x: x * scale, y: (56 - y) * scale)
+        }
+
+        position(leftLeg, x: 20, y: 41)
+        position(rightLeg, x: 28, y: 41)
+        position(leftArm, x: 16.5, y: 31)
+        position(rightArm, x: 31.5, y: 31)
+        position(rightEye, x: 31, y: 19)
 
         body.frame = bounds
         body.path = bodyPath
@@ -132,58 +151,60 @@ final class VikchaArt: CompanionArt {
         ], stroke: 0x4c2c71, width: 0.55)
 
         // Ноги и ботинки.
+        root.addSublayer(leftLeg)
         paint([
             .move(17.4, 40), .line(22.6, 40), .line(22.1, 46),
             .line(22.1, 48), .line(17.6, 48), .quad(17.3, 43, 17.4, 40),
             .close
-        ], gradient: (15, 10, 27, 40, [0xfff1da, 0xffd1bc, 0xefa197]), stroke: 0x32204f, width: 0.8)
+        ], gradient: (15, 10, 27, 40, [0xfff1da, 0xffd1bc, 0xefa197]), stroke: 0x32204f, width: 0.8, on: leftLeg)
         paint([
             .move(17.7, 45), .line(22.2, 45), .line(22.2, 48),
             .line(17.7, 48), .close
-        ], fill: 0xf4e9ff, stroke: 0x32204f, width: 0.6)
+        ], fill: 0xf4e9ff, stroke: 0x32204f, width: 0.6, on: leftLeg)
         paint([
             .move(17.6, 46), .line(22.3, 46)
-        ], stroke: 0xb385cb, width: 0.45)
+        ], stroke: 0xb385cb, width: 0.45, on: leftLeg)
         paint([
             .move(17.3, 47), .line(22.7, 47), .line(22.8, 51),
             .curve(16.9, 51, 15.3, 51.3, 15.3, 52.3), .curve(22.6, 53, 18.7, 53, 17.6, 52.8), .quad(17.3, 51, 17.3, 47),
             .close
-        ], gradient: (14, 47, 22, 53, [0x8057a2, 0x38264e, 0x271b3b]), stroke: 0x32204f, width: 0.8)
+        ], gradient: (14, 47, 22, 53, [0x8057a2, 0x38264e, 0x271b3b]), stroke: 0x32204f, width: 0.8, on: leftLeg)
         paint([
             .move(17.8, 52), .quad(20, 52.6, 16.7, 52.5)
-        ], stroke: 0xbc81c5, width: 0.46)
+        ], stroke: 0xbc81c5, width: 0.46, on: leftLeg)
         paint([
             .move(18.6, 48.45), .line(21, 48.45)
-        ], stroke: 0xf4caff, width: 0.4)
+        ], stroke: 0xf4caff, width: 0.4, on: leftLeg)
         paint([
             .move(18.6, 49.45), .line(21, 49.45)
-        ], stroke: 0xf4caff, width: 0.4)
+        ], stroke: 0xf4caff, width: 0.4, on: leftLeg)
+        root.addSublayer(rightLeg)
         paint([
             .move(25.4, 40), .line(30.6, 40), .line(30.1, 46),
             .line(30.1, 48), .line(25.6, 48), .quad(25.3, 43, 25.4, 40),
             .close
-        ], gradient: (15, 10, 27, 40, [0xfff1da, 0xffd1bc, 0xefa197]), stroke: 0x32204f, width: 0.8)
+        ], gradient: (15, 10, 27, 40, [0xfff1da, 0xffd1bc, 0xefa197]), stroke: 0x32204f, width: 0.8, on: rightLeg)
         paint([
             .move(25.7, 45), .line(30.2, 45), .line(30.2, 48),
             .line(25.7, 48), .close
-        ], fill: 0xf4e9ff, stroke: 0x32204f, width: 0.6)
+        ], fill: 0xf4e9ff, stroke: 0x32204f, width: 0.6, on: rightLeg)
         paint([
             .move(25.6, 46), .line(30.3, 46)
-        ], stroke: 0xb385cb, width: 0.45)
+        ], stroke: 0xb385cb, width: 0.45, on: rightLeg)
         paint([
             .move(25.3, 47), .line(30.7, 47), .line(30.8, 51),
             .curve(31.1, 51, 32.7, 51.3, 32.7, 52.3), .curve(30.6, 53, 26.7, 53, 25.6, 52.8), .quad(25.3, 51, 25.3, 47),
             .close
-        ], gradient: (14, 47, 22, 53, [0x8057a2, 0x38264e, 0x271b3b]), stroke: 0x32204f, width: 0.8)
+        ], gradient: (14, 47, 22, 53, [0x8057a2, 0x38264e, 0x271b3b]), stroke: 0x32204f, width: 0.8, on: rightLeg)
         paint([
             .move(25.8, 52), .quad(28, 52.6, 31.3, 52.5)
-        ], stroke: 0xbc81c5, width: 0.46)
+        ], stroke: 0xbc81c5, width: 0.46, on: rightLeg)
         paint([
             .move(26.6, 48.45), .line(29, 48.45)
-        ], stroke: 0xf4caff, width: 0.4)
+        ], stroke: 0xf4caff, width: 0.4, on: rightLeg)
         paint([
             .move(26.6, 49.45), .line(29, 49.45)
-        ], stroke: 0xf4caff, width: 0.4)
+        ], stroke: 0xf4caff, width: 0.4, on: rightLeg)
 
         // Юбка.
         paint([
@@ -208,36 +229,38 @@ final class VikchaArt: CompanionArt {
         ], stroke: 0xbb92d6, width: 0.38)
 
         // Рукава и жакет.
+        root.addSublayer(leftArm)
         paint([
             .move(14.5, 30), .curve(16.5, 29, 18.5, 29.5, 18.7, 31), .line(12.7, 38.8),
             .line(13.6, 40.4), .line(16.9, 39.7), .quad(14.6, 34, 14.5, 30),
             .close
-        ], gradient: (15, 29, 33, 40, [0xffb4d7, 0xe775a9, 0xa94382]), stroke: 0x32204f, width: 0.78)
+        ], gradient: (15, 29, 33, 40, [0xffb4d7, 0xe775a9, 0xa94382]), stroke: 0x32204f, width: 0.78, on: leftArm)
         paint([
             .move(16.7, 38), .line(13.4, 38.9)
-        ], stroke: 0xfff0f2, width: 0.65)
+        ], stroke: 0xfff0f2, width: 0.65, on: leftArm)
         paint([
             .move(13.1, 39.5), .curve(13.9, 39.4, 15.5, 40, 16, 40.1), .curve(16.5, 41.1, 16.2, 42.6, 15.1, 42.7),
             .curve(13.2, 43, 12.5, 42.2, 12.8, 41), .close
-        ], gradient: (15, 10, 27, 40, [0xfff1da, 0xffd1bc, 0xefa197]), stroke: 0x32204f, width: 0.55)
+        ], gradient: (15, 10, 27, 40, [0xfff1da, 0xffd1bc, 0xefa197]), stroke: 0x32204f, width: 0.55, on: leftArm)
         paint([
             .move(14.85, 41.1), .quad(15.25, 41.8, 15.1, 42.3)
-        ], stroke: 0xb96f77, width: 0.32)
+        ], stroke: 0xb96f77, width: 0.32, on: leftArm)
+        root.addSublayer(rightArm)
         paint([
             .move(29.5, 30), .curve(31.5, 29, 33.5, 29.5, 33.7, 31), .line(35.3, 38.8),
             .line(34.4, 40.4), .line(31.1, 39.7), .quad(29.6, 34, 29.5, 30),
             .close
-        ], gradient: (15, 29, 33, 40, [0xffb4d7, 0xe775a9, 0xa94382]), stroke: 0x32204f, width: 0.78)
+        ], gradient: (15, 29, 33, 40, [0xffb4d7, 0xe775a9, 0xa94382]), stroke: 0x32204f, width: 0.78, on: rightArm)
         paint([
             .move(31.3, 38), .line(34.6, 38.9)
-        ], stroke: 0xfff0f2, width: 0.65)
+        ], stroke: 0xfff0f2, width: 0.65, on: rightArm)
         paint([
             .move(32.1, 39.5), .curve(32.9, 39.4, 34.5, 40, 35, 40.1), .curve(35.5, 41.1, 35.2, 42.6, 34.1, 42.7),
             .curve(32.2, 43, 31.5, 42.2, 31.8, 41), .close
-        ], gradient: (15, 10, 27, 40, [0xfff1da, 0xffd1bc, 0xefa197]), stroke: 0x32204f, width: 0.55)
+        ], gradient: (15, 10, 27, 40, [0xfff1da, 0xffd1bc, 0xefa197]), stroke: 0x32204f, width: 0.55, on: rightArm)
         paint([
             .move(33.85, 41.1), .quad(34.25, 41.8, 34.1, 42.3)
-        ], stroke: 0xb96f77, width: 0.32)
+        ], stroke: 0xb96f77, width: 0.32, on: rightArm)
         paint([
             .move(21, 27), .line(27, 27), .line(31.8, 30),
             .line(30, 34.5), .line(30.2, 39), .curve(27, 40, 25.5, 39.5, 24, 38.4),
@@ -328,34 +351,35 @@ final class VikchaArt: CompanionArt {
         paint([
             .move(16.044, 14.198), .quad(17.838, 13.177, 20.334, 13.87)
         ], stroke: 0x73416f, width: 0.544, on: eyes)
+        eyes.addSublayer(rightEye)
         paint([
             .move(26.262, 18.761), .curve(26.496, 15.476, 30.24, 15.038, 32.19, 16.717), .curve(33.282, 20.586, 30.864, 22.484, 28.524, 21.681),
             .quad(27.042, 21.17, 26.262, 18.761), .close
-        ], fill: 0xfff6fe, stroke: 0x32204f, width: 0.642, on: eyes)
+        ], fill: 0xfff6fe, stroke: 0x32204f, width: 0.642, on: rightEye)
         paint([
             .oval(28.017, 16.06, 3.822, 5.402)
-        ], gradient: (28.017, 16.06, 28.017, 21.17, [0x44216e, 0x7844ba, 0xefa2fb]), stroke: 0x32204f, width: 0.325, on: eyes)
+        ], gradient: (28.017, 16.06, 28.017, 21.17, [0x44216e, 0x7844ba, 0xefa2fb]), stroke: 0x32204f, width: 0.325, on: rightEye)
         paint([
             .oval(29.07, 16.863, 1.95, 3.175)
-        ], fill: 0x321c4f, on: eyes)
+        ], fill: 0x321c4f, on: rightEye)
         paint([
             .oval(28.29, 16.498, 1.638, 1.314)
-        ], fill: 0xfff9ff, on: eyes)
+        ], fill: 0xfff9ff, on: rightEye)
         paint([
             .oval(30.552, 19.637, 0.78, 0.912)
-        ], fill: 0xffe4fc, on: eyes)
+        ], fill: 0xffe4fc, on: rightEye)
         paint([
             .move(25.755, 17.301), .quad(26.262, 16.644, 27.51, 16.206), .curve(29.382, 15.367, 31.722, 15.95, 32.346, 17.009)
-        ], stroke: 0x3a2354, width: 0.793, on: eyes)
+        ], stroke: 0x3a2354, width: 0.793, on: rightEye)
         paint([
             .move(26.457, 16.753), .line(25.56, 16.06)
-        ], stroke: 0x3a2354, width: 0.544, on: eyes)
+        ], stroke: 0x3a2354, width: 0.544, on: rightEye)
         paint([
             .move(27.12, 15.841), .line(26.535, 15.111)
-        ], stroke: 0x3a2354, width: 0.415, on: eyes)
+        ], stroke: 0x3a2354, width: 0.415, on: rightEye)
         paint([
             .move(26.808, 14.198), .quad(28.602, 13.177, 31.098, 13.87)
-        ], stroke: 0x73416f, width: 0.544, on: eyes)
+        ], stroke: 0x73416f, width: 0.544, on: rightEye)
         paint([
             .oval(14.718, 21.535, 4.056, 2.044)
         ], fill: 0xf3a2aa)
@@ -422,5 +446,58 @@ final class VikchaArt: CompanionArt {
                 .line(35, 41), .close
             ], fill: 0xffda83, stroke: 0x32204f, width: 1)
         }
+        let stars: [(CGFloat, CGFloat, CGFloat)] = [(5, 13, 2.6), (43, 9, 3.5), (45, 22, 1.8)]
+        sparks.frame = bounds
+        sparks.path = path(for: stars.flatMap { star -> [Segment] in
+            let (x, y, radius) = star
+            let corner = radius * 0.25
+            return [
+                .move(x, y - radius), .line(x + corner, y - corner), .line(x + radius, y),
+                .line(x + corner, y + corner), .line(x, y + radius), .line(x - corner, y + corner),
+                .line(x - radius, y), .line(x - corner, y - corner), .close,
+            ]
+        })
+        sparks.fillColor = CompanionView.Palette.rgb(0xffda83).cgColor
+        sparks.opacity = 0
+        root.addSublayer(sparks)
+    }
+
+    func setWalking(_ on: Bool) {
+        let limbs: [(CALayer, Double)] = [
+            (leftLeg, 0.32), (rightLeg, -0.32), (leftArm, -0.22), (rightArm, 0.22),
+        ]
+        for (limb, angle) in limbs {
+            if on {
+                let stride = motion("transform.rotation.z", [0, angle, 0, -angle, 0], duration: 0.55)
+                stride.repeatCount = .infinity
+                limb.add(stride, forKey: "stride")
+            } else {
+                limb.removeAnimation(forKey: "stride")
+            }
+        }
+    }
+
+    func wave() {
+        let wave = motion("transform.rotation.z", [0, 2, 1.72, 2.18, 1.72, 2, 0], duration: 1.35)
+        wave.keyTimes = [0, 0.17, 0.28, 0.4, 0.52, 0.73, 1]
+        rightArm.add(wave, forKey: "wave")
+    }
+
+    func react() {
+        let wink = motion("transform.scale.y", [1, 0.1, 0.1, 1], duration: 0.85)
+        wink.keyTimes = [0, 0.18, 0.73, 1]
+        rightEye.add(wink, forKey: "wink")
+
+        let shimmer = motion("opacity", [0, 1, 0.55, 0.95, 0], duration: 1.18)
+        shimmer.keyTimes = [0, 0.18, 0.47, 0.63, 1]
+        sparks.add(shimmer, forKey: "sparkles")
+    }
+
+    private func motion(_ keyPath: String, _ values: [Double], duration: CFTimeInterval) -> CAKeyframeAnimation {
+        let animation = CAKeyframeAnimation(keyPath: keyPath)
+        animation.values = values
+        animation.duration = duration
+        animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        return animation
     }
 }

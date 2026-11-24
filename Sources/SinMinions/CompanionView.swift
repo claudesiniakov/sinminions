@@ -61,6 +61,9 @@ final class CompanionView: NSView {
         static let bodyStroke = rgb(0x3a8a28)
         static let pupil = rgb(0xcfffca)
         static let panel = rgb(0x0e140c)
+        static let vikchaText = rgb(0xf8ade3)
+        static let vikchaBorder = rgb(0x95628d)
+        static let vikchaPanel = rgb(0x190f22)
     }
 
     let scale: CGFloat
@@ -179,8 +182,8 @@ final class CompanionView: NSView {
             glowOpacity.toValue = 0.8
         }
         group.repeatCount = .infinity
-        if golden != nil {
-            // Страж не парит: стоит на месте, а раз в несколько секунд сам переступает.
+        if golden != nil || vikchaWalking {
+            // Страж стоит на месте, а V во время ходьбы перестаёт парить.
             moth.removeAnimation(forKey: "float")
         } else {
             moth.add(group, forKey: "float")
@@ -211,6 +214,7 @@ final class CompanionView: NSView {
 
     /// Щелчок: подпрыгивание и вспышка свечения.
     func hop() {
+        if !sleeping { vikcha?.wave() }
         let hop = CAKeyframeAnimation(keyPath: "transform.translation.y")
         hop.values = [0, 14 * scale, 0]
         hop.keyTimes = [0, 0.45, 1]
@@ -231,6 +235,15 @@ final class CompanionView: NSView {
 
     /// Танец: оборот вокруг оси с подскоком и вспышкой свечения.
     func spin() {
+        if let vikcha {
+            guard !sleeping else { return }
+            vikcha.react()
+            let jump = keyframes("transform.translation.y", [0, 9 * scale, 0], [0, 0.4, 1])
+            jump.duration = 0.5
+            jump.isAdditive = true
+            moth.add(jump, forKey: "reactionJump")
+            return
+        }
         let degree = CGFloat.pi / 180
         let rotation = CABasicAnimation(keyPath: "transform.rotation.z")
         rotation.fromValue = 0
@@ -311,9 +324,19 @@ final class CompanionView: NSView {
 
     /// Золотой страж двигается по-своему: шагает, садится, играет, кричит «В бой!» и кланяется. У призрака этого нет.
     private var golden: GoldenArt? { art as? GoldenArt }
+    private var vikcha: VikchaArt? { art as? VikchaArt }
+    private var vikchaWalking = false
 
-    /// Перелёт стража — это шаги: ноги ступают по очереди, а парения нет.
+    /// Страж и V шагают при перемещении окна.
     func setWalking(_ on: Bool) {
+        if let vikcha {
+            let walking = on && !sleeping
+            guard walking != vikchaWalking else { return }
+            vikchaWalking = walking
+            vikcha.setWalking(walking)
+            startFloating()
+            return
+        }
         guard let golden, golden.pose == .idle || golden.pose == .walk else { return }
         golden.setPose(on ? .walk : .idle)
     }
@@ -365,6 +388,7 @@ final class CompanionView: NSView {
     func setSleeping(_ value: Bool) {
         guard value != sleeping else { return }
         sleeping = value
+        if value && vikchaWalking { setWalking(false) }
         golden?.setPose(value ? .sit : .idle)
         CATransaction.begin()
         CATransaction.setAnimationDuration(0.3)

@@ -129,6 +129,7 @@ public struct PhraseBook {
             case .wake: return ["снова в эфире!"]
             case .shooed: return ["увидимся после перерыва"]
             case .scared: return ["вот это резкий рост!"]
+            case .searching: return ["где же мой бриф?", "ищу зацепки для кампании…", "проверю, что тут есть"]
             default: return ["кому это будет полезно?", "проверим гипотезу?", "а что говорят цифры?"]
             }
         }

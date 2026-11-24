@@ -13,23 +13,37 @@ final class BubbleView: NSView {
     private typealias Palette = CompanionView.Palette
 
     var text = ""
-    /// У золотого стража пузырь золотой с багряной рамкой, у призрака зелёный.
     var character: CompanionCharacter = .f
     var below = false
     var tailX: CGFloat = 0
+
+    private static func colors(for character: CompanionCharacter) -> (
+        text: NSColor, glow: NSColor, panel: NSColor, border: NSColor
+    ) {
+        switch character {
+        case .f:
+            return (Palette.greenDim, Palette.green, Palette.panel, Palette.greenDark)
+        case .ab:
+            let gold = Palette.rgb(0xf0d58c)
+            return (gold, gold, Palette.rgb(0x0e0808), Palette.rgb(0x7a2222))
+        case .v:
+            return (Palette.vikchaText, Palette.vikchaText, Palette.vikchaPanel, Palette.vikchaBorder)
+        }
+    }
 
     private static func attributed(_ text: String, character: CompanionCharacter = .f) -> NSAttributedString {
         let style = NSMutableParagraphStyle()
         style.alignment = .center
         style.lineBreakMode = .byWordWrapping
         style.lineHeightMultiple = 1.15
+        let colors = colors(for: character)
         let glow = NSShadow()
-        glow.shadowColor = (character == .ab ? Palette.rgb(0xf0d58c) : Palette.green).withAlphaComponent(0.55)
+        glow.shadowColor = colors.glow.withAlphaComponent(0.55)
         glow.shadowBlurRadius = 6
         glow.shadowOffset = .zero
         return NSAttributedString(string: text, attributes: [
             .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .regular),
-            .foregroundColor: character == .ab ? Palette.rgb(0xf0d58c) : Palette.greenDim,
+            .foregroundColor: colors.text,
             .kern: 0.5,
             .shadow: glow,
             .paragraphStyle: style,
@@ -61,11 +75,10 @@ final class BubbleView: NSView {
             : CGRect(x: inset.minX, y: inset.minY + Self.tail, width: inset.width, height: inset.height - Self.tail)
 
         let frame = NSBezierPath(rect: box)
-        let panelColor = character == .ab ? Palette.rgb(0x0e0808) : Palette.panel
-        let edgeColor = character == .ab ? Palette.rgb(0x7a2222) : Palette.greenDark
-        panelColor.setFill()
+        let colors = Self.colors(for: character)
+        colors.panel.setFill()
         frame.fill()
-        edgeColor.setStroke()
+        colors.border.setStroke()
         frame.lineWidth = 1
         frame.stroke()
 
@@ -78,14 +91,14 @@ final class BubbleView: NSView {
         triangle.line(to: CGPoint(x: x, y: tipY))
         triangle.line(to: CGPoint(x: x + Self.tail, y: baseY + overlap))
         triangle.close()
-        panelColor.setFill()
+        colors.panel.setFill()
         triangle.fill()
         let edges = NSBezierPath()
         edges.move(to: CGPoint(x: x - Self.tail, y: baseY))
         edges.line(to: CGPoint(x: x, y: tipY))
         edges.line(to: CGPoint(x: x + Self.tail, y: baseY))
         edges.lineWidth = 1
-        edgeColor.setStroke()
+        colors.border.setStroke()
         edges.stroke()
 
         let t = Self.textSize(text)

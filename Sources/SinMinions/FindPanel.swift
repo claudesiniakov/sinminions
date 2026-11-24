@@ -86,7 +86,11 @@ final class FindPanel {
         let green = Palette.green
         let glow = CALayer()
         glow.frame = root.bounds
-        glow.shadowColor = (find.isRelic ? Palette.rgb(0xf0c24e) : green).cgColor
+        if find.isMarketingFind {
+            glow.shadowColor = Palette.vikchaText.cgColor
+        } else {
+            glow.shadowColor = (find.isRelic ? Palette.rgb(0xf0c24e) : green).cgColor
+        }
         glow.shadowOpacity = 0.8
         glow.shadowRadius = 7
         glow.shadowOffset = .zero
@@ -94,6 +98,8 @@ final class FindPanel {
         let mid = Palette.rgb(0x2f6a20)
         let water = Palette.rgb(0x4fc3ff)
         switch find {
+        case .campaignBrief, .metricsChart, .megaphone, .hypothesisNote:
+            drawMarketingFind(find, in: glow)
         case .waterChip:
             // Микросхема с выводами и каплей воды.
             let body = CGRect(x: 14, y: 14, width: 28, height: 28)
@@ -234,5 +240,64 @@ final class FindPanel {
         }
         root.addSublayer(glow)
         return root
+    }
+
+    private static func drawMarketingFind(_ find: SearchFind, in layer: CALayer) {
+        let ink = Palette.rgb(0x32204f)
+        let paper = Palette.rgb(0xffeaf5)
+        let pink = Palette.rgb(0xf788b9)
+        let purple = Palette.rgb(0x9c66d0)
+        let gold = Palette.rgb(0xffda83)
+
+        func rectangle(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, color: NSColor, radius: CGFloat = 2) {
+            let path = CGPath(roundedRect: CGRect(x: x, y: y, width: w, height: h),
+                              cornerWidth: radius, cornerHeight: radius, transform: nil)
+            layer.addSublayer(shape(path, fill: color, stroke: ink, width: 1.2))
+        }
+
+        func line(_ points: [CGPoint], stroke: NSColor, width: CGFloat = 1.6, fill: NSColor? = nil) {
+            guard let first = points.first else { return }
+            let path = CGMutablePath()
+            path.move(to: first)
+            for point in points.dropFirst() { path.addLine(to: point) }
+            if fill != nil { path.closeSubpath() }
+            layer.addSublayer(shape(path, fill: fill, stroke: stroke, width: width))
+        }
+
+        switch find {
+        case .campaignBrief:
+            rectangle(12, 7, 32, 40, color: purple, radius: 4)
+            rectangle(16, 11, 24, 33, color: paper)
+            rectangle(21, 41, 14, 8, color: gold)
+            for y in [19, 27, 35] as [CGFloat] {
+                line([CGPoint(x: 21, y: y), CGPoint(x: 23, y: y - 2), CGPoint(x: 26, y: y + 2)], stroke: purple)
+                line([CGPoint(x: 29, y: y), CGPoint(x: 35, y: y)], stroke: ink, width: 1)
+            }
+        case .metricsChart:
+            rectangle(8, 12, 40, 31, color: paper, radius: 4)
+            line([CGPoint(x: 15, y: 36), CGPoint(x: 15, y: 18), CGPoint(x: 42, y: 18)], stroke: ink)
+            rectangle(19, 18, 5, 7, color: pink, radius: 1)
+            rectangle(27, 18, 5, 12, color: purple, radius: 1)
+            rectangle(35, 18, 5, 17, color: gold, radius: 1)
+        case .megaphone:
+            rectangle(15, 13, 8, 14, color: purple)
+            rectangle(9, 23, 13, 11, color: paper)
+            line([CGPoint(x: 20, y: 24), CGPoint(x: 41, y: 14), CGPoint(x: 41, y: 43),
+                  CGPoint(x: 20, y: 33)], stroke: ink, fill: pink)
+            line([CGPoint(x: 39, y: 15), CGPoint(x: 39, y: 42)], stroke: purple, width: 2)
+            line([CGPoint(x: 45, y: 30), CGPoint(x: 51, y: 32)], stroke: gold, width: 2)
+            line([CGPoint(x: 44, y: 37), CGPoint(x: 48, y: 41)], stroke: gold, width: 2)
+        case .hypothesisNote:
+            line([CGPoint(x: 12, y: 12), CGPoint(x: 35, y: 12), CGPoint(x: 44, y: 21),
+                  CGPoint(x: 44, y: 45), CGPoint(x: 12, y: 45)], stroke: ink, fill: gold)
+            line([CGPoint(x: 35, y: 12), CGPoint(x: 35, y: 21), CGPoint(x: 44, y: 21)], stroke: ink, fill: paper)
+            rectangle(21, 42, 14, 6, color: pink, radius: 1)
+            let bulb = CGPath(ellipseIn: CGRect(x: 22, y: 25, width: 12, height: 12), transform: nil)
+            layer.addSublayer(shape(bulb, fill: paper, stroke: ink, width: 1.3))
+            line([CGPoint(x: 25, y: 22), CGPoint(x: 31, y: 22)], stroke: purple, width: 2)
+            line([CGPoint(x: 26, y: 19), CGPoint(x: 30, y: 19)], stroke: purple)
+        default:
+            break
+        }
     }
 }

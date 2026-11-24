@@ -51,6 +51,14 @@ private struct GeneralSettings: View {
         }
     }
 
+    private var searchDescription: String {
+        switch prefs.character {
+        case .f: return tr("Что-нибудь ищет и находит (водяной чип и другое)")
+        case .ab: return tr("Ищет реликвии Империума и находит их")
+        case .v: return tr("Ищет маркетинговые находки: брифы, графики и идеи")
+        }
+    }
+
     @State private var hasAccess = SpotlightLauncher.hasAccess
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var loginError: String?
@@ -85,9 +93,7 @@ private struct GeneralSettings: View {
                     .disabled(!prefs.wanderEnabled)
                 Toggle(tr("Пугается быстрого курсора"), isOn: $prefs.scareEnabled)
                 Toggle(tr("Отлетает в сторону, если щёлкнуть правой кнопкой"), isOn: $prefs.shooEnabled)
-                if prefs.character != .v {
-                    Toggle(prefs.character == .ab ? tr("Ищет реликвии Империума и находит их") : tr("Что-нибудь ищет и находит (водяной чип и другое)"), isOn: $prefs.searchEnabled)
-                }
+                Toggle(searchDescription, isOn: $prefs.searchEnabled)
                 if prefs.character == .ab {
                     Toggle(tr("Играет на приставке рядом с телевизором"), isOn: $prefs.playEnabled)
                     Toggle(tr("Иногда поёт гимн"), isOn: $prefs.singEnabled)

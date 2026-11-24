@@ -1,10 +1,15 @@
 import Foundation
 
-/// Находки призрака после поиска. Каждая рисуется отдельной картинкой рядом с ним.
+/// Находки компаньонов. У каждого предмета есть рисунок и реплики.
 public enum SearchFind: CaseIterable, Sendable {
     case waterChip, holotape, bottleCap, stimpak
     /// Реликвии Империума: их ищет золотой страж.
     case aquila, purityScroll, goldenSkull, chalice
+    case campaignBrief, metricsChart, megaphone, hypothesisNote
+
+    private static let marketingFinds: [SearchFind] = [.campaignBrief, .metricsChart, .megaphone, .hypothesisNote]
+
+    public var isMarketingFind: Bool { Self.marketingFinds.contains(self) }
 
     /// Реликвия ли это (находка стража, а не призрака).
     public var isRelic: Bool {
@@ -24,6 +29,10 @@ public enum SearchFind: CaseIterable, Sendable {
         case .purityScroll: return tr("СВИТОК С ПЕЧАТЬЮ ЧИСТОТЫ")
         case .goldenSkull: return tr("ЗОЛОЧЁНЫЙ ЧЕРЕП")
         case .chalice: return tr("СВЯТАЯ ЧАША")
+        case .campaignBrief: return tr("БРИФ КАМПАНИИ")
+        case .metricsChart: return tr("ГРАФИК МЕТРИК")
+        case .megaphone: return tr("МЕГАФОН")
+        case .hypothesisNote: return tr("СТИКЕР С ГИПОТЕЗОЙ")
         }
     }
 
@@ -38,6 +47,10 @@ public enum SearchFind: CaseIterable, Sendable {
         case .purityScroll: return [tr("свиток с печатью чистоты. хранить свято"), tr("печать чистоты найдена. молитва в запасе"), tr("древний свиток. пусть хранится у меня")]
         case .goldenSkull: return [tr("золочёный череп. реликвия павшего героя"), tr("священный череп. храню как святыню"), tr("нашёл череп героя. покойся с честью")]
         case .chalice: return [tr("чаша из давних времён. реликвия"), tr("священный кубок найден"), tr("святая чаша. пусть будет в запасе")]
+        case .campaignBrief: return [tr("бриф на месте! начнём с цели"), tr("нашла бриф. посмотрим, для кого кампания")]
+        case .metricsChart: return [tr("нашла график! посмотрим, где выросла конверсия"), tr("график метрик! есть что обсудить")]
+        case .megaphone: return [tr("мегафон! пора рассказать о запуске"), tr("нашла мегафон. какое сообщение передаём?")]
+        case .hypothesisNote: return [tr("нашла стикер с гипотезой. проверим её?"), tr("о, идея для следующего A/B-теста!")]
         }
     }
 
@@ -45,6 +58,10 @@ public enum SearchFind: CaseIterable, Sendable {
     /// чаще всего аквилу.
     public static func pick(for character: CompanionCharacter = .f, _ random: (ClosedRange<Double>) -> Double = { Double.random(in: $0) }) -> SearchFind {
         let roll = random(0...1)
+        if character == .v {
+            let index = min(Int(roll * Double(marketingFinds.count)), marketingFinds.count - 1)
+            return marketingFinds[index]
+        }
         if character == .ab {
             if roll < 0.4 { return .aquila }
             let others: [SearchFind] = [.purityScroll, .goldenSkull, .chalice]

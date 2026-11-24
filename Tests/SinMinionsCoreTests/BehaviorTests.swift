@@ -1193,6 +1193,16 @@ final class NewBehaviorsTests: XCTestCase {
         XCTAssertFalse(book.next(.click, hour: 12).isEmpty)
     }
 
+    func testVikchaSearchesOnlyMarketingFinds() {
+        let rolls = [0.0, 0.25, 0.50, 0.75, 1.0]
+        let finds = rolls.map { roll in SearchFind.pick(for: .v) { _ in roll } }
+        XCTAssertEqual(finds, [.campaignBrief, .metricsChart, .megaphone, .hypothesisNote, .hypothesisNote])
+        XCTAssertTrue(finds.allSatisfy(\.isMarketingFind))
+        for character in [CompanionCharacter.f, .ab] {
+            XCTAssertFalse(rolls.contains { roll in SearchFind.pick(for: character) { _ in roll }.isMarketingFind })
+        }
+    }
+
     func testGuardSearchesOnlyRelics() {
         for roll in stride(from: 0.0, through: 1.0, by: 0.05) {
             XCTAssertTrue(SearchFind.pick(for: .ab, { _ in roll }).isRelic, "\(roll)")
