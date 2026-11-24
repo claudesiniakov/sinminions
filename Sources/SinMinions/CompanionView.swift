@@ -182,8 +182,8 @@ final class CompanionView: NSView {
             glowOpacity.toValue = 0.8
         }
         group.repeatCount = .infinity
-        if golden != nil || vikchaWalking {
-            // Страж стоит на месте, а V во время ходьбы перестаёт парить.
+        if golden != nil || vikcha != nil {
+            // Страж и V стоят на опоре, даже когда их ноги неподвижны.
             moth.removeAnimation(forKey: "float")
         } else {
             moth.add(group, forKey: "float")

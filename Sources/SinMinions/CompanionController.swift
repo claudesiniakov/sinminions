@@ -731,7 +731,43 @@ final class CompanionController: NSObject {
         self.timer = timer
     }
 
+    private var windowPosition: CGFloat = 0.75
+    private var nextWindowCheck: Double = 0
+
+    /// WindowServer перечисляет окна спереди назад в координатах с началом вверху основного экрана.
+    private func windowWalkTarget(at fraction: CGFloat) -> CGPoint? {
+        guard prefs.character == .v, prefs.vikchaWindowWalk,
+              let application = NSWorkspace.shared.frontmostApplication,
+              application.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+              let screen = NSScreen.screens.first,
+              let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+                as? [[String: Any]] else { return nil }
+        let figure = view.mothFrame
+        for window in windows {
+            guard window[kCGWindowOwnerPID as String] as? Int32 == application.processIdentifier,
+                  window[kCGWindowLayer as String] as? Int == 0,
+                  let rect = window[kCGWindowBounds as String] as? [String: CGFloat],
+                  let x = rect["X"], let y = rect["Y"], let w = rect["Width"], let h = rect["Height"],
+                  w >= figure.width, h >= figure.height else { continue }
+            let frame = CGRect(x: x, y: screen.frame.maxY - y - h, width: w, height: h)
+            let visible = NSScreen.screens.map { $0.visibleFrame.intersection(frame) }
+                .filter { !$0.isNull && $0.width >= figure.width && $0.height >= figure.height }
+                .max { $0.width * $0.height < $1.width * $1.height }
+            guard let visible else { continue }
+            return clamped(CGPoint(x: visible.minX + fraction * (visible.width - figure.width) - figure.minX,
+                                   y: visible.minY - figure.minY), size: panel.frame.size)
+        }
+        return nil
+    }
+
     private func fastTick() {
+        if prefs.character == .v, prefs.vikchaWindowWalk, flight == nil, !view.isDragging,
+           engine.mode == .idle, now >= nextWindowCheck {
+            nextWindowCheck = now + 0.45
+            if let target = windowWalkTarget(at: windowPosition), target != panel.frame.origin {
+                panel.setFrameOrigin(target)
+            }
+        }
         let mouse = NSEvent.mouseLocation
         if !view.isDragging {
             let inside = view.silhouetteContains(screenPoint: mouse)
@@ -954,7 +990,15 @@ final class CompanionController: NSObject {
 
     private func startFlight(to explicit: CGPoint? = nil, chase: Bool = false) {
         let from = panel.frame.origin
-        let to = explicit ?? Layout.randomTarget(size: panel.frame.size, in: area, from: from)
+        let to: CGPoint
+        if let explicit {
+            to = explicit
+        } else if prefs.character == .v && prefs.vikchaWindowWalk {
+            windowPosition = windowPosition > 0.5 ? .random(in: 0.05...0.40) : .random(in: 0.60...0.95)
+            to = windowWalkTarget(at: windowPosition) ?? Layout.randomTarget(size: panel.frame.size, in: area, from: from)
+        } else {
+            to = Layout.randomTarget(size: panel.frame.size, in: area, from: from)
+        }
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             // «Уменьшение движения»: вместо перелёта — плавное появление в новой точке.
             NSAnimationContext.runAnimationGroup({ context in

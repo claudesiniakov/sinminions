@@ -646,5 +646,17 @@ V — vikcha piccha, аниме-девочка-маркетолог.	V — vikch
 где же мой бриф?	where did I put my brief?	Wo ist nur mein Briefing?	¿dónde dejé el brief?
 ищу зацепки для кампании…	looking for campaign ideas…	Suche nach Ideen für die Kampagne…	busco ideas para la campaña…
 проверю, что тут есть	let me see what's here	Ich schaue mal, was hier ist.	voy a ver qué hay aquí
+Маршрут	Route	Route	Ruta
+По рабочему столу	Across the desktop	Über den Schreibtisch	Por el escritorio
+По краю активного окна	Along the active window edge	Am Rand des aktiven Fensters	Por el borde de la ventana activa
+Самостоятельные прогулки	Walk around automatically	Selbstständig umhergehen	Pasear automáticamente
+у этого заголовка есть характер	this headline has personality	diese Überschrift hat Charakter	este titular tiene personalidad
+записала идею на полях брифа	I jotted an idea in the margin of the brief	ich habe eine Idee am Rand des Briefings notiert	anoté una idea en el margen del brief
+интересно, почему люди нажимают именно сюда?	I wonder why people click right here?	warum klicken die Leute wohl gerade hier?	¿por qué la gente hace clic justo aquí?
+первый черновик готов	the first draft is ready	der erste Entwurf ist fertig	el primer borrador está listo
+оставим место для неожиданной идеи	let's leave room for a surprise idea	lassen wir Platz für eine unerwartete Idee	dejemos espacio para una idea inesperada
+а если спросить самих читателей?	what if we asked the readers themselves?	was, wenn wir die Leser selbst fragen?	¿y si les preguntamos a los lectores?
+кажется, придумала конец для этой истории	I think I've found the ending to this story	ich glaube, ich habe ein Ende für diese Geschichte	creo que ya tengo un final para esta historia
+мне нравится этот оттенок розового	I like this shade of pink	dieser Rosaton gefällt mir	me gusta este tono de rosa
 """#
 }

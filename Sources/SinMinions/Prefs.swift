@@ -73,6 +73,7 @@ final class Prefs {
         }
     }
     var scale: Double { didSet { store(scale, "scale") } }
+    var vikchaWindowWalk: Bool { didSet { storeGlobal(vikchaWindowWalk, "v.windowWalk") } }
     var wanderEnabled: Bool { didSet { store(wanderEnabled, "wanderEnabled") } }
     var teleportEnabled: Bool { didSet { store(teleportEnabled, "teleportEnabled") } }
     var scareEnabled: Bool { didSet { store(scareEnabled, "scareEnabled") } }
@@ -125,6 +126,7 @@ final class Prefs {
         let d = UserDefaults.standard
         mode = CompanionMode(rawValue: d.string(forKey: "mode") ?? "") ?? .medium
         connections = LLMConnections.decode(d.data(forKey: "llmConnections")) ?? Self.legacyConnections(d)
+        vikchaWindowWalk = d.bool(forKey: "v.windowWalk")
         let active = CompanionCharacter(rawValue: d.string(forKey: "character") ?? "") ?? .f
         character = active
         let c = CharacterSettings.read(d, active)

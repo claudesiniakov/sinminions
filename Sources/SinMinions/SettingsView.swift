@@ -87,7 +87,15 @@ private struct GeneralSettings: View {
             }
 
             Section(trf("Поведение: %@", "\(prefs.character.tabTitle)")) {
-                Toggle(tr("Перелёты по экрану"), isOn: $prefs.wanderEnabled)
+                if prefs.character == .v {
+                    Picker(tr("Маршрут"), selection: $prefs.vikchaWindowWalk) {
+                        Text(tr("По рабочему столу")).tag(false)
+                        Text(tr("По краю активного окна")).tag(true)
+                    }
+                    Toggle(tr("Самостоятельные прогулки"), isOn: $prefs.wanderEnabled)
+                } else {
+                    Toggle(tr("Перелёты по экрану"), isOn: $prefs.wanderEnabled)
+                }
                 Toggle(tr("Телепорты через порталы"), isOn: $prefs.teleportEnabled)
                 Toggle(tr("Подлетает к курсору (в составе перелётов)"), isOn: $prefs.chaseEnabled)
                     .disabled(!prefs.wanderEnabled)
