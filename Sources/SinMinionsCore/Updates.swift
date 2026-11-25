@@ -53,12 +53,15 @@ public enum ReleaseFeedError: LocalizedError, Equatable {
     case invalidResponse
     case noArchive
     case badVersion(String)
+    /// GitHub ответил 403/429: исчерпан лимит запросов на адрес (60 в час без ключа).
+    case rateLimited
 
     public var errorDescription: String? {
         switch self {
         case .invalidResponse: return tr("Сервер обновлений вернул неожиданный ответ")
         case .noArchive: return tr("В релизе нет архива SinMinions.zip")
         case let .badVersion(tag): return trf("Не удалось разобрать номер версии «%@»", "\(tag)")
+        case .rateLimited: return tr("GitHub ограничил частоту запросов — попробуйте через несколько минут")
         }
     }
 }
@@ -75,6 +78,42 @@ public enum ReleaseFeed {
 
     public static var releasesPage: URL {
         URL(string: "https://github.com/\(owner)/\(repo)/releases")!
+    }
+
+    /// Страница последнего релиза: GitHub перенаправляет её на тег. Нужна, когда API
+    /// ответило 403/429 (лимит запросов на адрес) — у страниц такого лимита нет.
+    public static var latestPageURL: URL {
+        URL(string: "https://github.com/\(owner)/\(repo)/releases/latest")!
+    }
+
+    /// Тег из адреса вида `https://github.com/<owner>/<repo>/releases/tag/v1.2.3`.
+    public static func tag(fromLocation url: URL) -> String? {
+        guard url.scheme == "https", url.host == "github.com" else { return nil }
+        let parts = url.path.split(separator: "/").map(String.init)
+        guard parts.count == 5, parts[0] == owner, parts[1] == repo,
+              parts[2] == "releases", parts[3] == "tag", !parts[4].isEmpty else { return nil }
+        return parts[4]
+    }
+
+    /// Релиз, собранный по одному тегу: адреса архива и контрольной суммы у GitHub предсказуемы.
+    /// Заметок о выпуске в этом пути нет — их отдаёт только API.
+    public static func fallback(tag: String) -> ReleaseInfo? {
+        guard let version = AppVersion(tag) else { return nil }
+        let base = "https://github.com/\(owner)/\(repo)/releases/download/\(tag)/"
+        guard let page = URL(string: "https://github.com/\(owner)/\(repo)/releases/tag/\(tag)"),
+              let archive = URL(string: base + archiveName), isTrustedDownload(archive) else { return nil }
+        let sum = URL(string: base + archiveName + ".sha256").flatMap { isTrustedDownload($0) ? $0 : nil }
+        return ReleaseInfo(
+            version: version,
+            tag: tag,
+            title: "SinMinions \(version)",
+            notes: "",
+            publishedAt: nil,
+            pageURL: page,
+            archiveURL: archive,
+            archiveSize: 0,
+            checksumURL: sum
+        )
     }
 
     private struct Release: Decodable {

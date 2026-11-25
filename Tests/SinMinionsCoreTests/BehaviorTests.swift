@@ -1594,4 +1594,46 @@ final class UpdatesTests: XCTestCase {
         XCTAssertEqual(UpdateVerifier.parseChecksum("\(hex)  SinMinions.zip\n"), hex)
         XCTAssertNil(UpdateVerifier.parseChecksum("not a hash"))
     }
+
+    // MARK: - Запасной путь, когда GitHub ограничил частоту запросов
+
+    func testTagFromLatestReleaseRedirect() {
+        let url = URL(string: "https://github.com/claudesiniakov/sinminions/releases/tag/v0.1.38")!
+        XCTAssertEqual(ReleaseFeed.tag(fromLocation: url), "v0.1.38")
+    }
+
+    func testTagIsTakenOnlyFromOwnRepositoryPage() {
+        let foreign = [
+            "https://github.com/claudesiniakov/sinminions/releases",
+            "https://github.com/other/sinminions/releases/tag/v1",
+            "https://github.com/claudesiniakov/other/releases/tag/v1",
+            "http://github.com/claudesiniakov/sinminions/releases/tag/v1",
+            "https://gitlab.com/claudesiniakov/sinminions/releases/tag/v1",
+        ]
+        for text in foreign {
+            XCTAssertNil(ReleaseFeed.tag(fromLocation: URL(string: text)!), text)
+        }
+    }
+
+    func testFallbackReleasePointsAtTrustedArchive() throws {
+        let release = try XCTUnwrap(ReleaseFeed.fallback(tag: "v0.1.38"))
+        XCTAssertEqual(release.tag, "v0.1.38")
+        XCTAssertEqual(release.version, try XCTUnwrap(AppVersion("0.1.38")))
+        XCTAssertEqual(release.notes, "")
+        XCTAssertNil(release.publishedAt)
+        XCTAssertEqual(release.archiveURL.lastPathComponent, ReleaseFeed.archiveName)
+        XCTAssertTrue(ReleaseFeed.isTrustedDownload(release.archiveURL))
+        let checksum = try XCTUnwrap(release.checksumURL)
+        XCTAssertTrue(ReleaseFeed.isTrustedDownload(checksum))
+        XCTAssertEqual(checksum.lastPathComponent, ReleaseFeed.archiveName + ".sha256")
+    }
+
+    func testFallbackRejectsTagWithoutVersion() {
+        XCTAssertNil(ReleaseFeed.fallback(tag: "latest"))
+    }
+
+    func testRateLimitErrorExplainsItself() throws {
+        let text = try XCTUnwrap(ReleaseFeedError.rateLimited.errorDescription)
+        XCTAssertTrue(text.contains("частоту"), text)
+    }
 }

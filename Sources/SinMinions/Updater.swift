@@ -125,6 +125,15 @@ final class Updater {
             request.timeoutInterval = 20
             let (data, response) = try await UpdateNetwork.session.data(for: request)
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            // Лимит запросов на адрес (60 в час без ключа): берём последний релиз со страницы.
+            if code == 403 || code == 429 {
+                let release = try await latestFromPage()
+                lastCheck = Date()
+                UserDefaults.standard.set(lastCheck, forKey: Keys.lastCheck)
+                let newer = currentVersion.map { release.version > $0 } ?? true
+                state = newer ? .available(release) : .upToDate
+                return
+            }
             // Проверка засчитывается только при внятном ответе: после сбоя (например, лимита
             // запросов) следующая автопроверка не откладывается на сутки.
             guard code == 200 || code == 404 else { throw ReleaseFeedError.invalidResponse }
@@ -135,7 +144,13 @@ final class Updater {
                 state = .upToDate
                 return
             }
-            let release = try ReleaseFeed.parse(data)
+            // Ответ пришёл, но разобрать его не вышло — не сдаёмся, идём тем же запасным путём.
+            let release: ReleaseInfo
+            do {
+                release = try ReleaseFeed.parse(data)
+            } catch {
+                release = try await latestFromPage()
+            }
             let newer = currentVersion.map { release.version > $0 } ?? true
             state = newer ? .available(release) : .upToDate
         } catch {
@@ -148,6 +163,24 @@ final class Updater {
                 state = .idle
             }
         }
+    }
+
+    /// Последний релиз без API: страница `/releases/latest` перенаправляется на тег,
+    /// а адреса архива и контрольной суммы у GitHub предсказуемы. Заметок о выпуске
+    /// на этом пути нет — их отдаёт только API.
+    private func latestFromPage() async throws -> ReleaseInfo {
+        var request = URLRequest(url: ReleaseFeed.latestPageURL)
+        request.httpMethod = "HEAD"
+        request.setValue("SinMinions-Updater", forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 20
+        let (_, response) = try await UpdateNetwork.session.data(for: request)
+        guard let url = response.url, let tag = ReleaseFeed.tag(fromLocation: url) else {
+            throw ReleaseFeedError.rateLimited
+        }
+        guard let release = ReleaseFeed.fallback(tag: tag) else {
+            throw ReleaseFeedError.badVersion(tag)
+        }
+        return release
     }
 
     // MARK: - Установка
