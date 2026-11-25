@@ -21,6 +21,20 @@ public enum Layout {
         )
     }
 
+    /// Точка прогулки по низу области: ноги персонажа стоят на её нижней границе,
+    /// `fraction` — доля свободного хода слева направо (0 — у левого края, 1 — у правого).
+    /// `figure` — силуэт персонажа внутри его окна, то есть в тех же координатах, что и окно.
+    public static func walkPoint(
+        figure: CGRect, in area: CGRect, fraction: CGFloat, margin: CGFloat = 8
+    ) -> CGPoint {
+        let minX = area.minX - figure.minX + margin
+        let maxX = area.maxX - figure.maxX - margin
+        let x = minX <= maxX
+            ? minX + (maxX - minX) * min(max(fraction, 0), 1)
+            : area.midX - figure.midX
+        return CGPoint(x: x, y: area.minY - figure.minY)
+    }
+
     /// Случайная точка перелёта: внутри области и не ближе `minDistance` от текущей (если получается).
     public static func randomTarget(
         size: CGSize, in area: CGRect, from current: CGPoint,

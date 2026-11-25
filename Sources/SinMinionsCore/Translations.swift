@@ -642,6 +642,7 @@ V — vikcha piccha, аниме-девочка-маркетолог.	V — vikch
 Маршрут	Route	Route	Ruta
 По рабочему столу	Across the desktop	Über den Schreibtisch	Por el escritorio
 По краю активного окна	Along the active window edge	Am Rand des aktiven Fensters	Por el borde de la ventana activa
+По низу экрана	Along the bottom of the screen	Am unteren Bildschirmrand	Por el borde inferior de la pantalla
 Самостоятельные прогулки	Walk around automatically	Selbstständig umhergehen	Pasear automáticamente
 у этого заголовка есть характер	this headline has personality	diese Überschrift hat Charakter	este titular tiene personalidad
 записала идею на полях брифа	I jotted an idea in the margin of the brief	ich habe eine Idee am Rand des Briefings notiert	anoté una idea en el margen del brief

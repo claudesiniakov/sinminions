@@ -197,7 +197,10 @@ final class CompanionController: NSObject {
     func returnToCorner() {
         guard let area = NSScreen.main?.visibleFrame else { return }
         apply(engine.handle(.dragBegan, now: now))
-        panel.setFrameOrigin(Layout.corner(size: panel.frame.size, in: area, margin: 8))
+        let corner = prefs.character == .v && prefs.vikchaRoute == .screenBottom
+            ? Layout.walkPoint(figure: view.mothFrame, in: area, fraction: 1)
+            : Layout.corner(size: panel.frame.size, in: area, margin: 8)
+        panel.setFrameOrigin(corner)
         apply(engine.handle(.dragEnded, now: now))
         savePosition()
     }
@@ -398,7 +401,13 @@ final class CompanionController: NSObject {
         let moth = view.mothFrame
         let area = area
         let from = panel.frame.origin
-        let target = Layout.randomTarget(size: panel.frame.size, in: area, from: from, minDistance: 240)
+        let target: CGPoint
+        if prefs.character == .v, prefs.vikchaRoute == .screenBottom {
+            // По низу экрана портал выносит её в другую точку той же линии, без смены высоты.
+            target = Self.bottomLineTarget(figure: moth, in: area, from: from)
+        } else {
+            target = Layout.randomTarget(size: panel.frame.size, in: area, from: from, minDistance: 240)
+        }
 
         // В демо-режиме для снимка в CI порталы рисуются всегда: на раннере «Уменьшение движения» включено.
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion && !demo {
@@ -733,10 +742,12 @@ final class CompanionController: NSObject {
 
     private var windowPosition: CGFloat = 0.75
     private var nextWindowCheck: Double = 0
+    /// Скорость прогулки по низу экрана, точек в секунду.
+    private static let walkSpeed: Double = 80
 
     /// WindowServer перечисляет окна спереди назад в координатах с началом вверху основного экрана.
     private func windowWalkTarget(at fraction: CGFloat) -> CGPoint? {
-        guard prefs.character == .v, prefs.vikchaWindowWalk,
+        guard prefs.character == .v, prefs.vikchaRoute == .windowEdge,
               let application = NSWorkspace.shared.frontmostApplication,
               application.processIdentifier != ProcessInfo.processInfo.processIdentifier,
               let screen = NSScreen.screens.first,
@@ -760,13 +771,36 @@ final class CompanionController: NSObject {
         return nil
     }
 
+    /// Телепорт в плоскости линии низа: та же высота, но далеко по горизонтали.
+    private static func bottomLineTarget(figure: CGRect, in area: CGRect, from origin: CGPoint) -> CGPoint {
+        var best = origin
+        for _ in 0..<8 {
+            let candidate = Layout.walkPoint(figure: figure, in: area, fraction: .random(in: 0...1))
+            if abs(candidate.x - origin.x) >= 240 { return candidate }
+            if abs(candidate.x - origin.x) > abs(best.x - origin.x) { best = candidate }
+        }
+        return best
+    }
+
     private func fastTick() {
-        if prefs.character == .v, prefs.vikchaWindowWalk, flight == nil, !view.isDragging,
+        if prefs.character == .v, prefs.vikchaRoute == .windowEdge, flight == nil, !view.isDragging,
            engine.mode == .idle, now >= nextWindowCheck {
             nextWindowCheck = now + 0.45
             if let target = windowWalkTarget(at: windowPosition), target != panel.frame.origin {
                 panel.setFrameOrigin(target)
                 followBubble()
+            }
+        }
+        // Только когда она «живёт» на экране: в терминале её держит раскладка, при перетаскивании — курсор.
+        if prefs.character == .v, prefs.vikchaRoute == .screenBottom, flight == nil, !view.isDragging,
+           engine.mode == .idle || engine.mode == .wandering {
+            // Ноги держим на линии низа: после смены размера, экрана или возврата из терминала.
+            if let area = (panel.screen ?? NSScreen.main)?.visibleFrame {
+                let line = Layout.walkPoint(figure: view.mothFrame, in: area, fraction: 0)
+                if abs(panel.frame.origin.y - line.y) > 0.5 {
+                    panel.setFrameOrigin(CGPoint(x: panel.frame.origin.x, y: line.y))
+                    followBubble()
+                }
             }
         }
         let mouse = NSEvent.mouseLocation
@@ -993,9 +1027,12 @@ final class CompanionController: NSObject {
         let to: CGPoint
         if let explicit {
             to = explicit
-        } else if prefs.character == .v && prefs.vikchaWindowWalk {
+        } else if prefs.character == .v && prefs.vikchaRoute == .windowEdge {
             windowPosition = windowPosition > 0.5 ? .random(in: 0.05...0.40) : .random(in: 0.60...0.95)
             to = windowWalkTarget(at: windowPosition) ?? Layout.randomTarget(size: panel.frame.size, in: area, from: from)
+        } else if prefs.character == .v && prefs.vikchaRoute == .screenBottom {
+            windowPosition = windowPosition > 0.5 ? .random(in: 0.05...0.35) : .random(in: 0.65...0.95)
+            to = Layout.walkPoint(figure: view.mothFrame, in: area, fraction: windowPosition)
         } else {
             to = Layout.randomTarget(size: panel.frame.size, in: area, from: from)
         }
@@ -1017,9 +1054,11 @@ final class CompanionController: NSObject {
             })
             return
         }
-        let speed = Double.random(in: prefs.flightSpeedRange)
+        // По низу экрана она идёт пешком: та же линейная траектория, но медленно и с шагом.
+        let walking = prefs.character == .v && prefs.vikchaRoute == .screenBottom
+        let speed = walking ? Self.walkSpeed : Double.random(in: prefs.flightSpeedRange)
         let distance = Double(hypot(to.x - from.x, to.y - from.y))
-        flight = Flight(from: from, to: to, start: now, duration: max(distance / speed, 0.5), wander: true, chase: chase)
+        flight = Flight(from: from, to: to, start: now, duration: max(distance / speed, walking ? 0.6 : 0.5), wander: true, chase: chase)
         startFlightTimer()
     }
 

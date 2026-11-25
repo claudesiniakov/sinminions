@@ -31,6 +31,16 @@ enum Frequency: String, CaseIterable, Identifiable {
     }
 }
 
+/// Маршрут V: как она перемещается по экрану.
+enum VikchaRoute: String, CaseIterable {
+    /// Свободные перелёты по всей области экрана.
+    case desktop
+    /// Перелёты к низу активного окна.
+    case windowEdge
+    /// Прогулка пешком по линии низа экрана; телепорты — в той же плоскости.
+    case screenBottom
+}
+
 /// Настройки пользователя; хранятся в UserDefaults.
 @MainActor
 @Observable
@@ -56,7 +66,8 @@ final class Prefs {
         }
     }
     var scale: Double { didSet { store(scale, "scale") } }
-    var vikchaWindowWalk: Bool { didSet { storeGlobal(vikchaWindowWalk, "v.windowWalk") } }
+    /// Маршрут V. Значение по умолчанию читается из старого флага «по краю окна».
+    var vikchaRoute: VikchaRoute { didSet { storeGlobal(vikchaRoute.rawValue, "v.route") } }
     var wanderEnabled: Bool { didSet { store(wanderEnabled, "wanderEnabled") } }
     var teleportEnabled: Bool { didSet { store(teleportEnabled, "teleportEnabled") } }
     var scareEnabled: Bool { didSet { store(scareEnabled, "scareEnabled") } }
@@ -108,7 +119,8 @@ final class Prefs {
     init() {
         let d = UserDefaults.standard
         connections = LLMConnections.decode(d.data(forKey: "llmConnections")) ?? Self.legacyConnections(d)
-        vikchaWindowWalk = d.bool(forKey: "v.windowWalk")
+        vikchaRoute = d.string(forKey: "v.route").flatMap(VikchaRoute.init(rawValue:))
+            ?? (d.bool(forKey: "v.windowWalk") ? .windowEdge : .desktop)
         let active = CompanionCharacter(rawValue: d.string(forKey: "character") ?? "") ?? .f
         character = active
         let c = CharacterSettings.read(d, active)

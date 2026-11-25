@@ -85,9 +85,10 @@ private struct GeneralSettings: View {
 
             Section(trf("Поведение: %@", "\(prefs.character.tabTitle)")) {
                 if prefs.character == .v {
-                    Picker(tr("Маршрут"), selection: $prefs.vikchaWindowWalk) {
-                        Text(tr("По рабочему столу")).tag(false)
-                        Text(tr("По краю активного окна")).tag(true)
+                    Picker(tr("Маршрут"), selection: $prefs.vikchaRoute) {
+                        Text(tr("По рабочему столу")).tag(VikchaRoute.desktop)
+                        Text(tr("По краю активного окна")).tag(VikchaRoute.windowEdge)
+                        Text(tr("По низу экрана")).tag(VikchaRoute.screenBottom)
                     }
                     Toggle(tr("Самостоятельные прогулки"), isOn: $prefs.wanderEnabled)
                 } else {

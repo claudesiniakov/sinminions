@@ -1522,6 +1522,43 @@ final class LayoutTests: XCTestCase {
         XCTAssertEqual(Layout.ease(0.5), 0.5)
         XCTAssertEqual(Layout.ease(2), 1)
     }
+
+    // MARK: - Прогулка по низу экрана
+
+    private let walkArea = CGRect(x: 0, y: 25, width: 1440, height: 850)
+    private let walkFigure = CGRect(x: 10, y: 20, width: 89, height: 135)
+
+    func testWalkPointStandsOnTheBottomLine() {
+        for fraction in [0.0, 0.3, 0.5, 1.0] {
+            let point = Layout.walkPoint(figure: walkFigure, in: walkArea, fraction: CGFloat(fraction))
+            XCTAssertEqual(point.y, walkArea.minY - walkFigure.minY, accuracy: 0.001,
+                           "ноги должны стоять на линии низа")
+        }
+    }
+
+    func testWalkPointStaysInsideTheArea() {
+        for fraction in [0.0, 0.2, 0.5, 0.8, 1.0] {
+            let point = Layout.walkPoint(figure: walkFigure, in: walkArea, fraction: CGFloat(fraction))
+            let figure = walkFigure.offsetBy(dx: point.x, dy: point.y)
+            XCTAssertGreaterThanOrEqual(figure.minX, walkArea.minX)
+            XCTAssertLessThanOrEqual(figure.maxX, walkArea.maxX)
+        }
+    }
+
+    func testWalkPointClampsFractionsAndKeepsOrder() {
+        let left = Layout.walkPoint(figure: walkFigure, in: walkArea, fraction: -1)
+        let right = Layout.walkPoint(figure: walkFigure, in: walkArea, fraction: 2)
+        XCTAssertEqual(left.x, Layout.walkPoint(figure: walkFigure, in: walkArea, fraction: 0).x, accuracy: 0.001)
+        XCTAssertEqual(right.x, Layout.walkPoint(figure: walkFigure, in: walkArea, fraction: 1).x, accuracy: 0.001)
+        XCTAssertLessThan(left.x, right.x)
+    }
+
+    func testWalkPointOnTooNarrowAreaIsCentered() {
+        // Экран уже силуэта: ходить некуда — остаётся по центру и не выпадает из области.
+        let area = CGRect(x: 0, y: 0, width: 60, height: 100)
+        let point = Layout.walkPoint(figure: walkFigure, in: area, fraction: 0.4)
+        XCTAssertEqual(point.x, area.midX - walkFigure.midX, accuracy: 0.001)
+    }
 }
 
 final class UpdatesTests: XCTestCase {
