@@ -179,12 +179,11 @@ struct MonitorView: View {
             if model.llmConnections.isEmpty {
                 Text(tr("ПОДКЛЮЧЕНИЙ НЕТ")).foregroundStyle(Term.dim)
             } else {
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 5) {
-                        ForEach(model.llmConnections) { item in limitRow(item) }
-                    }
+                // Все подключения видны сразу: раньше список обрезался на трёх строках без индикатора прокрутки,
+                // и четвёртое подключение (например, DeepSeek) выглядело как отсутствующее.
+                VStack(alignment: .leading, spacing: 5) {
+                    ForEach(model.llmConnections) { item in limitRow(item) }
                 }
-                .frame(height: min(CGFloat(model.llmConnections.count) * 31, 96))
             }
         }
     }
