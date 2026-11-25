@@ -349,6 +349,10 @@ zsh: не удалось запустить: %@	zsh: failed to start: %@	zsh: St
 Усыпить на 1 час	Sleep for 1 hour	1 Stunde schlafen	Dormir 1 hora
 Физлица (GIGACHAT_API_PERS)	Individuals (GIGACHAT_API_PERS)	Privatpersonen (GIGACHAT_API_PERS)	Particulares (GIGACHAT_API_PERS)
 ХАРИЗМА	CHARISMA	CHARISMA	CARISMA
+ПРОВОРНОСТЬ	NIMBLENESS	FLINKHEIT	AGILIDAD
+ИНСТРУМЕНТ	TOOL	WERKZEUG	HERRAMIENTA
+АПТАЙМ	UPTIME	UPTIME	TIEMPO ACTIVO
+РЕПЛИКИ	LINES	SPRÜCHE	FRASES
 ЦП	CPU	CPU	CPU
 ЧАСТО (8–14 С)	OFTEN (8–14 S)	OFT (8–14 S)	A MENUDO (8–14 S)
 ЧАТ С ИИ	AI CHAT	KI-CHAT	CHAT CON IA

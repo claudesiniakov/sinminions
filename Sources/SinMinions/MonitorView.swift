@@ -95,11 +95,11 @@ struct MonitorView: View {
     /// «−» и «+» под призраком меняют её уровень (у I — подключение к нейросети).
     private var specialStrip: some View {
         HStack(spacing: 4) {
-            ForEach(SpecialStat.allCases) { stat in
+            ForEach(SpecialStat.all(for: model.character)) { stat in
                 let selected = model.selectedStat == stat
                 let strength: Double = selected ? 1 : (model.isActive(stat) ? 0.5 : 0.28)
                 // Буква и точка внутри одного квадрата: «S.», «P.», …
-                Text(stat.letter + ".")
+                Text(stat.letter(for: model.character) + ".")
                     .font(.system(size: 15, weight: .bold, design: .monospaced))
                     .frame(maxWidth: 34)
                     .frame(height: 30)
@@ -125,7 +125,7 @@ struct MonitorView: View {
             specialStrip
             GhostFigure(style: model.ghostStyle, coffee: model.coffee, character: model.character, outfit: model.outfit)
                 .frame(width: 72, height: 84)
-            Text(stat.title)
+            Text(stat.title(for: model.character))
                 .foregroundStyle(Term.dim)
             HStack(spacing: 10) {
                 stepButton("−", enabled: isIntelligence ? model.llmCount > 1 : level > 0) {

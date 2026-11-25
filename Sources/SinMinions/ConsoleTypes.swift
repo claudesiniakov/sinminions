@@ -137,11 +137,48 @@ enum LayoutEvent {
 enum SpecialStat: Int, CaseIterable, Identifiable {
     case strength, perception, endurance, charisma, intelligence, agility, luck
     var id: Int { rawValue }
-    var letter: String { ["S", "P", "E", "C", "I", "A", "L"][rawValue] }
-    var title: String {
-        [tr("СИЛА"), tr("ВОСПРИЯТИЕ"), tr("ВЫНОСЛИВОСТЬ"), tr("ХАРИЗМА"), tr("ИНТЕЛЛЕКТ"), tr("ЛОВКОСТЬ"), tr("УДАЧА")][rawValue]
+
+    private static let specialLetters = ["S", "P", "E", "C", "I", "A", "L"]
+    private static let specialTitles = [
+        tr("СИЛА"), tr("ВОСПРИЯТИЕ"), tr("ВЫНОСЛИВОСТЬ"), tr("ХАРИЗМА"),
+        tr("ИНТЕЛЛЕКТ"), tr("ЛОВКОСТЬ"), tr("УДАЧА"),
+    ]
+
+    /// Какие кнопки видит персонаж. У призрака и стража — S.P.E.C.I.A.L. из Fallout,
+    /// у V — своё слово «ПИАР»: каждая буква называет то, что эта кнопка и меняет
+    /// (П — проворность, И — инструмент, А — аптайм, Р — реплики).
+    static func all(for character: CompanionCharacter) -> [SpecialStat] {
+        character == .v ? [.agility, .intelligence, .endurance, .charisma] : allCases
     }
-    var isActive: Bool { self == .strength || self == .perception || self == .endurance || self == .intelligence || self == .agility || self == .charisma }
+
+    func letter(for character: CompanionCharacter) -> String {
+        guard character == .v else { return Self.specialLetters[rawValue] }
+        switch self {
+        case .agility: return "П"
+        case .intelligence: return "И"
+        case .endurance: return "А"
+        case .charisma: return "Р"
+        default: return ""
+        }
+    }
+
+    func title(for character: CompanionCharacter) -> String {
+        guard character == .v else { return Self.specialTitles[rawValue] }
+        switch self {
+        case .agility: return tr("ПРОВОРНОСТЬ")
+        case .intelligence: return tr("ИНСТРУМЕНТ")
+        case .endurance: return tr("АПТАЙМ")
+        case .charisma: return tr("РЕПЛИКИ")
+        default: return ""
+        }
+    }
+
+    /// Кнопка работает и меняет настройку. У стража и V «восприятие» осталось от призрака
+    /// (облик есть только у него), а «удача» — шутка для порядка, как в Fallout.
+    func isActive(for character: CompanionCharacter) -> Bool {
+        guard character != .v else { return Self.all(for: .v).contains(self) }
+        return self != .luck && !(character != .f && self == .perception)
+    }
 }
 
 /// Значения характеристик для экрана S.P.E.C.I.A.L.

@@ -162,13 +162,14 @@ final class ConsoleModel {
         didSet {
             Term.theme = character
             chat.setCharacter(character)
-            if character != .f, selectedStat == .perception { selectedStat = .intelligence }
+            // У другого персонажа набор кнопок свой: выбранная буква могла исчезнуть.
+            if !isActive(selectedStat) { selectedStat = .intelligence }
         }
     }
 
     /// Доступна ли буква: у золотого стража один облик, поэтому «P» неактивна.
     func isActive(_ stat: SpecialStat) -> Bool {
-        stat.isActive && !(character != .f && stat == .perception)
+        stat.isActive(for: character)
     }
     var coffee = false
     var outfit: Outfit = .armor
