@@ -210,5 +210,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" artifact/SinMinions.zip artifact/SinMinions.zip.sha256 \
-            --verify-tag --title "${GITHUB_REF_NAME}" --notes-file artifact/RELEASE_NOTES.md
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          NOTES="artifact/RELEASE_NOTES.md"
+          # Повторный прогон и ответы GitHub 5xx не должны оставлять тег без релиза:
+          # если релиз уже есть — доливаем файлы и обновляем заметки, иначе создаём.
+          for attempt in 1 2 3; do
+            if gh release view "$TAG" > /dev/null 2>&1; then
+              gh release upload "$TAG" artifact/SinMinions.zip artifact/SinMinions.zip.sha256 --clobber
+              gh release edit "$TAG" --title "$TAG" --notes-file "$NOTES"
+            else
+              gh release create "$TAG" artifact/SinMinions.zip artifact/SinMinions.zip.sha256 \
+                --verify-tag --title "$TAG" --notes-file "$NOTES"
+            fi && exit 0
+            echo "::warning::GitHub не ответил на публикацию, попытка $attempt из 3" >&2
+            sleep 30
+          done
+          echo "::error::Не удалось опубликовать релиз $TAG"
+          exit 1
