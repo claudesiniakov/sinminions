@@ -493,6 +493,29 @@ final class VikchaArt: CompanionArt {
         sparks.add(shimmer, forKey: "sparkles")
     }
 
+    /// Танец: махи руками и притопывание вразнобой, корпус покачивается, искры и подмигивание.
+    /// Шаг на время танца снимает вызывающий: иначе руки и ноги дёргаются вместе с походкой.
+    func dance() {
+        react()
+        // Качаем весь рисунок: body — только силуэт с тенью, детали лежат в root.
+        let sway = motion("transform.rotation.z", [0, 0.085, -0.06, 0.045, 0], duration: 1.2)
+        root.add(sway, forKey: "danceSway")
+        let arms: [(CALayer, [Double])] = [
+            (leftArm, [0, 0.95, -0.25, 0.7, 0]),
+            (rightArm, [0, -0.25, 0.95, -0.2, 0]),
+        ]
+        for (limb, angles) in arms {
+            limb.add(motion("transform.rotation.z", angles, duration: 1.2), forKey: "danceArm")
+        }
+        let legs: [(CALayer, [Double])] = [
+            (leftLeg, [0, 0.4, -0.15, 0.3, 0]),
+            (rightLeg, [0, -0.15, 0.4, -0.1, 0]),
+        ]
+        for (limb, angles) in legs {
+            limb.add(motion("transform.rotation.z", angles, duration: 1.2), forKey: "danceLeg")
+        }
+    }
+
     private func motion(_ keyPath: String, _ values: [Double], duration: CFTimeInterval) -> CAKeyframeAnimation {
         let animation = CAKeyframeAnimation(keyPath: keyPath)
         animation.values = values

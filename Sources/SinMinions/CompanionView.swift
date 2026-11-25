@@ -233,15 +233,20 @@ final class CompanionView: NSView {
         body.add(flash, forKey: "flash")
     }
 
-    /// Танец: оборот вокруг оси с подскоком и вспышкой свечения.
+    /// Танец: у V — притопывание с махами руками и подскоками, у призрака — оборот вокруг оси.
     func spin() {
         if let vikcha {
             guard !sleeping else { return }
-            vikcha.react()
-            let jump = keyframes("transform.translation.y", [0, 9 * scale, 0], [0, 0.4, 1])
-            jump.duration = 0.5
+            // Шаг на время танца снимаем: иначе ноги дёргаются вместе с походкой,
+            // и танец не видно, когда она идёт по маршруту вдоль окна.
+            setWalking(false)
+            vikcha.dance()
+            let jump = keyframes(
+                "transform.translation.y", [0, 11 * scale, 0, 6 * scale, 0], [0, 0.22, 0.5, 0.72, 1]
+            )
+            jump.duration = 1.2
             jump.isAdditive = true
-            moth.add(jump, forKey: "reactionJump")
+            moth.add(jump, forKey: "danceJump")
             return
         }
         let degree = CGFloat.pi / 180
