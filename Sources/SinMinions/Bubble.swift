@@ -177,4 +177,22 @@ final class BubblePanel {
             }
         })
     }
+
+    /// Реплика уже на экране. Во время затухания пузырь не двигаем.
+    var isVisible: Bool { panel.isVisible && panel.alphaValue > 0.02 }
+
+    /// Двигает видимую реплику за персонажем: он шагает, а текст остаётся у его головы.
+    /// Размер не пересчитываем — текст не менялся.
+    func follow(over moth: CGRect, in area: CGRect) {
+        guard isVisible else { return }
+        let size = panel.frame.size
+        let placement = Layout.bubble(size: size, over: moth, in: area)
+        guard placement.origin != panel.frame.origin
+                || placement.below != view.below
+                || placement.tailX != view.tailX else { return }
+        view.below = placement.below
+        view.tailX = placement.tailX
+        panel.setFrame(CGRect(origin: placement.origin, size: size), display: false)
+        view.needsDisplay = true
+    }
 }

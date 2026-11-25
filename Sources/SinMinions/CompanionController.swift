@@ -45,6 +45,8 @@ final class CompanionController: NSObject {
     private var lastMouseTime: Double?
     private var flight: Flight?
     private var flightTimer: Timer?
+    /// Сторож выхода из полноэкранного режима: основной таймер в это время выключен.
+    private var fullScreenWatch: Timer?
     private var power: PowerState?
     private(set) var lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
 
@@ -52,6 +54,8 @@ final class CompanionController: NSObject {
     private(set) var hiddenByUser = false
     /// Скрыт системой: экран заблокирован или погашен.
     private var suspendedBySystem = false
+    /// Скрыт, потому что активное приложение занимает экран целиком.
+    private var hiddenForFullScreen = false
 
     /// Меняется то, что показывает меню (скрыт, спит).
     var onStateChange: () -> Void = {}
@@ -82,7 +86,7 @@ final class CompanionController: NSObject {
     }
 
     var isSleeping: Bool { engine.mode == .sleeping }
-    private var isVisible: Bool { !hiddenByUser && !suspendedBySystem }
+    private var isVisible: Bool { !hiddenByUser && !suspendedBySystem && !hiddenForFullScreen }
     var now: Double { Date().timeIntervalSinceReferenceDate }
 
     init(prefs: Prefs) {
@@ -137,9 +141,20 @@ final class CompanionController: NSObject {
             self, selector: #selector(powerModeChanged),
             name: Notification.Name.NSProcessInfoPowerStateDidChange, object: nil
         )
+        // Полноэкранный режим: сменилось активное приложение или пространство — проверяем,
+        // не занят ли экран целиком, и скрываемся, если так.
+        workspace.addObserver(
+            self, selector: #selector(frontmostAppChanged),
+            name: NSWorkspace.didActivateApplicationNotification, object: nil
+        )
+        workspace.addObserver(
+            self, selector: #selector(frontmostAppChanged),
+            name: NSWorkspace.activeSpaceDidChangeNotification, object: nil
+        )
 
         panel.orderFrontRegardless()
         startTimer()
+        updateFullScreenHide()
         installMouseMonitors()
         // «Помнить кофе»: режим, включённый до перезапуска, снова не даёт ноутбуку уснуть.
         updateCaffeine()
@@ -335,6 +350,7 @@ final class CompanionController: NSObject {
         applyCharacter()
         if view.scale != CGFloat(prefs.scale) || view.style != prefs.ghostStyle || view.coffee != prefs.coffee || view.character != prefs.character || view.outfit != prefs.outfit { rebuildView() }
         applyCollectionBehavior()
+        updateFullScreenHide()
         engine.reconfigure(prefs.behaviorConfig(lowPower: lowPower), now: now)
     }
 
@@ -750,6 +766,7 @@ final class CompanionController: NSObject {
             nextWindowCheck = now + 0.45
             if let target = windowWalkTarget(at: windowPosition), target != panel.frame.origin {
                 panel.setFrameOrigin(target)
+                followBubble()
             }
         }
         let mouse = NSEvent.mouseLocation
@@ -955,10 +972,18 @@ final class CompanionController: NSObject {
     private func say(_ kind: PhraseKind) {
         let hour = Calendar.current.component(.hour, from: Date())
         let text = book.next(kind, hour: hour)
+        bubble.show(text, over: liftedMoth, in: area)
+    }
+
+    /// Персонаж в координатах экрана с запасом над головой под парение.
+    private var liftedMoth: CGRect {
         let moth = view.mothFrame.offsetBy(dx: panel.frame.minX, dy: panel.frame.minY)
-        // Над головой оставляем место под парение.
-        let lifted = CGRect(x: moth.minX, y: moth.minY, width: moth.width, height: moth.height + 11 * view.scale)
-        bubble.show(text, over: lifted, in: area)
+        return CGRect(x: moth.minX, y: moth.minY, width: moth.width, height: moth.height + 11 * view.scale)
+    }
+
+    /// Реплика идёт за персонажем: он шагает по окну или летит, а пузырь остаётся у головы.
+    private func followBubble() {
+        bubble.follow(over: liftedMoth, in: area)
     }
 
     // MARK: - Перелёт
@@ -1023,6 +1048,7 @@ final class CompanionController: NSObject {
             x: flight.from.x + (flight.to.x - flight.from.x) * k,
             y: flight.from.y + (flight.to.y - flight.from.y) * k
         ))
+        followBubble()
         if progress >= 1 { finishFlight() }
     }
 
@@ -1128,5 +1154,68 @@ final class CompanionController: NSObject {
 
     @objc private func screensChanged() {
         panel.setFrameOrigin(clamped(panel.frame.origin, size: panel.frame.size))
+        updateFullScreenHide()
+    }
+
+    @objc private func frontmostAppChanged() {
+        updateFullScreenHide()
+    }
+
+    /// Скрывается ли компаньон, потому что активное приложение занимает экран целиком.
+    /// Настройка «Скрывать в полноэкранных приложениях» по умолчанию включена.
+    private func updateFullScreenHide() {
+        var shouldHide = false
+        if prefs.hideInFullScreen,
+           let front = NSWorkspace.shared.frontmostApplication,
+           let screen = (panel.screen ?? NSScreen.main)?.frame {
+            shouldHide = FullScreenCover.covers(
+                screen: screen,
+                windows: Self.windowInfos(),
+                frontmostPID: front.processIdentifier,
+                ownPID: ProcessInfo.processInfo.processIdentifier
+            )
+        }
+        guard shouldHide != hiddenForFullScreen else { return }
+        hiddenForFullScreen = shouldHide
+        // Пока скрыты из-за полноэкранного режима, основной таймер выключен: следим отдельным,
+        // иначе выход из полноэкранного режима без смены приложения оставил бы компаньона скрытым.
+        if shouldHide { startFullScreenWatch() } else { stopFullScreenWatch() }
+        updateVisibility()
+    }
+
+    private func startFullScreenWatch() {
+        guard fullScreenWatch == nil else { return }
+        let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.updateFullScreenHide() }
+        }
+        timer.tolerance = 0.4
+        RunLoop.main.add(timer, forMode: .common)
+        fullScreenWatch = timer
+    }
+
+    private func stopFullScreenWatch() {
+        fullScreenWatch?.invalidate()
+        fullScreenWatch = nil
+    }
+
+    /// Окна WindowServer в координатах AppKit: он отдаёт их от верхнего левого угла основного экрана.
+    private static func windowInfos() -> [FullScreenCover.Window] {
+        guard let mainHeight = NSScreen.screens.first?.frame.maxY,
+              let list = CGWindowListCopyWindowInfo(
+                  [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID
+              ) as? [[String: Any]] else { return [] }
+        return list.compactMap { info in
+            guard let pid = info[kCGWindowOwnerPID as String] as? Int32,
+                  let layer = info[kCGWindowLayer as String] as? Int,
+                  let rect = info[kCGWindowBounds as String] as? [String: CGFloat],
+                  let x = rect["X"], let y = rect["Y"],
+                  let w = rect["Width"], let h = rect["Height"] else { return nil }
+            return FullScreenCover.Window(
+                ownerPID: pid,
+                layer: layer,
+                bounds: CGRect(x: x, y: mainHeight - y - h, width: w, height: h),
+                isOnScreen: (info[kCGWindowIsOnscreen as String] as? Bool) ?? true
+            )
+        }
     }
 }
