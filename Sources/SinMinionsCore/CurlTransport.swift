@@ -15,6 +15,13 @@ public enum CurlTransport {
     /// Коды выхода curl, при которых имеет смысл попробовать другой транспорт (ошибки TLS и сертификата).
     public static let tlsExitCodes: Set<Int32> = [35, 51, 53, 54, 58, 59, 60, 64, 66, 77, 80, 82, 83, 90, 91]
 
+    /// Аргументы запуска curl.
+    ///
+    /// `-q` обязателен и должен идти первым: иначе curl читает пользовательский `~/.curlrc`,
+    /// и записанные там `proxy`/`insecure` отменяют проверку TLS и уводят запросы с ключом.
+    /// Конфигурация запроса передаётся через стандартный ввод, чтобы секретов не было в `ps`.
+    public static let arguments = ["-q", "--config", "-"]
+
     /// Строка в двойных кавычках конфигурационного файла curl.
     static func escape(_ text: String) -> String {
         var result = ""
@@ -124,7 +131,7 @@ public enum CurlTransport {
     private static func execute(config: String, box: ProcessBox) throws -> (Data, Int) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/curl")
-        process.arguments = ["--config", "-"]
+        process.arguments = Self.arguments
         let input = Pipe(), output = Pipe(), errors = Pipe()
         process.standardInput = input
         process.standardOutput = output

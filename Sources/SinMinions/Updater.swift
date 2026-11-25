@@ -313,8 +313,9 @@ final class Updater {
         guard version == expected else {
             throw UpdateError(trf("Версия в архиве (%@) не совпадает с релизом %@", "\(version?.description ?? "?")", "\(expected)"))
         }
-        try run("/usr/bin/codesign", ["--verify", "--deep", "--strict",
-                                    #"-R=certificate leaf = H"6AF0CB9419CE2D6A8AFD7F5460F1EA51DA557FAE""#, newApp.path])
+        // Подпись должна принадлежать сертификату из списка SigningIdentity: `--deep` не нужен,
+        // вложенного кода в бандле нет, а проверка остаётся по всему содержимому.
+        try run("/usr/bin/codesign", ["--verify", "--strict", "-R=\(SigningIdentity.requirement)", newApp.path])
         _ = try? run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", newApp.path])
     }
 

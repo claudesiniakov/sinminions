@@ -52,7 +52,7 @@ PLIST
 # у всех сборок одно, и выданный «Универсальный доступ» переживает обновления.
 # Без сертификата — ad-hoc: тогда после каждого обновления разрешение приходится выдавать заново.
 IDENTITY="${SIGN_IDENTITY:--}"
-codesign --force --deep --options runtime --timestamp=none --sign "$IDENTITY" "$APP"
+codesign --force --options runtime --timestamp=none --sign "$IDENTITY" "$APP"
 codesign --verify --verbose "$APP"
 codesign -d -r- "$APP" 2>&1 | tee build/requirement.txt
 if [ "$IDENTITY" != "-" ] && ! grep -q "certificate leaf" build/requirement.txt; then
@@ -60,8 +60,23 @@ if [ "$IDENTITY" != "-" ] && ! grep -q "certificate leaf" build/requirement.txt;
   exit 1
 fi
 rm build/requirement.txt
+
+# Проверка подписи тем же требованием, что применяет апдейтер приложения (SigningIdentity).
+# Отпечаток берём у сертификата, которым подписывали, и сверяем со списком в исходниках:
+# сборка, подписанная сертификатом вне списка, не должна уехать в релиз — её отвергнут установленные версии.
+ALLOWED="Sources/SinMinionsCore/SigningIdentity.swift"
 if [[ "$IDENTITY" != "-" || "${GITHUB_REF:-}" == refs/tags/v* ]]; then
-  codesign --verify --deep --strict '-R=certificate leaf = H"6AF0CB9419CE2D6A8AFD7F5460F1EA51DA557FAE"' "$APP"
+  LEAF="$(security find-certificate -c "SinMinions Signing" -Z 2>/dev/null | awk '/SHA-1/ {print $NF; exit}')"
+  if [ -z "$LEAF" ]; then
+    echo "Сертификат «SinMinions Signing» не найден в связке ключей" >&2
+    exit 1
+  fi
+  if ! grep -q "\"$LEAF\"" "$ALLOWED"; then
+    echo "Отпечаток $LEAF отсутствует в SigningIdentity.leafHashes ($ALLOWED)." >&2
+    echo "Выпустите переходную версию с двумя отпечатками — иначе обновление не установится." >&2
+    exit 1
+  fi
+  codesign --verify --strict "-R=certificate leaf = H\"$LEAF\"" "$APP"
 fi
 
 ditto -c -k --keepParent "$APP" build/SinMinions.zip

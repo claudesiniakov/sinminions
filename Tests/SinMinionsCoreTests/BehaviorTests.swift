@@ -845,6 +845,16 @@ final class CurlTransportTests: XCTestCase {
         XCTAssertEqual(CurlTransport.escape("привет"), "привет")
     }
 
+    func testRunIgnoresUserCurlrc() {
+        // `-q` первым аргументом отключает чтение ~/.curlrc: иначе записанные там
+        // proxy/insecure отменяют проверку TLS и уводят запросы с ключом.
+        XCTAssertEqual(CurlTransport.arguments.first, "-q")
+        XCTAssertEqual(CurlTransport.arguments, ["-q", "--config", "-"])
+        // Конфигурация и секреты передаются через stdin, а не аргументами.
+        XCTAssertFalse(CurlTransport.arguments.contains { $0.contains("Authorization") })
+        XCTAssertFalse(CurlTransport.arguments.contains { $0.hasPrefix("--header") })
+    }
+
     func testConfigForChatRequest() {
         var request = GigaChatAPI.chatRequest(token: "tok", model: "GigaChat", messages: [ChatMessage(.user, "привет")])
         request.timeoutInterval = 90
