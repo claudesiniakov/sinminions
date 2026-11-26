@@ -25,8 +25,16 @@ extension CompanionController {
         apply(engine.handle(.closeConsole, now: now))
     }
 
-    func teleportForDemo() {
+    /// Телепорт для снимка. Автомат принимает событие только в `idle`: если в этот момент
+    /// он говорит или реагирует, попытка теряется и сцена в CI истекает по таймауту
+    /// (так упал прогон v0.1.43). Поэтому повторяем, пока режим не станет `teleporting`.
+    func teleportForDemo(attempt: Int = 0) {
         apply(engine.handle(.teleportNow, now: now))
+        guard engine.mode != .teleporting, attempt < 20 else { return }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            self?.teleportForDemo(attempt: attempt + 1)
+        }
     }
 
     /// Для CI: набирает текст настоящими событиями клавиатуры, как пользователь (в CI «Универсальный доступ» выдан).
