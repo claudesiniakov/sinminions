@@ -16,6 +16,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var checkTimer: Timer?
     /// Версия, о которой компаньон уже сказал репликой.
     private var announcedVersion: AppVersion?
+    /// Глобальное сочетание ⌥⌘C: открыть или закрыть чат.
+    private var chatHotKey: HotKey?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         installMainMenu()
@@ -67,7 +69,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         checkTimer = timer
         Updater.confirmUpdatedLaunch()
 
-        if ProcessInfo.processInfo.environment["SINMINIONS_DEMO"] != nil { runDemo(controller) }
+        // Первый запуск: коротко объясняем, как открыть чат. Больше не повторяем.
+        let isDemo = ProcessInfo.processInfo.environment["SINMINIONS_DEMO"] != nil
+        if !isDemo, !UserDefaults.standard.bool(forKey: "didShowIntro") {
+            UserDefaults.standard.set(true, forKey: "didShowIntro")
+            Task { @MainActor [weak controller] in
+                try? await Task.sleep(for: .seconds(4))
+                controller?.showIntroHint()
+            }
+        }
+        if !isDemo {
+            let hotKey = HotKey { [weak controller] in
+                MainActor.assumeIsolated { controller?.toggleConsole() }
+            }
+            if hotKey.register() { chatHotKey = hotKey }
+        }
+
+        if isDemo { runDemo(controller) }
     }
 
     /// Для CI: сцены демонстрации. Перед каждой приложение ставит файл-метку `<имя>.ready`,
@@ -296,7 +314,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let self else { return }
                 if case let .available(release) = self.updater.state, self.announcedVersion != release.version {
                     self.announcedVersion = release.version
-                    self.controller?.announce(.updateAvailable)
+                    self.controller?.announceUpdate(version: release.version.description)
                 }
                 self.observeUpdater()
             }

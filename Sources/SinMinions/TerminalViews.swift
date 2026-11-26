@@ -42,6 +42,10 @@ struct TerminalFrame<Content: View>: View {
         model.unlocked ? tr("Заблокировать окна") : tr("Разблокировать окна")
     }
 
+    private var pinAccessibilityLabel: String {
+        model.chatPinned ? tr("Открепить чат") : tr("Приколоть чат: не закроется при потере фокуса")
+    }
+
     private var fg: Color { Term.green }
     private var dimColor: Color { Term.dim }
     private var lineColor: Color { Term.dark }
@@ -259,6 +263,8 @@ struct ChatScreen: View {
                         .textFieldStyle(.plain)
                         .focused($focused)
                         .onSubmit { chat.submit() }
+                        .onKeyPress(.upArrow) { chat.historyUp(); return .handled }
+                        .onKeyPress(.downArrow) { chat.historyDown(); return .handled }
                         .onKeyPress(.tab) {
                             guard let name = SlashParser.completion(for: chat.input) else { return .ignored }
                             chat.input = name

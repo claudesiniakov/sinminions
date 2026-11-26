@@ -307,6 +307,7 @@ final class ConsoleController: NSObject, NSWindowDelegate {
         isOpen = true
         model.setShellMode(false)
         model.unlocked = false
+        model.chatPinned = false
         session = nil
         sampler.reset()
         model.snapshot = sampler.sample()
@@ -364,7 +365,7 @@ final class ConsoleController: NSObject, NSWindowDelegate {
     func windowDidResignKey(_ notification: Notification) {
         // По умолчанию чат закрывается, как только фокус ушёл; в настройках это можно выключить,
         // чтобы держать диалог открытым рядом с работой в другом приложении.
-        if isOpen, !model.chatStaysOpen { onDismiss() }
+        if isOpen, !model.chatStaysOpen, !model.chatPinned { onDismiss() }
     }
 }
 

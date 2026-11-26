@@ -40,6 +40,8 @@ final class ChatSession {
     var entries: [ChatEntry] = []
     var input = ""
     private(set) var isSending = false
+    /// История отправленного: стрелки ↑/↓ листают её в строке ввода.
+    private var inputHistory = InputHistory()
 
     @ObservationIgnored var send: @MainActor ([ChatMessage]) async throws -> String = { _ in throw LLMError.noCredentials }
     @ObservationIgnored var hasCredentials: () -> Bool = { false }
@@ -55,6 +57,7 @@ final class ChatSession {
     func submit() {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+        inputHistory.remember(text)
         if text.hasPrefix("/") {
             input = ""
             append(ChatEntry(kind: .user, text: text))
@@ -92,6 +95,16 @@ final class ChatSession {
             }
             self.isSending = false
         }
+    }
+
+    /// Стрелка вверх: предыдущая отправленная реплика.
+    func historyUp() {
+        if let line = inputHistory.older() { input = line }
+    }
+
+    /// Стрелка вниз: следующая реплика, в конце — пустая строка.
+    func historyDown() {
+        input = inputHistory.newer() ?? ""
     }
 
     func addInfo(_ text: String) {
@@ -187,6 +200,8 @@ final class ConsoleModel {
     /// Активный персонаж: меняет рисунок в мониторе, стиль окон и названия.
     /// Чат не закрывать при потере фокуса (настройка).
     var chatStaysOpen = false
+    /// Чат приколот на время: кнопка в заголовке терминала, действие сильнее настройки.
+    var chatPinned = false
 
     var character: CompanionCharacter = .f {
         didSet {

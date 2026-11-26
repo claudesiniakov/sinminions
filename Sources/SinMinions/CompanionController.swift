@@ -27,6 +27,8 @@ final class CompanionController: NSObject {
     private var teleportTask: Task<Void, Never>?
     /// Меняется при каждом начале и прерывании телепорта: устаревшие шаги не выполняются.
     private var teleportToken = 0
+    /// Номер подсказки: новая подсказка или реплика отменяет таймер скрытия прежней.
+    private var hintToken = 0
     /// Демо-режим для снимка в CI: порталы остаются открытыми подольше.
     private let demo = ProcessInfo.processInfo.environment["SINMINIONS_DEMO"] != nil
     /// Где призрак был до открытия терминала; nil — терминал закрыт.
@@ -203,6 +205,40 @@ final class CompanionController: NSObject {
         panel.setFrameOrigin(corner)
         apply(engine.handle(.dragEnded, now: now))
         savePosition()
+    }
+
+    /// Чат по горячей клавише и из меню: открыть, а если уже открыт — закрыть.
+    func toggleConsole() {
+        if engine.mode == .console {
+            apply(engine.handle(.closeConsole, now: now))
+        } else {
+            // Отдельного события «открыть чат» нет: открытие — это двойной щелчок по персонажу.
+            apply(engine.handle(.doubleClick, now: now))
+        }
+    }
+
+    /// Неназойливая подсказка в пузыре: приветствие при первом запуске, весть об обновлении.
+    /// Живёт `seconds` секунд, но любая реплика персонажа её сменяет.
+    func showHint(_ text: String, seconds: Double = 6) {
+        guard isVisible else { return }
+        hintToken += 1
+        let token = hintToken
+        bubble.show(text, over: liftedMoth, in: area)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard let self, self.hintToken == token else { return }
+            self.bubble.hide()
+        }
+    }
+
+    /// Первый запуск: как открыть чат.
+    func showIntroHint() {
+        showHint(tr("Двойной щелчок по мне — чат. Меню — у значка в строке меню."), seconds: 9)
+    }
+
+    /// Вышла новая версия: говорим об этом в пузыре, установка — из меню.
+    func announceUpdate(version: String) {
+        showHint(trf("Вышла версия %@ — обновить можно из меню", version), seconds: 10)
     }
 
     /// Реплика по системному поводу; обычные поводы молчат, если реплики выключены или компаньон спит.
@@ -1004,6 +1040,7 @@ final class CompanionController: NSObject {
     }
 
     private func say(_ kind: PhraseKind) {
+        hintToken += 1
         let hour = Calendar.current.component(.hour, from: Date())
         let text = book.next(kind, hour: hour)
         bubble.show(text, over: liftedMoth, in: area)

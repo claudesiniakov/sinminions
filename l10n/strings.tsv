@@ -735,3 +735,8 @@ GitHub ограничил частоту запросов — попробуйт
 СРЕДНЕ	MEDIUM	MITTEL	MEDIO
 ДОЛГО	LONG	LANGE	LARGO
 Реплика на экране	Bubble on screen	Sprechblase auf dem Bildschirm	Burbuja en pantalla
+Чат (⌥⌘C)	Chat (⌥⌘C)	Chat (⌥⌘C)	Chat (⌥⌘C)
+Двойной щелчок по мне — чат. Меню — у значка в строке меню.	Double-click me to chat. The menu is in the menu bar icon.	Doppelklick auf mich öffnet den Chat. Das Menü sitzt im Menüleisten-Symbol.	Doble clic en mí abre el chat. El menú está en el icono de la barra de menús.
+Вышла версия %@ — обновить можно из меню	Version %@ is out — update from the menu	Version %@ ist da — Update über das Menü	Ya salió la versión %@: actualiza desde el menú
+Открепить чат	Unpin the chat	Chat loslösen	Desanclar el chat
+Приколоть чат: не закроется при потере фокуса	Pin the chat: it stays open when focus moves	Chat anheften: bleibt offen, wenn der Fokus wechselt	Anclar el chat: no se cierra al perder el foco
