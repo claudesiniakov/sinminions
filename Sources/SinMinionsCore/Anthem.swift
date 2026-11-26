@@ -18,5 +18,5 @@ public enum Anthem {
     public static let secondsPerLine: Double = 4.4
 
     /// Общая длина песни, секунды.
-    public static var duration: Double { Double(lines.count) * secondsPerLine + 1 }
+    public static var duration: Double { Double(original.count) * secondsPerLine + 1 }
 }

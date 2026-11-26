@@ -32,6 +32,8 @@ final class UsageStore {
     private func save() {
         guard let file, let data = try? JSONEncoder().encode(ledger) else { return }
         try? data.write(to: file, options: .atomic)
+        // Журнал расхода — не секрет, но и не для всех: как у ключа, только владельцу.
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
     }
 
     /// Для снимков в CI: три модели с расходом за две недели.
@@ -230,12 +232,16 @@ struct AnalyticsView: View {
         if !entry.provider.supportsLimits {
             row(tr("ОСТАТОК (API)"), tr("СЕРВИС НЕ ОТДАЁТ ПО КЛЮЧУ"))
         } else if let connection {
-            switch limits.state(for: connection) ?? .loading {
-            case .loading: row(tr("ОСТАТОК (API)"), "…")
-            case let .value(value): row(tr("ОСТАТОК (API)"), value.uppercased())
-            case let .failed(reason): row(tr("ОСТАТОК (API)"), reason.uppercased()).foregroundStyle(Term.amber)
-            case .noKey: row(tr("ОСТАТОК (API)"), tr("НЕТ КЛЮЧА")).foregroundStyle(Term.amber)
-            case .unsupported: row(tr("ОСТАТОК (API)"), "—")
+            if connection.showLimits {
+                switch limits.state(for: connection) ?? .loading {
+                case .loading: row(tr("ОСТАТОК (API)"), "…")
+                case let .value(value): row(tr("ОСТАТОК (API)"), value.uppercased())
+                case let .failed(reason): row(tr("ОСТАТОК (API)"), reason.uppercased()).foregroundStyle(Term.amber)
+                case .noKey: row(tr("ОСТАТОК (API)"), tr("НЕТ КЛЮЧА")).foregroundStyle(Term.amber)
+                case .unsupported: row(tr("ОСТАТОК (API)"), "—")
+                }
+            } else {
+                row(tr("ОСТАТОК (API)"), tr("СКРЫТО В НАСТРОЙКАХ"))
             }
         } else {
             row(tr("ОСТАТОК (API)"), tr("ПОДКЛЮЧЕНИЕ УДАЛЕНО"))
@@ -251,7 +257,9 @@ final class AnalyticsWindow {
 
     func show(store: UsageStore, limits: LimitsStore, connections: [LLMConnection], character: CompanionCharacter, near anchor: CGRect?) {
         // Остаток по ключу берём у тех же подключений, что и блок «Лимиты» на мониторе, и ещё у используемых в чате.
-        limits.refresh(connections.filter { $0.showLimits || $0.provider.supportsLimits })
+        // Только те подключения, где остаток разрешён в настройках: иначе запрос уходит
+        // с ключом за спиной у пользователя, а строка висит на «…».
+        limits.refresh(connections.filter(\.showLimits))
         let view = AnalyticsView(store: store, limits: limits, connections: connections, character: character) { [weak self] in
             self?.panel?.orderOut(nil)
         }

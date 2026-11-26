@@ -110,10 +110,14 @@ final class Prefs {
     var talkFrequency: Frequency { didSet { store(talkFrequency.rawValue, "talkFrequency") } }
     var sleepMinutes: Int { didSet { store(sleepMinutes, "sleepMinutes") } }
     var hideInFullScreen: Bool { didSet { storeGlobal(hideInFullScreen, "hideInFullScreen") } }
+    /// Чат не закрывается, когда фокус уходит в другое приложение.
+    var chatStaysOpen: Bool { didSet { storeGlobal(chatStaysOpen, "chatStaysOpen") } }
 
     /// Вызывается после любого изменения.
     @ObservationIgnored var onChange: () -> Void = {}
     @ObservationIgnored private let defaults = UserDefaults.standard
+    /// Демонстрация для снимков CI: настройки живут только в памяти и не трогают профиль пользователя.
+    @ObservationIgnored private let demoStorage = ProcessInfo.processInfo.environment["SINMINIONS_DEMO"] != nil
     @ObservationIgnored private var applying = false
 
     init() {
@@ -146,6 +150,7 @@ final class Prefs {
         talkFrequency = c.talkFrequency
         sleepMinutes = c.sleepMinutes
         hideInFullScreen = d.object(forKey: "hideInFullScreen") as? Bool ?? true
+        chatStaysOpen = d.object(forKey: "chatStaysOpen") as? Bool ?? false
         let savedLanguage = AppLanguage(rawValue: d.string(forKey: "language") ?? "") ?? .system
         language = savedLanguage
         L10n.current = savedLanguage.resolved()
@@ -245,12 +250,14 @@ final class Prefs {
 
     /// Настройка активного персонажа: ключ получает его префикс.
     private func store(_ value: Any, _ key: String) {
+        guard !demoStorage else { return }
         defaults.set(value, forKey: character.keyPrefix + key)
         if !applying { onChange() }
     }
 
     /// Общая настройка, не зависящая от персонажа.
     private func storeGlobal(_ value: Any, _ key: String) {
+        guard !demoStorage else { return }
         defaults.set(value, forKey: key)
         if !applying { onChange() }
     }

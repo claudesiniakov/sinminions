@@ -63,8 +63,21 @@ public enum ShellText {
 
     /// Убирает цветовые и прочие управляющие последовательности ANSI и возвраты каретки.
     public static func stripANSI(_ text: String) -> String {
-        var result = ""
-        result.reserveCapacity(text.count)
+        var out: [Unicode.Scalar] = []
+        out.reserveCapacity(text.unicodeScalars.count)
+        // Курсор как в терминале: «\r» возвращает его в начало строки, и следующие символы
+        // затирают написанное (так выглядят строки прогресса «10%\r20%»), «\b» стирает один.
+        var lineStart = 0
+        var cursor = 0
+        func put(_ scalar: Unicode.Scalar) {
+            if cursor < out.count, out[cursor] != "\n" {
+                out[cursor] = scalar
+            } else {
+                out.insert(scalar, at: min(cursor, out.count))
+            }
+            cursor += 1
+        }
+
         var iterator = text.unicodeScalars.makeIterator()
         var pending: Unicode.Scalar? = iterator.next()
         while let scalar = pending {
@@ -82,18 +95,33 @@ public enum ShellText {
                     while let next = pending {
                         pending = iterator.next()
                         if next == "\u{07}" { break }
-                        if next == "\u{1B}" { pending = iterator.next(); break }
+                        if next == "\u{1B}" {
+                            // ST — это ESC \: второй символ терминатора тоже съедаем.
+                            if pending == "\\" { pending = iterator.next() }
+                            break
+                        }
                     }
                 }
                 continue
             }
-            if scalar == "\r" || scalar == "\u{07}" { continue }
-            if scalar == "\u{08}" {
-                if !result.isEmpty { result.removeLast() }
-                continue
+            switch scalar {
+            case "\n":
+                out.insert("\n", at: min(cursor, out.count))
+                cursor += 1
+                lineStart = cursor
+            case "\r":
+                cursor = lineStart
+            case "\u{07}":
+                break
+            case "\u{08}":
+                if cursor > lineStart {
+                    out.remove(at: cursor - 1)
+                    cursor -= 1
+                }
+            default:
+                put(scalar)
             }
-            result.unicodeScalars.append(scalar)
         }
-        return result
+        return String(String.UnicodeScalarView(out))
     }
 }

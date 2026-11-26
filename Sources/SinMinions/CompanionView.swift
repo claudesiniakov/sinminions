@@ -106,6 +106,10 @@ final class CompanionView: NSView {
         super.init(frame: CGRect(origin: .zero, size: Self.windowSize(scale: scale)))
         wantsLayer = true
         layer?.backgroundColor = .clear
+        // Для VoiceOver персонаж — картинка с подписью, а не безымянная область.
+        setAccessibilityElement(true)
+        setAccessibilityRole(.image)
+        setAccessibilityLabel(character == .v ? tr("Викча на рабочем столе") : tr("Компаньон на рабочем столе"))
 
         let size = CGSize(width: MothShape.size.width * scale, height: MothShape.size.height * scale)
         let inset = Self.glowMargin * scale

@@ -215,6 +215,7 @@ final class CompanionController: NSObject {
     /// Выбранное подключение к нейросети — в модель терминала и монитора.
     private func refreshLLM() {
         let list = prefs.connections
+        console.model.chatStaysOpen = prefs.chatStaysOpen
         console.model.llmName = list.active?.name
         console.model.llmModelName = list.active?.model
         console.model.llmConnections = list.items.filter(\.showLimits)

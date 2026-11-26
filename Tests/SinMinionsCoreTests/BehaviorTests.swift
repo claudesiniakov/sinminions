@@ -872,6 +872,28 @@ final class CurlTransportTests: XCTestCase {
         XCTAssertFalse(config.contains("--"))
     }
 
+    func testRunReportsCurlFailureWithoutNetwork() async {
+        // Порт, на котором никто не слушает: curl падает быстро, и мы проверяем,
+        // что запасной транспорт отдаёт внятную ошибку, а не висит.
+        var request = URLRequest(url: URL(string: "https://127.0.0.1:1/")!)
+        request.timeoutInterval = 5
+        do {
+            _ = try await CurlTransport.run(request)
+            XCTFail("ожидали ошибку соединения")
+        } catch let failure as CurlTransport.Failure {
+            XCTAssertFalse(failure.message.isEmpty)
+            XCTAssertNotEqual(failure.exitCode, 0)
+        } catch {
+            XCTFail("неожиданный тип ошибки: \(error)")
+        }
+    }
+
+    func testTrustedHostsCoverGigaChat() {
+        let hosts = GigaChatAPI.trustedHosts
+        XCTAssertFalse(hosts.isEmpty)
+        XCTAssertTrue(hosts.contains("api.giga.chat"), "\(hosts)")
+    }
+
     func testParseOutput() throws {
         let ok = try XCTUnwrap(CurlTransport.parse(Data("{\"a\":1}\n401".utf8)))
         XCTAssertEqual(ok.status, 401)

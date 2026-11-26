@@ -52,6 +52,8 @@ PLIST
 # у всех сборок одно, и выданный «Универсальный доступ» переживает обновления.
 # Без сертификата — ad-hoc: тогда после каждого обновления разрешение приходится выдавать заново.
 IDENTITY="${SIGN_IDENTITY:--}"
+# В синхронизируемых папках (iCloud/Documents) на файлах висят xattr, и codesign на них падает.
+xattr -cr "$APP"
 codesign --force --options runtime --timestamp=none --sign "$IDENTITY" "$APP"
 codesign --verify --verbose "$APP"
 codesign -d -r- "$APP" 2>&1 | tee build/requirement.txt

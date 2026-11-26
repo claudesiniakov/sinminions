@@ -49,7 +49,7 @@ public struct BehaviorConfig: Equatable, Sendable {
     /// Песня: страж иногда поёт гимн строка за строкой; время рассчитано на все строки.
     public var singEnabled = false
     public var singInterval: ClosedRange<Double> = 900...2400
-    public var singDuration: Double = 24
+    public var singDuration: Double = Anthem.duration
 
     public init() {}
 }
@@ -478,8 +478,15 @@ public struct BehaviorEngine {
     }
 
     private mutating func postpone(now: Double) {
-        nextWanderAt = max(nextWanderAt, now + Self.quietAfterInteraction)
-        nextTeleportAt = max(nextTeleportAt, now + Self.quietAfterInteraction)
-        nextTalkAt = max(nextTalkAt, now + Self.quietAfterInteraction)
+        // После любого вмешательства молчим все таймеры, а не только перелёты и реплики:
+        // иначе поиск или песня начинались через секунду после клика.
+        let until = now + Self.quietAfterInteraction
+        nextWanderAt = max(nextWanderAt, until)
+        nextTeleportAt = max(nextTeleportAt, until)
+        nextTalkAt = max(nextTalkAt, until)
+        nextHideAt = max(nextHideAt, until)
+        nextSearchAt = max(nextSearchAt, until)
+        nextPlayAt = max(nextPlayAt, until)
+        nextSingAt = max(nextSingAt, until)
     }
 }

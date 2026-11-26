@@ -57,17 +57,17 @@ final class ChatSession {
         guard !text.isEmpty else { return }
         if text.hasPrefix("/") {
             input = ""
-            entries.append(ChatEntry(kind: .user, text: text))
+            append(ChatEntry(kind: .user, text: text))
             onSlash(text)
             return
         }
         guard !isSending else { return }
         guard hasCredentials() else {
-            entries.append(ChatEntry(kind: .info, text: tr("НЕТ ПОДКЛЮЧЕНИЯ С КЛЮЧОМ — ОТКРЫВАЮ НАСТРОЙКИ")))
+            append(ChatEntry(kind: .info, text: tr("НЕТ ПОДКЛЮЧЕНИЯ С КЛЮЧОМ — ОТКРЫВАЮ НАСТРОЙКИ")))
             needCredentials()
             return
         }
-        entries.append(ChatEntry(kind: .user, text: text))
+        append(ChatEntry(kind: .user, text: text))
         input = ""
         history.append(ChatMessage(.user, text))
         isSending = true
@@ -80,13 +80,14 @@ final class ChatSession {
                 let answer = try await self.send(snapshot)
                 guard mine == self.generation else { return }
                 self.history.append(ChatMessage(.assistant, answer))
-                self.entries.append(ChatEntry(kind: .assistant, text: answer, speaker: who))
+                self.append(ChatEntry(kind: .assistant, text: answer, speaker: who))
+                self.history = ChatHistory.trimmed(self.history)
             } catch {
                 guard mine == self.generation else { return }
                 // Неудавшийся вопрос из истории убираем, чтобы его можно было задать заново.
                 self.history.removeLast()
                 if !(error is CancellationError) {
-                    self.entries.append(ChatEntry(kind: .error, text: error.localizedDescription))
+                    self.append(ChatEntry(kind: .error, text: error.localizedDescription))
                 }
             }
             self.isSending = false
@@ -94,7 +95,18 @@ final class ChatSession {
     }
 
     func addInfo(_ text: String) {
-        entries.append(ChatEntry(kind: .info, text: text))
+        append(ChatEntry(kind: .info, text: text))
+    }
+
+    /// Журнал на экране не растёт бесконечно: при долгой переписке память и отрисовка
+    /// оставались пропорциональны числу реплик. Храним последние двести сорок.
+    static let entriesLimit = 240
+
+    private func append(_ entry: ChatEntry) {
+        entries.append(entry)
+        if entries.count > Self.entriesLimit {
+            entries.removeFirst(entries.count - Self.entriesLimit)
+        }
     }
 
     /// Терминал закрыт во время запроса: ответ уже не нужен.
@@ -105,7 +117,7 @@ final class ChatSession {
         task = nil
         history.removeLast()
         isSending = false
-        entries.append(ChatEntry(kind: .info, text: tr("ЗАПРОС ПРЕРВАН")))
+        append(ChatEntry(kind: .info, text: tr("ЗАПРОС ПРЕРВАН")))
     }
 
     func reset() {
@@ -158,6 +170,9 @@ final class ConsoleModel {
     /// Облик призрака в мониторе.
     var ghostStyle: GhostStyle = .classic
     /// Активный персонаж: меняет рисунок в мониторе, стиль окон и названия.
+    /// Чат не закрывать при потере фокуса (настройка).
+    var chatStaysOpen = false
+
     var character: CompanionCharacter = .f {
         didSet {
             Term.theme = character

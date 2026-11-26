@@ -32,5 +32,10 @@ final class ShellTextTests: XCTestCase {
         XCTAssertEqual(ShellText.stripANSI("\u{1B}[1;32mok\u{1B}[0m\r"), "ok")
         XCTAssertEqual(ShellText.stripANSI("\u{1B}]0;title\u{07}text"), "text")
         XCTAssertEqual(ShellText.stripANSI("ab\u{08}c"), "ac")
+        // Строка прогресса: возврат каретки затирает прошлое значение.
+        XCTAssertEqual(ShellText.stripANSI("10%\r20%"), "20%")
+        XCTAssertEqual(ShellText.stripANSI("10%\r20%\nготово"), "20%\nготово")
+        // OSC с терминатором ST (ESC \\) не оставляет лишних символов.
+        XCTAssertEqual(ShellText.stripANSI("\u{1B}]8;;https://x\u{1B}\\ссылка"), "ссылка")
     }
 }

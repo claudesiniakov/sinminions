@@ -16,7 +16,6 @@
  ТОК.	 TOK.	 TOK.	 TOK.
  ТЫС	 K	 TSD	 K
 %@ // МОНИТОР	%@ // MONITOR	%@ // MONITOR	%@ // MONITOR
-%@ // ТЕРМИНАЛ	%@ // TERMINAL	%@ // TERMINAL	%@ // TERMINAL
 %@ завершился с кодом %@	%@ exited with code %@	%@ wurde mit Code %@ beendet	%@ terminó con el código %@
 %@ не ответил за %@ с	%@ did not respond within %@ s	%@ hat nicht innerhalb von %@ s geantwortet	%@ no respondió en %@ s
 %@ → код %@	%@ → code %@	%@ → Code %@	%@ → código %@
@@ -57,7 +56,6 @@ SinMinions: кофе	SinMinions: coffee	SinMinions: Kaffee	SinMinions: café
 [ЗАКРЫТЬ]	[CLOSE]	[SCHLIESSEN]	[CERRAR]
 [ЗАМОК ВКЛ]	[LOCK ON]	[SPERRE AN]	[BLOQUEO SÍ]
 [ЗАМОК ВЫКЛ]	[LOCK OFF]	[SPERRE AUS]	[BLOQUEO NO]
-\nЖурнал: ~/Library/Logs/SinMinions/update.log	\nLog: ~/Library/Logs/SinMinions/update.log	\nProtokoll: ~/Library/Logs/SinMinions/update.log	\nRegistro: ~/Library/Logs/SinMinions/update.log
 ab: золотой страж, терминал и монитор в стиле Вархаммера.	ab: the golden guardian, Warhammer-style terminal and monitor.	ab: der goldene Wächter, Terminal und Monitor im Warhammer-Stil.	ab: el guardián dorado, terminal y monitor al estilo Warhammer.
 curl не запустился: 	curl failed to start: 	curl ließ sich nicht starten: 	curl no se inició: 
 curl: %@ (код %@)	curl: %@ (code %@)	curl: %@ (Code %@)	curl: %@ (código %@)
@@ -92,11 +90,9 @@ zsh: не удалось запустить: %@	zsh: failed to start: %@	zsh: St
 Вставить	Paste	Einsetzen	Pegar
 Встроенный клиент не установил защищённое соединение	The built-in client could not establish a secure connection	Der integrierte Client konnte keine sichere Verbindung herstellen	El cliente integrado no pudo establecer una conexión segura
 Выбрать всё	Select All	Alles auswählen	Seleccionar todo
-Выдать…	Grant…	Erteilen…	Conceder…
 Вырезать	Cut	Ausschneiden	Cortar
 Выше в списке	Move up	Nach oben	Subir
 ГОЛОЗАПИСЬ	HOLOTAPE	HOLOBAND	HOLOCINTA
-ДАННЫХ ПОКА НЕТ.\nЗАДАЙТЕ ВОПРОС В ЧАТЕ — РАСХОД ТОКЕНОВ ПРИДЁТ В ОТВЕТЕ API.	NO DATA YET.\nASK SOMETHING IN THE CHAT — TOKEN USAGE COMES WITH THE API RESPONSE.	NOCH KEINE DATEN.\nSTELLEN SIE IM CHAT EINE FRAGE — DER TOKENVERBRAUCH KOMMT MIT DER API-ANTWORT.	AÚN NO HAY DATOS.\nHAGA UNA PREGUNTA EN EL CHAT: EL CONSUMO DE TOKENS LLEGA CON LA RESPUESTA DE LA API.
 ДЕТАЛЬНЫЙ	DETAILED	DETAILLIERT	DETALLADO
 ДИСК	DISK	FESTPLATTE	DISCO
 ДОЛЯ ОТВЕТА	ANSWER SHARE	ANTWORTANTEIL	CUOTA DE RESPUESTA
@@ -133,8 +129,6 @@ zsh: не удалось запустить: %@	zsh: failed to start: %@	zsh: St
 Ищет реликвии Империума и находит их	Searches for relics of the Imperium and finds them	Sucht Reliquien des Imperiums und findet sie	Busca reliquias del Imperio y las encuentra
 КЛАССИЧЕСКИЙ	CLASSIC	KLASSISCH	CLÁSICO
 КОГИТАТОР	COGITATOR	COGITATOR	COGITADOR
-КОМАНДЫ НАЧИНАЮТСЯ СО «/». /HELP — СПИСОК.	COMMANDS START WITH “/”. /HELP — LIST.	BEFEHLE BEGINNEN MIT „/“. /HELP — LISTE.	LOS COMANDOS EMPIEZAN CON «/». /HELP — LISTA.
-КОМАНДЫ НАЧИНАЮТСЯ СО «/». ВВЕДИТЕ /HELP — СПИСОК.	COMMANDS START WITH “/”. TYPE /HELP FOR THE LIST.	BEFEHLE BEGINNEN MIT „/“. /HELP EINGEBEN — LISTE.	LOS COMANDOS EMPIEZAN CON «/». ESCRIBA /HELP PARA VER LA LISTA.
 КОФЕ	COFFEE	KAFFEE	CAFÉ
 КОФЕ ДОПИТ: НОУТБУК СНОВА МОЖЕТ ЗАСНУТЬ	COFFEE FINISHED: THE LAPTOP CAN SLEEP AGAIN	KAFFEE AUSGETRUNKEN: DAS LAPTOP DARF WIEDER SCHLAFEN	CAFÉ TERMINADO: EL PORTÁTIL PUEDE VOLVER A DORMIR
 КОФЕ: НЕ ДАЁТ НОУТБУКУ УСНУТЬ	COFFEE: KEEPS THE LAPTOP AWAKE	KAFFEE: HÄLT DAS LAPTOP WACH	CAFÉ: MANTIENE DESPIERTO EL PORTÁTIL
@@ -263,12 +257,10 @@ zsh: не удалось запустить: %@	zsh: failed to start: %@	zsh: St
 Разблокировать: окна можно двигать и менять их размер	Unlock: windows can be moved and resized	Entsperren: Fenster lassen sich verschieben und in der Größe ändern	Desbloquear: las ventanas se pueden mover y redimensionar
 Разбудить	Wake up	Aufwecken	Despertar
 Размер	Size	Größe	Tamaño
-Разрешение выдано, но не действует	Permission granted but not in effect	Berechtigung erteilt, aber nicht wirksam	Permiso concedido pero sin efecto
 Распаковка и проверка подписи	Unpacking and verifying the signature	Entpacken und Signatur prüfen	Descomprimiendo y verificando la firma
 Редко	Rarely	Selten	Rara vez
 Редко (3–6 мин)	Rarely (3–6 min)	Selten (3–6 Min)	Rara vez (3–6 min)
 Редко (5–15 мин)	Rarely (5–15 min)	Selten (5–15 Min)	Rara vez (5–15 min)
-Режим	Mode	Modus	Modo
 Реплики	Lines	Sprüche	Frases
 Репозиторий на GitHub	Repository on GitHub	Repository auf GitHub	Repositorio en GitHub
 СВИТОК С ПЕЧАТЬЮ ЧИСТОТЫ	PURITY SEAL SCROLL	SCHRIFTROLLE MIT REINHEITSSIEGEL	PERGAMINO CON SELLO DE PUREZA
@@ -285,8 +277,6 @@ zsh: не удалось запустить: %@	zsh: failed to start: %@	zsh: St
 СПИТ В ПИЖАМЕ	ASLEEP IN PAJAMAS	SCHLÄFT IM SCHLAFANZUG	DUERME EN PIJAMA
 СРЕДНЕЕ НА ЗАПРОС	AVERAGE PER REQUEST	DURCHSCHNITT PRO ANFRAGE	MEDIA POR SOLICITUD
 СТИМПАК	STIMPAK	STIMPAK	ESTIMULANTE
-Сбросить и запросить заново	Reset and request again	Zurücksetzen und erneut anfordern	Restablecer y volver a solicitar
-Сбросить не удалось. Удалите SinMinions из списка «Универсальный доступ» кнопкой «−» и добавьте снова.	Reset failed. Remove SinMinions from the Accessibility list with the “−” button and add it again.	Zurücksetzen fehlgeschlagen. Entfernen Sie SinMinions mit „−“ aus der Liste „Bedienungshilfen“ und fügen Sie es erneut hinzu.	No se pudo restablecer. Quite SinMinions de la lista de Accesibilidad con el botón «−» y vuelva a añadirlo.
 Сделать выбранным	Make active	Auswählen	Hacer activa
 Сервер вернул неожиданный ответ	The server returned an unexpected response	Der Server lieferte eine unerwartete Antwort	El servidor devolvió una respuesta inesperada
 Сервер не ответил вовремя	The server did not respond in time	Der Server hat nicht rechtzeitig geantwortet	El servidor no respondió a tiempo
@@ -304,11 +294,9 @@ zsh: не удалось запустить: %@	zsh: failed to start: %@	zsh: St
 Слишком много запросов	Too many requests	Zu viele Anfragen	Demasiadas solicitudes
 Слишком много запросов: ключ физлица принимает один запрос за раз	Too many requests: a personal key accepts one request at a time	Zu viele Anfragen: ein privater Schlüssel nimmt nur eine Anfrage gleichzeitig an	Demasiadas solicitudes: una clave personal admite una solicitud a la vez
 Сохранить	Save	Sichern	Guardar
-Средний — терминал и монитор по двойному щелчку	Medium — terminal and monitor on double click	Mittel — Terminal und Monitor per Doppelklick	Medio: terminal y monitor con doble clic
 ТЕРМИНАЛ	TERMINAL	TERMINAL	TERMINAL
 ТЕРМИНАЛ КОМПАНЬОНА	COMPANION TERMINAL	BEGLEITER-TERMINAL	TERMINAL DEL COMPAÑERO
 ТОКЕНЫ ПО ДНЯМ · 14 ДНЕЙ	TOKENS PER DAY · 14 DAYS	TOKENS PRO TAG · 14 TAGE	TOKENS POR DÍA · 14 DÍAS
-Так бывает после обновления: система помнит разрешение прежней сборки. Сброс удаляет старую запись, после чего разрешение нужно выдать ещё раз.	This happens after an update: the system remembers the permission of the previous build. Reset removes the old entry, after which you need to grant the permission again.	Das passiert nach einem Update: Das System merkt sich die Berechtigung des vorherigen Builds. Zurücksetzen entfernt den alten Eintrag, danach muss die Berechtigung erneut erteilt werden.	Ocurre tras una actualización: el sistema recuerda el permiso de la compilación anterior. Restablecer elimina la entrada antigua y después hay que conceder el permiso de nuevo.
 Танцует, когда подключили зарядку	Dances when the charger is connected	Tanzt, wenn das Ladegerät angeschlossen wird	Baila al conectar el cargador
 Телепорты через порталы	Teleports through portals	Teleportiert durch Portale	Se teletransporta por portales
 Токен не принят	Token not accepted	Token nicht akzeptiert	Token no aceptado
@@ -321,18 +309,18 @@ zsh: не удалось запустить: %@	zsh: failed to start: %@	zsh: St
 Удалить	Delete	Löschen	Eliminar
 Удалить вместе с ключом	Delete with the key	Mit Schlüssel löschen	Eliminar con la clave
 Удалить подключение «%@»?	Delete connection “%@”?	Verbindung „%@“ löschen?	¿Eliminar la conexión «%@»?
-Универсальный доступ	Accessibility	Bedienungshilfen	Accesibilidad
 Установка невозможна: %@; бандл %@	Cannot install: %@; bundle %@	Installation nicht möglich: %@; Bundle %@	No se puede instalar: %@; paquete %@
 Усыпить на 1 час	Sleep for 1 hour	1 Stunde schlafen	Dormir 1 hora
 Физлица (GIGACHAT_API_PERS)	Individuals (GIGACHAT_API_PERS)	Privatpersonen (GIGACHAT_API_PERS)	Particulares (GIGACHAT_API_PERS)
 ХАРИЗМА	CHARISMA	CHARISMA	CARISMA
+Язык	Language	Sprache	Idioma
+СКРЫТО В НАСТРОЙКАХ	HIDDEN IN SETTINGS	IN DEN EINSTELLUNGEN AUSGEBLENDET	OCULTO EN LOS AJUSTES
 ПРОВОРНОСТЬ	NIMBLENESS	FLINKHEIT	AGILIDAD
 ИНСТРУМЕНТ	TOOL	WERKZEUG	HERRAMIENTA
 АПТАЙМ	UPTIME	UPTIME	TIEMPO ACTIVO
 РЕПЛИКИ	LINES	SPRÜCHE	FRASES
 ЦП	CPU	CPU	CPU
 ЧАСТО (8–14 С)	OFTEN (8–14 S)	OFT (8–14 S)	A MENUDO (8–14 S)
-ЧАТ С ИИ	AI CHAT	KI-CHAT	CHAT CON IA
 Часто	Often	Oft	A menudo
 Часто (20–60 с)	Often (20–60 s)	Oft (20–60 s)	A menudo (20–60 s)
 Часто (8–14 с)	Often (8–14 s)	Oft (8–14 s)	A menudo (8–14 s)
@@ -395,7 +383,6 @@ zsh: не удалось запустить: %@	zsh: failed to start: %@	zsh: St
 проверка…	checking…	wird geprüft…	comprobando…
 работает	working	funktioniert	funciona
 разблокировать окна	unlock windows	Fenster entsperren	desbloquear ventanas
-разрешён	granted	erteilt	concedido
 сбой сервиса	service failure	Dienstfehler	fallo del servicio
 сбросить раскладку	reset layout	Anordnung zurücksetzen	restablecer disposición
 свиток с печатью чистоты. хранить свято	a scroll with a purity seal. keep it sacred	eine Schriftrolle mit Reinheitssiegel. heilig aufbewahren	un pergamino con sello de pureza. guárdalo como sagrado
@@ -414,7 +401,6 @@ zsh: не удалось запустить: %@	zsh: failed to start: %@	zsh: St
 через 15 мин	in 15 min	in 15 Min	en 15 min
 через 5 мин	in 5 min	in 5 Min	en 5 min
 — Обновление %@ → %@, бандл %@	— Update %@ → %@, bundle %@	— Aktualisierung %@ → %@, Bundle %@	— Actualización %@ → %@, paquete %@
-↑↓ ВЫБОР · TAB ДОПИСАТЬ · /HELP · ESC ВЫХОД	↑↓ SELECT · TAB COMPLETE · /HELP · ESC EXIT	↑↓ AUSWAHL · TAB ERGÄNZEN · /HELP · ESC ENDE	↑↓ ELEGIR · TAB COMPLETAR · /HELP · ESC SALIR
 ↑↓ ИСТОРИЯ · CTRL+L ОЧИСТИТЬ · EXIT НАЗАД · ESC ЗАКРЫТЬ	↑↓ HISTORY · CTRL+L CLEAR · EXIT BACK · ESC CLOSE	↑↓ VERLAUF · CTRL+L LEEREN · EXIT ZURÜCK · ESC SCHLIESSEN	↑↓ HISTORIAL · CTRL+L LIMPIAR · EXIT VOLVER · ESC CERRAR
 всё под контролем	all under control	alles unter Kontrolle	todo bajo control
 радиация в норме	radiation is normal	Strahlung im Normbereich	radiación normal
@@ -483,8 +469,6 @@ zsh: не удалось запустить: %@	zsh: failed to start: %@	zsh: St
 вышла новая версия	a new version is out	eine neue Version ist da	ha salido una nueva versión
 есть обновление — загляни в меню	there’s an update — check the menu	es gibt ein Update — schau ins Menü	hay una actualización: mira el menú
 меня можно обновить	I can be updated	man kann mich aktualisieren	me pueden actualizar
-для поиска нужен «Универсальный доступ»	search needs “Accessibility”	für die Suche braucht es „Bedienungshilfen“	la búsqueda necesita «Accesibilidad»
-нет доступа. если он выдан — сбрось его в настройках	no access. if it’s granted — reset it in settings	kein Zugriff. wenn erteilt — in den Einstellungen zurücksetzen	sin acceso. si está concedido, restablécelo en los ajustes
 АА!	AAH!	AAH!	¡AAH!
 слишком быстро!	too fast!	zu schnell!	¡demasiado rápido!
 осторожнее!	careful!	vorsichtig!	¡cuidado!
@@ -696,3 +680,15 @@ Open rate 12%. Тема письма „Новости компании“ — �
 Рабочий день окончен. Сначала три строки: гипотеза, метрика, срок. Всё, приказ выполнен, можешь выдохнуть.	Workday's over. Three lines first: hypothesis, metric, deadline. There. Orders fulfilled. You can breathe out.	Feierabend. Erst noch drei Zeilen: Hypothese, Kennzahl, Frist. So, Befehl ausgeführt. Du kannst durchatmen.	Se acabó la jornada. Antes, tres líneas: hipótesis, métrica, plazo. Listo, orden cumplida. Ya puedes respirar.
 Ты снова открыл ноутбук. Я вижу. Мы обсуждали границы. Закрывай.	You opened the laptop again. I see you. We talked about boundaries. Close it.	Du hast den Laptop wieder aufgeklappt. Ich seh's. Wir hatten über Grenzen gesprochen. Zuklappen.	Has vuelto a abrir el portátil. Te veo. Hablamos de los límites. Ciérralo.
 Метрики спят. И тебе пора. Утром воронка будет той же — обещаю, я проверяла.	The metrics are asleep. Your turn. The funnel will still be the same in the morning. Promise. I checked.	Die Kennzahlen schlafen. Du bist dran. Morgen früh ist der Funnel noch derselbe. Versprochen, ich hab nachgesehen.	Las métricas duermen. A ti también te toca. Por la mañana el embudo seguirá igual. Te lo prometo, lo he comprobado.
+\nЖурнал: ~/Library/Logs/SinMinions/update.log	\nLog: ~/Library/Logs/SinMinions/update.log	\nProtokoll: ~/Library/Logs/SinMinions/update.log	\nRegistro: ~/Library/Logs/SinMinions/update.log
+ДАННЫХ ПОКА НЕТ.\nЗАДАЙТЕ ВОПРОС В ЧАТЕ — РАСХОД ТОКЕНОВ ПРИДЁТ В ОТВЕТЕ API.	NO DATA YET.\nASK SOMETHING IN THE CHAT — TOKEN USAGE COMES WITH THE API RESPONSE.	NOCH KEINE DATEN.\nSTELLEN SIE IM CHAT EINE FRAGE — DER TOKENVERBRAUCH KOMMT MIT DER API-ANTWORT.	AÚN NO HAY DATOS.\nHAGA UNA PREGUNTA EN EL CHAT: EL CONSUMO DE TOKENS LLEGA CON LA RESPUESTA DE LA API.
+GitHub ограничил частоту запросов — попробуйте через несколько минут	GitHub limited the request rate — try again in a few minutes	GitHub hat die Anfragefrequenz begrenzt — versuchen Sie es in ein paar Minuten erneut	GitHub limitó la frecuencia de solicitudes — inténtelo de nuevo en unos minutos
+%@ из %@	%@ of %@	%@ von %@	%@ de %@
+Больше	More	Mehr	Más
+Меньше	Less	Weniger	Menos
+Викча на рабочем столе	Vikcha on the desktop	Vikcha auf dem Schreibtisch	Vikcha en el escritorio
+Компаньон на рабочем столе	Companion on the desktop	Begleiter auf dem Schreibtisch	Compañero en el escritorio
+Изменить размер	Resize	Größe ändern	Cambiar el tamaño
+Не закрывать чат при потере фокуса	Keep the chat open when focus moves	Chat nicht schließen, wenn der Fokus wechselt	No cerrar el chat al perder el foco
+Разблокировать окна	Unlock the windows	Fenster entsperren	Desbloquear las ventanas
+Чат останется открытым, когда вы переключитесь в другое приложение	The chat stays open when you switch to another app	Der Chat bleibt offen, wenn Sie zu einer anderen App wechseln	El chat sigue abierto al cambiar a otra aplicación

@@ -1,0 +1,34 @@
+# Сцены демонстрации: приложение ставит <сцена>.ready, CI делает снимок.
+# Порядок совпадает с порядком demoMark в CompanionController+Demo.swift.
+screen
+settings
+llm
+console
+chat
+typing
+unlock
+lang_en
+shell
+style1
+style2
+style3
+style4
+analytics
+coffee
+ab
+ab_shell
+ab_cup
+ab_cheer
+ab_sit
+ab_pajama
+ab_sing
+ab_find
+ab_play
+v_dialog
+v_walk
+v_wave
+v_stars
+v_find
+search
+find
+teleport

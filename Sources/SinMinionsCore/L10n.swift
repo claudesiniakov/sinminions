@@ -32,7 +32,22 @@ public enum AppLanguage: String, CaseIterable, Identifiable, Sendable {
 /// Нет перевода — показывается русский текст.
 public enum L10n {
     /// Текущий язык (уже раскрытый). По умолчанию русский: так работают тесты и исходные тексты.
-    nonisolated(unsafe) public static var current: AppLanguage = .ru
+    /// Читается и с главного потока (интерфейс), и из фоновых задач (ошибки, лимиты), поэтому под замком.
+    nonisolated(unsafe) private static var storedCurrent: AppLanguage = .ru
+    private static let currentLock = NSLock()
+
+    public static var current: AppLanguage {
+        get {
+            currentLock.lock()
+            defer { currentLock.unlock() }
+            return storedCurrent
+        }
+        set {
+            currentLock.lock()
+            storedCurrent = newValue
+            currentLock.unlock()
+        }
+    }
 
     public static func translate(_ key: String, to language: AppLanguage) -> String {
         switch language {

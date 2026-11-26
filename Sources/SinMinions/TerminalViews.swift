@@ -38,6 +38,10 @@ struct TerminalFrame<Content: View>: View {
     var model: ConsoleModel
     @ViewBuilder var content: Content
 
+    private var lockAccessibilityLabel: String {
+        model.unlocked ? tr("Заблокировать окна") : tr("Разблокировать окна")
+    }
+
     private var fg: Color { Term.green }
     private var dimColor: Color { Term.dim }
     private var lineColor: Color { Term.dark }
@@ -67,6 +71,9 @@ struct TerminalFrame<Content: View>: View {
                     .contentShape(Rectangle())
                     .onTapGesture { model.layoutEvent(window, .toggleLock) }
                     .help(model.unlocked ? tr("Заблокировать окна") : tr("Разблокировать: окна можно двигать и менять их размер"))
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityLabel(Text(lockAccessibilityLabel))
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
@@ -108,15 +115,7 @@ struct TerminalFrame<Content: View>: View {
             .allowsHitTesting(false)
         )
         .overlay(alignment: .bottomTrailing) {
-            if model.unlocked {
-                Text("◢")
-                    .font(.system(size: 14, design: .monospaced))
-                    .foregroundStyle(fg)
-                    .padding(4)
-                    .contentShape(Rectangle())
-                    .gesture(resizeGesture)
-                    .help(tr("Потяните, чтобы изменить размер"))
-            }
+            if model.unlocked { resizeHandle }
         }
         .shadow(color: Term.green.opacity(0.35), radius: 8)
         .padding(10)
@@ -133,6 +132,20 @@ struct TerminalFrame<Content: View>: View {
             }
         }
         .allowsHitTesting(false)
+    }
+
+    /// Ручка изменения размера в правом нижнем углу разблокированного окна.
+    private var resizeHandle: some View {
+        Text("◢")
+            .font(.system(size: 14, design: .monospaced))
+            .foregroundStyle(fg)
+            .padding(4)
+            .contentShape(Rectangle())
+            .gesture(resizeGesture)
+            .help(tr("Потяните, чтобы изменить размер"))
+            .accessibilityElement(children: .ignore)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel(Text(tr("Изменить размер")))
     }
 
     private var moveGesture: some Gesture {

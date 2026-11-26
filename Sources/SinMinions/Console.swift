@@ -350,7 +350,9 @@ final class ConsoleController: NSObject, NSWindowDelegate {
     }
 
     func windowDidResignKey(_ notification: Notification) {
-        if isOpen { onDismiss() }
+        // По умолчанию чат закрывается, как только фокус ушёл; в настройках это можно выключить,
+        // чтобы держать диалог открытым рядом с работой в другом приложении.
+        if isOpen, !model.chatStaysOpen { onDismiss() }
     }
 }
 

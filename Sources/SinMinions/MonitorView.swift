@@ -109,9 +109,20 @@ struct MonitorView: View {
                     .shadow(color: Term.green.opacity(selected ? 0.9 : 0), radius: selected ? 5 : 0)
                     .contentShape(Rectangle())
                     .onTapGesture { if model.isActive(stat) { model.selectedStat = stat } }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityLabel(Text(stat.title(for: model.character)))
+                    .accessibilityValue(Text(accessibilityValue(stat)))
             }
         }
         .frame(maxWidth: .infinity)
+    }
+
+    /// Для VoiceOver: «3 из 4» у обычной характеристики, название подключения у «интеллекта».
+    private func accessibilityValue(_ stat: SpecialStat) -> String {
+        guard let info = specialInfo(stat) else { return "" }
+        if stat == .intelligence { return info.label }
+        return trf("%@ из %@", "\(info.level + 1)", "\(info.levels)")
     }
 
     /// Подпись и «−» с «+» под призраком: для I — подключение, для остальных букв — уровень выбранной характеристики.
@@ -169,6 +180,10 @@ struct MonitorView: View {
             .opacity(enabled ? 1 : 0.45)
             .contentShape(Rectangle())
             .onTapGesture { if enabled { action() } }
+            .accessibilityElement(children: .ignore)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel(Text(symbol == "−" ? tr("Меньше") : tr("Больше")))
+            .accessibilityValue(Text(enabled ? "" : tr("недоступно")))
     }
 
     /// Остаток токенов или средств по каждому подключению: название и остаток, под ними модель.

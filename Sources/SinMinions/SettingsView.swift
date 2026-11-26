@@ -148,6 +148,8 @@ private struct GeneralSettings: View {
                     }
                 }
                 Toggle(tr("Скрывать в полноэкранных приложениях"), isOn: $prefs.hideInFullScreen)
+                Toggle(tr("Не закрывать чат при потере фокуса"), isOn: $prefs.chatStaysOpen)
+                    .help(tr("Чат останется открытым, когда вы переключитесь в другое приложение"))
                 Toggle(tr("Помнить режим «кофе» после перезапуска"), isOn: $prefs.coffeeKeep)
                     .help(tr("Ноутбук не будет засыпать, пока режим кофе не выключат вручную (буква E или /coffee)"))
                 Toggle(tr("Запускать при входе в систему"), isOn: $launchAtLogin)
