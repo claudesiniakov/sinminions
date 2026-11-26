@@ -38,6 +38,11 @@ final class BubbleView: NSView {
     var below = false
     var tailX: CGFloat = 0
     private(set) var fit = Fit(text: "", fontSize: fontSize, textWidth: 1, textHeight: 1)
+    /// Готовое изображение текста. TextKit рисует глифы в перевёрнутой системе координат,
+    /// поэтому рендерим их один раз в перевёрнутый контекст и вставляем картинкой —
+    /// так ориентация не зависит от того, в каком контексте потом рисуется пузырь.
+    private var textImage: NSImage?
+    private static let imageMargin: CGFloat = 8
 
     private static func colors(for character: CompanionCharacter) -> (
         text: NSColor, glow: NSColor, panel: NSColor, border: NSColor
@@ -136,7 +141,22 @@ final class BubbleView: NSView {
 
     func apply(_ fit: Fit) {
         self.fit = fit
+        textImage = Self.render(fit, character: character)
         needsDisplay = true
+    }
+
+    private static func render(_ fit: Fit, character: CompanionCharacter) -> NSImage? {
+        guard fit.textWidth > 0, fit.textHeight > 0 else { return nil }
+        let margin = imageMargin
+        let size = NSSize(width: fit.textWidth + margin * 2, height: fit.textHeight + margin * 2)
+        let laid = layout(fit.text, width: fit.textWidth, character: character, fontSize: fit.fontSize)
+        return NSImage(size: size, flipped: true) { _ in
+            laid.manager.drawGlyphs(
+                forGlyphRange: NSRange(location: 0, length: laid.storage.length),
+                at: CGPoint(x: margin, y: margin)
+            )
+            return true
+        }
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -173,20 +193,15 @@ final class BubbleView: NSView {
         colors.border.setStroke()
         edges.stroke()
 
-        guard !fit.text.isEmpty else { return }
-        let laid = Self.layout(fit.text, width: fit.textWidth, character: character, fontSize: fit.fontSize)
-        // TextKit рисует сверху вниз в перевёрнутой системе координат: переворачиваем сами,
-        // тогда верх текста ровно там, где мы его посчитали.
-        let top = box.midY + laid.height / 2
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        ctx.saveGState()
-        ctx.textMatrix = .identity
-        ctx.translateBy(x: box.minX + Self.padH, y: top)
-        ctx.scaleBy(x: 1, y: -1)
-        laid.manager.drawGlyphs(
-            forGlyphRange: NSRange(location: 0, length: laid.storage.length), at: .zero
-        )
-        ctx.restoreGState()
+        guard let textImage else { return }
+        let margin = Self.imageMargin
+        let imageSize = textImage.size
+        textImage.draw(in: CGRect(
+            x: box.minX + Self.padH - margin,
+            y: box.midY - imageSize.height / 2,
+            width: imageSize.width,
+            height: imageSize.height
+        ))
     }
 }
 
