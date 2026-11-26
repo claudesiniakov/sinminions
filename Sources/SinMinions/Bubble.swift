@@ -60,11 +60,40 @@ final class BubbleView: NSView {
         return CGSize(width: ceil(box.width), height: ceil(box.height) + CGFloat(extra))
     }
 
-    /// Размер окна пузыря вместе с хвостиком.
+    /// Высота текста по правилам отрисовки: тот же TextKit, что и в `draw`.
+    /// `boundingRect` для многострочного текста с `lineHeightMultiple` занижает высоту,
+    /// и последняя строка уезжала под нижнюю границу пузыря.
+    static func layoutHeight(_ text: String, width: CGFloat) -> CGFloat {
+        let storage = NSTextStorage(attributedString: attributed(text))
+        let manager = NSLayoutManager()
+        let container = NSTextContainer(size: CGSize(width: width, height: .greatestFiniteMagnitude))
+        container.lineFragmentPadding = 0
+        manager.addTextContainer(container)
+        storage.addLayoutManager(manager)
+        manager.ensureLayout(for: container)
+        return ceil(manager.usedRect(for: container).height)
+    }
+
+    /// Ширина текста, на которой он будет нарисован при данном размере окна.
+    static func textWidth(forPanelWidth width: CGFloat) -> CGFloat {
+        max(width - 2 - padH * 2, 1)
+    }
+
+    /// Размер окна пузыря вместе с хвостиком. Высота считается раскладкой на той же ширине,
+    /// на которой текст рисуется, плюс небольшой запас — тогда последняя строка не режется.
     static func size(for text: String) -> CGSize {
-        let t = textSize(text)
-        // Запас по ширине, чтобы при рисовании строки переносились так же, как при замере.
-        return CGSize(width: max(t.width + padH * 2, 44) + 6, height: t.height + padV * 2 + tail + 2)
+        let widest = maxWidth - padH * 2
+        var textWidth = min(max(textSize(text).width, 44), widest)
+        var height = layoutHeight(text, width: textWidth)
+        // На узкой ширине текст может занять больше строк, чем на максимальной: берём лучший вариант.
+        if textWidth < widest {
+            let atWidest = layoutHeight(text, width: widest)
+            if atWidest <= height {
+                textWidth = widest
+                height = atWidest
+            }
+        }
+        return CGSize(width: textWidth + padH * 2 + 2, height: height + padV * 2 + tail + 2 + 6)
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -101,11 +130,9 @@ final class BubbleView: NSView {
         colors.border.setStroke()
         edges.stroke()
 
-        let t = Self.textSize(text)
-        let textRect = CGRect(
-            x: box.minX + Self.padH, y: box.midY - t.height / 2,
-            width: box.width - Self.padH * 2, height: t.height
-        )
+        let width = Self.textWidth(forPanelWidth: bounds.width)
+        let height = Self.layoutHeight(text, width: width)
+        let textRect = CGRect(x: box.minX + Self.padH, y: box.midY - height / 2, width: width, height: height)
         Self.attributed(text, character: character).draw(with: textRect, options: [.usesLineFragmentOrigin, .usesFontLeading])
     }
 }
