@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let usage = UsageStore()
     private let settingsRouter = SettingsRouter()
     private let helpWindow = HelpWindow()
+    private var onboarding: OnboardingWindow?
     private var controller: CompanionController?
     private var statusMenu: StatusMenu?
     private var settingsWindow: NSWindow?
@@ -32,7 +33,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let statusMenu = StatusMenu(
             controller: controller, updater: updater, prefs: prefs,
             openSettings: { [weak self] in self?.showSettings() },
-            openHelp: { [weak self] in self?.helpWindow.show() }
+            openHelp: { [weak self] in self?.helpWindow.show() },
+            openOnboarding: { [weak self] in self?.onboarding?.show() }
         )
         self.statusMenu = statusMenu
         controller.onStateChange = { [weak statusMenu] in statusMenu?.refresh() }
@@ -72,8 +74,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         checkTimer = timer
         Updater.confirmUpdatedLaunch()
 
-        // Первый запуск: коротко объясняем, как открыть чат. Больше не повторяем.
+        // Первый запуск: мастер знакомства (три шага). После него подсказка-пузырь не нужна.
         let isDemo = ProcessInfo.processInfo.environment["SINMINIONS_DEMO"] != nil
+        let needsOnboarding = !UserDefaults.standard.bool(forKey: "didCompleteOnboarding")
+        let onboarding = OnboardingWindow(
+            openSettings: { [weak self] in self?.showSettings(tab: .llm) },
+            openHelp: { [weak self] in self?.helpWindow.show() },
+            summary: { [weak self] in
+                guard let self else { return (0, 0) }
+                let items = self.prefs.connections.items
+                return (items.count, items.filter { Keychain.exists($0.keyAccount) }.count)
+            },
+            finish: { UserDefaults.standard.set(true, forKey: "didCompleteOnboarding") }
+        )
+        self.onboarding = onboarding
+        if !isDemo, needsOnboarding {
+            UserDefaults.standard.set(true, forKey: "didShowIntro")
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1.5))
+                onboarding.show()
+            }
+        }
         if !isDemo, !UserDefaults.standard.bool(forKey: "didShowIntro") {
             UserDefaults.standard.set(true, forKey: "didShowIntro")
             Task { @MainActor [weak controller] in

@@ -782,3 +782,24 @@ S.P.E.C.I.A.L. у Мота и стража, ПИАР у V	S.P.E.C.I.A.L. for Mot
 НЕТ ДОСТУПА	NO ACCESS	KEIN ZUGRIFF	SIN ACCESO
 Нет доступа к ключу в Связке ключей	No access to the key in the Keychain	Kein Zugriff auf den Schlüssel im Schlüsselbund	Sin acceso a la clave en el Llavero
 Вышла версия %@. Что нового: %@. Обновить можно из меню	Version %@ is out. What's new: %@. Update from the menu	Version %@ ist da. Neu: %@. Update über das Menü	Ya salió la versión %@. Novedades: %@. Actualiza desde el menú
+Знакомство	Getting started	Erste Schritte	Primeros pasos
+Мастер знакомства…	Getting-started guide…	Erste-Schritte-Assistent…	Guía de primeros pasos…
+1. Установка	1. Installation	1. Installation	1. Instalación
+2. Модель и ключ	2. Model and key	2. Modell und Schlüssel	2. Modelo y clave
+3. Как открыть чат	3. Opening the chat	3. Chat öffnen	3. Cómo abrir el chat
+Приложению нужна папка «Программы»: из «Загрузок» обновление и запуск спотыкаются.	The app belongs in Applications: running from Downloads breaks updates and launch.	Die App gehört in „Programme“: aus „Downloads“ hakeln Update und Start.	La app debe estar en Aplicaciones: desde Descargas fallan la actualización y el arranque.
+Уже в «Программах» — этот шаг пройден.	Already in Applications — this step is done.	Schon in „Programme“ — dieser Schritt ist erledigt.	Ya está en Aplicaciones: paso hecho.
+Сейчас запущено из: %@	Currently running from: %@	Läuft derzeit aus: %@	Se ejecuta desde: %@
+Открыть «Программы»	Open Applications	„Programme“ öffnen	Abrir Aplicaciones
+Проверить снова	Check again	Erneut prüfen	Comprobar de nuevo
+Без ключа модели чат не работает. Ключ хранится в Связке ключей, а не в настройках.	The chat needs a model key. The key lives in the Keychain, not in settings.	Der Chat braucht einen Modellschlüssel. Er liegt im Schlüsselbund, nicht in den Einstellungen.	El chat necesita una clave de modelo. Se guarda en el Llavero, no en los ajustes.
+Подключений: %@, с ключом: %@	Connections: %@, with a key: %@	Verbindungen: %@, mit Schlüssel: %@	Conexiones: %@, con clave: %@
+Открыть настройки нейросетей	Open model settings	Modelleinstellungen öffnen	Abrir ajustes de modelos
+Двойной щелчок по персонажу — чат. Одиночный — короткая реплика, перетаскивание — перенос.	Double-click the companion for the chat. Single click says a line, drag moves it.	Doppelklick auf den Begleiter öffnet den Chat. Einfacher Klick sagt eine Zeile, Ziehen verschiebt ihn.	Doble clic en el compañero abre el chat. Un clic dice una frase, arrastrar lo mueve.
+⌥⌘C открывает и закрывает чат из любого приложения.	⌥⌘C opens and closes the chat from any app.	⌥⌘C öffnet und schließt den Chat aus jeder App.	⌥⌘C abre y cierra el chat desde cualquier app.
+Всё остальное — в меню у значка в строке меню.	Everything else is in the menu bar icon menu.	Alles Weitere steckt im Menü des Menüleisten-Symbols.	Todo lo demás está en el menú del icono de la barra.
+Шаг %@ из 3	Step %@ of 3	Schritt %@ von 3	Paso %@ de 3
+Назад	Back	Zurück	Atrás
+Пропустить	Skip	Überspringen	Omitir
+Далее	Next	Weiter	Siguiente
+Готово	Done	Fertig	Listo
