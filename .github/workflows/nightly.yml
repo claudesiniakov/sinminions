@@ -1,0 +1,44 @@
+name: Nightly
+
+# Ночная проверка того, что нельзя проверить на каждом пуше: живые серверы GigaChat
+# и корень Минцифры. Днём этот шаг только диагностирует, поэтому ночью смотрим на него
+# как на настоящую проверку и заводим задачу при падении.
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  live-tls:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Live TLS (GigaChat, DeepSeek, Claude, GPT, Grok, Gemini)
+        run: |
+          set -o pipefail
+          SINMINIONS_LIVE_TLS=1 swift test --filter LiveTLSTests 2>&1 | tee live-tls.log
+
+      - name: Keep the log
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: live-tls-log
+          path: live-tls.log
+          if-no-files-found: warn
+
+      - name: Report failure as an issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --title "Ночная проверка TLS упала (${{ github.run_id }})" \
+            --body "Живая проверка серверов нейросетей не прошла: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            || true

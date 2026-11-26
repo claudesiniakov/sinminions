@@ -65,3 +65,7 @@ swift test
 - `Sources/SinMinions` — приложение: окно персонажа (AppKit, Core Animation), пузырь, меню, настройки (SwiftUI), обновление.
 
 Персонаж взят из [claudesiniakov/summary](https://github.com/claudesiniakov/summary).
+
+## Лицензия
+
+MIT — см. [LICENSE](LICENSE). История изменений по версиям — в [CHANGELOG.md](CHANGELOG.md).

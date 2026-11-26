@@ -23,7 +23,7 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           # Токен не остаётся в .git/config: этот job исполняет код ветки.
@@ -36,11 +36,25 @@ jobs:
           sw_vers
           swift --version
 
+      # Скрипты сборки и локализации — тоже код: ловим синтаксис до того, как он сломает релиз.
+      - name: Scripts
+        run: |
+          bash -n scripts/build-app.sh
+          python3 -m py_compile scripts/*.py
+
       - name: Build
         run: swift build -c release
 
       - name: Test
         run: swift test
+
+      # Переводы: таблица — источник, Translations.swift генерируется; расхождение и непереведённые
+      # строки из кода ловятся здесь, а не глазами в релизе.
+      - name: Localization
+        run: |
+          python3 scripts/gen-l10n.py
+          git diff --exit-code Sources/SinMinionsCore/Translations.swift
+          python3 scripts/check-l10n.py
 
       # Серверы GigaChat подписаны корнем Минцифры: проверяем, что встроенный корень принимается системой.
       - name: Live TLS check (GigaChat)
@@ -84,7 +98,8 @@ jobs:
           SINMINIONS_DEMO=1 SINMINIONS_SHOT_DIR="$PWD/build" build/SinMinions.app/Contents/MacOS/SinMinions > smoke.log 2>&1 &
           PID=$!
           # Приложение само проходит сцены и перед каждой ставит метку <сцена>.ready — по ней делается снимок.
-          for scene in screen settings llm console chat typing unlock lang_en shell style1 style2 style3 style4 analytics coffee ab ab_shell ab_cup ab_cheer ab_sit ab_pajama ab_sing ab_find ab_play v_dialog v_walk v_wave v_stars v_find search find teleport; do
+          while IFS= read -r scene; do
+            case "$scene" in ""|"#"*) continue;; esac
             for i in $(seq 1 120); do [ -f "build/$scene.ready" ] && break; sleep 0.5; done
             if [ ! -f "build/$scene.ready" ]; then
               cat smoke.log
@@ -93,8 +108,24 @@ jobs:
             fi
             screencapture -x "build/$scene.png"
             test -s "build/$scene.png"
+            # Снимок должен быть не «пустым»: у чёрного или одноцветного экрана PNG весит единицы килобайт.
+            size=$(stat -f%z "build/$scene.png")
+            if [ "$size" -lt 20000 ]; then
+              echo "::error::Снимок $scene подозрительно пустой ($size байт)"
+              exit 1
+            fi
+            if ! sips -g pixelWidth "build/$scene.png" | grep -q "pixelWidth"; then
+              echo "::error::Снимок $scene не читается"
+              exit 1
+            fi
             rm -f "build/$scene.ready"
-          done
+          done < scripts/scenes.txt
+          # Ввод должен дойти до строки чата: демонстрация печатает «привет» системными
+          # событиями, а затем «ab» — как из окна. Раньше это только писалось в лог.
+          grep -q "DEMO input after system typing: \[привет\]" smoke.log \
+            || { cat smoke.log; echo "::error::Ввод с клавиатуры не дошёл до чата"; exit 1; }
+          grep -q "DEMO input after window typing: \[ab\]" smoke.log \
+            || { cat smoke.log; echo "::error::Ввод из окна не дошёл до чата"; exit 1; }
           if kill -0 $PID 2>/dev/null; then
             echo "Процесс жив после демонстрации порталов"
             cat smoke.log
@@ -115,7 +146,7 @@ jobs:
             security delete-keychain "$SIGNING_KEYCHAIN" 2>/dev/null || true
           fi
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: SinMinions-app
           path: |
@@ -150,6 +181,22 @@ jobs:
             build/find.png
             build/chat.png
 
+  # Минимальная заявленная система (macOS 14) не проверяется основным раннером.
+  # Job не блокирует релиз: образ может быть недоступен, но сигнал мы получаем.
+  compatibility:
+    runs-on: macos-14
+    continue-on-error: true
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Build and test on macOS 14
+        run: |
+          swift --version
+          swift build -c release
+          swift test
+
   # Публикация отделена от сборки: право записи в репозиторий есть только здесь,
   # и только для тега, который стоит на main и совпадает с версией в собранном архиве.
   release:
@@ -163,7 +210,7 @@ jobs:
     # не меняя workflow. Если правило не задано, шаг не блокируется.
     environment: release
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -182,7 +229,7 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: SinMinions-app
           path: artifact
