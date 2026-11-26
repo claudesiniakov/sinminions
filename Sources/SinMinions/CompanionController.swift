@@ -1194,11 +1194,15 @@ final class CompanionController: NSObject {
 
     @objc private func screensChanged() {
         panel.setFrameOrigin(clamped(panel.frame.origin, size: panel.frame.size))
+        if console.isOpen {
+            console.keepOnScreen(in: area, ghost: view.mothFrame.offsetBy(dx: panel.frame.minX, dy: panel.frame.minY))
+        }
         updateFullScreenHide()
     }
 
-    @objc private func frontmostAppChanged() {
-        updateFullScreenHide()
+    /// Это уведомление система может прислать не из главного потока (как и смену режима питания).
+    @objc private nonisolated func frontmostAppChanged() {
+        Task { @MainActor in self.updateFullScreenHide() }
     }
 
     /// Скрывается ли компаньон, потому что активное приложение занимает экран целиком.

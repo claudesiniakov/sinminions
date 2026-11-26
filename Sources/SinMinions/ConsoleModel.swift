@@ -105,6 +105,17 @@ final class ChatSession {
     /// Растёт с каждой записью, даже когда журнал упёрся в лимит: по нему идёт автоскролл.
     private(set) var revision = 0
 
+    /// Кэш свёрстанного журнала: собирать `AttributedString` из всех записей на каждый
+    /// символ ввода слишком дорого. Ключ — ревизия журнала, язык и персонаж.
+    @ObservationIgnored private var logCache: (key: String, value: AttributedString)?
+
+    func cachedLog(key: String, build: () -> AttributedString) -> AttributedString {
+        if let logCache, logCache.key == key { return logCache.value }
+        let value = build()
+        logCache = (key, value)
+        return value
+    }
+
     private func append(_ entry: ChatEntry) {
         revision += 1
         entries.append(entry)

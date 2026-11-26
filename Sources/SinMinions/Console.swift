@@ -330,6 +330,18 @@ final class ConsoleController: NSObject, NSWindowDelegate {
         self.timer = timer
     }
 
+    /// Смена конфигурации экранов: окна не должны остаться за пределами видимой области.
+    /// Положение, которое пользователь задал сам, сохраняем — двигаем только то, что выпало.
+    func keepOnScreen(in area: CGRect, ghost: CGRect) {
+        guard isOpen else { return }
+        ghostRect = ghost
+        for panel in [terminal, monitor] {
+            let frame = panel.frame
+            let origin = Layout.clamp(origin: frame.origin, size: frame.size, in: area)
+            if origin != frame.origin { panel.setFrameOrigin(origin) }
+        }
+    }
+
     func close() {
         guard isOpen else { return }
         isOpen = false

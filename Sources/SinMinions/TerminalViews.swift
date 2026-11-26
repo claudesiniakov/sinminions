@@ -210,7 +210,7 @@ struct ChatScreen: View {
                             }
                             if !chat.entries.isEmpty {
                                 // Весь журнал — один текст: выделять можно мышью через несколько реплик, ⌘C копирует.
-                                Text(log(chat))
+                                Text(chat.cachedLog(key: "\(chat.revision)|\(model.language)|\(model.character)") { log(chat) })
                                     .textSelection(.enabled)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }

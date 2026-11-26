@@ -3,8 +3,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# Версия — из последнего тега vX.Y.Z, номер сборки — число коммитов.
-VERSION="${VERSION:-$( (git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true) | sed 's/^v//')}"
+# Версия — из имени тега, если собираем релиз (перевыпуск на том же коммите возможен),
+# иначе из последнего тега vX.Y.Z. Номер сборки — число коммитов.
+if [ -n "${GITHUB_REF_NAME:-}" ] && [ "${GITHUB_REF:-}" = "refs/tags/${GITHUB_REF_NAME}" ]; then
+  VERSION="${VERSION:-${GITHUB_REF_NAME#v}}"
+else
+  VERSION="${VERSION:-$( (git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true) | sed 's/^v//')}"
+fi
 VERSION="${VERSION:-0.0.0}"
 BUILD_NUMBER="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 APP="build/SinMinions.app"

@@ -241,7 +241,10 @@ final class Updater {
         let work = FileManager.default.temporaryDirectory
             .appendingPathComponent("SinMinions-update-\(UUID().uuidString)", isDirectory: true)
         do {
-            try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+            // Каталог только для владельца: там лежит распакованное приложение до замены.
+            try FileManager.default.createDirectory(
+                at: work, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]
+            )
             let archive = work.appendingPathComponent(ReleaseFeed.archiveName)
 
             UpdateLog.write(trf("Загрузка %@", "\(release.archiveURL.lastPathComponent)"))
@@ -411,6 +414,9 @@ final class Updater {
         STORE=$(mktemp -d "$OLD.rollback.XXXXXX") || { open "$OLD"; exit 1; }
         BACKUP="$STORE/SinMinions.app"
         mv "$OLD" "$BACKUP" || { rmdir "$STORE"; open "$OLD"; exit 1; }
+        # Перед копированием проверяем подпись ещё раз: между проверкой в приложении
+        # и этим моментом файл мог быть подменён — codesign --strict это поймает.
+        /usr/bin/codesign --verify --strict -R="$7" "$NEW" || { echo "подпись не сошлась — отмена"; rm -rf "$OLD"; mv "$BACKUP" "$OLD" && rmdir "$STORE" && open "$OLD"; exit 1; }
         if ditto "$NEW" "$OLD"; then
           SINMINIONS_UPDATE_TOKEN="$5" "$OLD/Contents/MacOS/SinMinions" &
           CHILD=$!
@@ -437,7 +443,8 @@ final class Updater {
         p.executableURL = URL(fileURLWithPath: "/bin/sh")
         let token = UUID()
         p.arguments = [scriptURL.path, String(ProcessInfo.processInfo.processIdentifier),
-                       Self.installURL.path, newApp.path, log.path, token.uuidString, Self.launchMarker(token).path]
+                       Self.installURL.path, newApp.path, log.path, token.uuidString, Self.launchMarker(token).path,
+                       SigningIdentity.requirement]
         p.standardInput = FileHandle.nullDevice
         p.standardOutput = FileHandle.nullDevice
         p.standardError = FileHandle.nullDevice

@@ -24,6 +24,9 @@ jobs:
       - name: Live TLS (GigaChat, DeepSeek, Claude, GPT, Grok, Gemini)
         run: |
           set -o pipefail
+          # Фильтр по имени класса молча выполнит 0 тестов, если класс переименуют:
+          # сначала убеждаемся, что такие тесты вообще есть.
+          swift test --list-tests | grep -q "LiveTLSTests" || { echo "::error::Тесты LiveTLSTests не найдены"; exit 1; }
           SINMINIONS_LIVE_TLS=1 swift test --filter LiveTLSTests 2>&1 | tee live-tls.log
 
       - name: Keep the log

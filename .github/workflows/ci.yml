@@ -183,6 +183,24 @@ jobs:
             build/find.png
             build/chat.png
 
+  # Линтеры в режиме предупреждений: пока не блокируют релиз, но дают сигнал о дрейфе.
+  lint:
+    runs-on: macos-26
+    continue-on-error: true
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: swift-format
+        run: |
+          brew install swift-format
+          swift-format lint --recursive Sources Tests || true
+      - name: actionlint
+        run: |
+          brew install actionlint
+          actionlint .github/workflows/*.yml
+
   # Публикация отделена от сборки: право записи в репозиторий есть только здесь,
   # и только для тега, который стоит на main и совпадает с версией в собранном архиве.
   release:
@@ -251,7 +269,8 @@ jobs:
           for attempt in 1 2 3; do
             if gh release view "$TAG" > /dev/null 2>&1; then
               gh release upload "$TAG" artifact/SinMinions.zip artifact/SinMinions.zip.sha256 --clobber
-              gh release edit "$TAG" --title "$TAG" --notes-file "$NOTES"
+              # Если релиз остался черновиком с прошлой попытки — публикуем его здесь же.
+              gh release edit "$TAG" --draft=false --title "$TAG" --notes-file "$NOTES"
             else
               gh release create "$TAG" artifact/SinMinions.zip artifact/SinMinions.zip.sha256 \
                 --verify-tag --title "$TAG" --notes-file "$NOTES"
