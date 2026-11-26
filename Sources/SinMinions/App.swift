@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let llm = LLMService()
     private let usage = UsageStore()
     private let settingsRouter = SettingsRouter()
+    private let helpWindow = HelpWindow()
     private var controller: CompanionController?
     private var statusMenu: StatusMenu?
     private var settingsWindow: NSWindow?
@@ -28,9 +29,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updater.beforeRestart = { [weak controller] in controller?.savePosition() }
 
         controller.onOpenSettings = { [weak self] tab in self?.showSettings(tab: tab) }
-        let statusMenu = StatusMenu(controller: controller, updater: updater, prefs: prefs) { [weak self] in
-            self?.showSettings()
-        }
+        let statusMenu = StatusMenu(
+            controller: controller, updater: updater, prefs: prefs,
+            openSettings: { [weak self] in self?.showSettings() },
+            openHelp: { [weak self] in self?.helpWindow.show() }
+        )
         self.statusMenu = statusMenu
         controller.onStateChange = { [weak statusMenu] in statusMenu?.refresh() }
         controller.attachLimits { [weak self] connection, key in

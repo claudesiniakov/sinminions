@@ -11,27 +11,33 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private let updater: Updater
     private let prefs: Prefs
     private let openSettings: () -> Void
+    private let openHelp: () -> Void
 
     private let hideItem = NSMenuItem(title: tr("Скрыть"), action: #selector(StatusMenu.toggleHidden), keyEquivalent: "")
     private let napItem = NSMenuItem(title: tr("Усыпить на 1 час"), action: #selector(StatusMenu.toggleNap), keyEquivalent: "")
     private let cornerItem = NSMenuItem(title: tr("Вернуть в угол"), action: #selector(StatusMenu.returnToCorner), keyEquivalent: "")
     private let chatItem = NSMenuItem(title: tr("Чат (⌥⌘C)"), action: #selector(StatusMenu.toggleChat), keyEquivalent: "")
+    private let helpItem = NSMenuItem(title: tr("Что умеет"), action: #selector(StatusMenu.showHelp), keyEquivalent: "")
     private let versionItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let updateItem = NSMenuItem(title: "", action: #selector(StatusMenu.updateAction), keyEquivalent: "")
     private let settingsItem = NSMenuItem(title: tr("Настройки…"), action: #selector(StatusMenu.showSettings), keyEquivalent: ",")
     private let quitItem = NSMenuItem(title: tr("Завершить SinMinions"), action: #selector(StatusMenu.quit), keyEquivalent: "q")
 
-    init(controller: CompanionController, updater: Updater, prefs: Prefs, openSettings: @escaping () -> Void) {
+    init(
+        controller: CompanionController, updater: Updater, prefs: Prefs,
+        openSettings: @escaping () -> Void, openHelp: @escaping () -> Void
+    ) {
         self.controller = controller
         self.updater = updater
         self.prefs = prefs
         self.openSettings = openSettings
+        self.openHelp = openHelp
         super.init()
 
         menu.autoenablesItems = false
         menu.delegate = self
         versionItem.isEnabled = false
-        for entry in [hideItem, napItem, cornerItem, chatItem, .separator(), versionItem, updateItem, .separator(), settingsItem, quitItem] {
+        for entry in [hideItem, napItem, cornerItem, chatItem, helpItem, .separator(), versionItem, updateItem, .separator(), settingsItem, quitItem] {
             entry.target = self
             menu.addItem(entry)
         }
@@ -112,6 +118,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         } else {
             controller.nap(seconds: 3600)
         }
+    }
+
+    @objc private func showHelp() {
+        openHelp()
     }
 
     @objc private func toggleChat() {

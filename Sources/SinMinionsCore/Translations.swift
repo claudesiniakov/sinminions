@@ -763,5 +763,38 @@ GitHub ограничил частоту запросов — попробуйт
 Вышла версия %@ — обновить можно из меню	Version %@ is out — update from the menu	Version %@ ist da — Update über das Menü	Ya salió la versión %@: actualiza desde el menú
 Открепить чат	Unpin the chat	Chat loslösen	Desanclar el chat
 Приколоть чат: не закроется при потере фокуса	Pin the chat: it stays open when focus moves	Chat anheften: bleibt offen, wenn der Fokus wechselt	Anclar el chat: no se cierra al perder el foco
+Что умеет	What it can do	Was er kann	Qué puede hacer
+Управление	Controls	Bedienung	Controles
+двойной щелчок	double-click	Doppelklick	doble clic
+открыть чат	open the chat	Chat öffnen	abrir el chat
+одиночный	single click	einfacher Klick	clic simple
+короткая реплика	a short line	eine kurze Zeile	una frase corta
+перетаскивание	drag	Ziehen	arrastrar
+перенести в другое место	move it somewhere else	woandershin ziehen	moverlo a otro sitio
+чат из любого приложения	chat from any app	Chat aus jeder App	chat desde cualquier app
+дополнить команду	complete the command	Befehl vervollständigen	completar el comando
+листать отправленное	browse sent lines	Gesendetes durchblättern	recorrer lo enviado
+закрыть чат	close the chat	Chat schließen	cerrar el chat
+все команды	all commands	alle Befehle	todos los comandos
+обычный zsh, exit — назад в чат	plain zsh, exit returns to the chat	normale zsh, exit zurück zum Chat	zsh normal, exit vuelve al chat
+не давать ноутбуку уснуть	keep the laptop awake	Laptop wach halten	evitar que el portátil duerma
+расход токенов по моделям	token usage by model	Tokenverbrauch je Modell	consumo de tokens por modelo
+буквы	letters	Buchstaben	letras
+S.P.E.C.I.A.L. у Мота и стража, ПИАР у V	S.P.E.C.I.A.L. for Moth and the guard, ПИАР for V	S.P.E.C.I.A.L. bei Moth und Wächter, ПИАР bei V	S.P.E.C.I.A.L. para Moth y el guardián, ПИАР para V
+изменить выбранную характеристику	change the selected trait	ausgewählte Eigenschaft ändern	cambiar el rasgo elegido
+лимиты	limits	Limits	límites
+остаток по подключениям, где он разрешён	remaining balance for connections where allowed	Restguthaben für erlaubte Verbindungen	saldo por conexión donde se permite
+Меню у значка	Menu in the menu bar	Menü im Menüleisten-Symbol	Menú en el icono
+скрыть	hide	Ausblenden	ocultar
+спрятать компаньона или вернуть	hide the companion or bring it back	Begleiter ausblenden oder zurückholen	ocultar al compañero o traerlo
+усыпить	nap	Schlafen	dormir
+тишина на час	an hour of silence	eine Stunde Ruhe	una hora de silencio
+в угол	to the corner	in die Ecke	a la esquina
+вернуть на место	put it back	zurück an seinen Platz	devolverlo a su sitio
+обновление	update	Update	actualización
+проверить и установить новую версию	check and install a new version	prüfen und neue Version installieren	comprobar e instalar una versión nueva
+ЗАКРЫТЬ	CLOSE	SCHLIESSEN	CERRAR
+Монитор	Monitor	Monitor	Monitor
+Чат	Chat	Chat	Chat
 """#
 }
