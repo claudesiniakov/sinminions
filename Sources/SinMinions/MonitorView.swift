@@ -120,8 +120,11 @@ struct MonitorView: View {
 
     /// Для VoiceOver: «3 из 4» у обычной характеристики, название подключения у «интеллекта».
     private func accessibilityValue(_ stat: SpecialStat) -> String {
+        if stat == .intelligence {
+            let label = model.special.intelligenceLabel
+            return label.isEmpty ? model.llmName ?? tr("не выбрано") : label
+        }
         guard let info = specialInfo(stat) else { return "" }
-        if stat == .intelligence { return info.label }
         return trf("%@ из %@", "\(info.level + 1)", "\(info.levels)")
     }
 
@@ -139,7 +142,7 @@ struct MonitorView: View {
             Text(stat.title(for: model.character))
                 .foregroundStyle(Term.dim)
             HStack(spacing: 10) {
-                stepButton("−", enabled: isIntelligence ? model.llmCount > 1 : level > 0) {
+                stepButton("−", enabled: isIntelligence ? model.llmCount > 1 : level > 0, connection: isIntelligence) {
                     if isIntelligence { model.switchConnection(-1) } else { model.adjustSpecial(stat, -1) }
                 }
                 VStack(spacing: 1) {
@@ -165,7 +168,7 @@ struct MonitorView: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                stepButton("+", enabled: isIntelligence ? model.llmCount > 1 : level < levels - 1) {
+                stepButton("+", enabled: isIntelligence ? model.llmCount > 1 : level < levels - 1, connection: isIntelligence) {
                     if isIntelligence { model.switchConnection(1) } else { model.adjustSpecial(stat, 1) }
                 }
             }
@@ -173,7 +176,9 @@ struct MonitorView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func stepButton(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+    private func stepButton(
+        _ symbol: String, enabled: Bool, connection: Bool = false, action: @escaping () -> Void
+    ) -> some View {
         Text(symbol)
             .frame(width: 26, height: 26)
             .overlay(Rectangle().strokeBorder(enabled ? Term.green : Term.dark, lineWidth: 1))
@@ -182,8 +187,16 @@ struct MonitorView: View {
             .onTapGesture { if enabled { action() } }
             .accessibilityElement(children: .ignore)
             .accessibilityAddTraits(.isButton)
-            .accessibilityLabel(Text(symbol == "−" ? tr("Меньше") : tr("Больше")))
+            .accessibilityLabel(Text(stepLabel(symbol, connection: connection)))
             .accessibilityValue(Text(enabled ? "" : tr("недоступно")))
+    }
+
+    /// Что делает «−/+»: у «инструмента» листают подключения, у остальных — уровень.
+    private func stepLabel(_ symbol: String, connection: Bool) -> String {
+        if connection {
+            return symbol == "−" ? tr("Предыдущее подключение") : tr("Следующее подключение")
+        }
+        return symbol == "−" ? tr("Меньше") : tr("Больше")
     }
 
     /// Остаток токенов или средств по каждому подключению: название и остаток, под ними модель.

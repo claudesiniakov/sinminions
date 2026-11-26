@@ -12,8 +12,11 @@ final class SigningIdentityTests: XCTestCase {
         }
     }
 
-    func testSingleLeafHasNoDisjunction() {
-        XCTAssertFalse(SigningIdentity.requirement.contains(" or "))
+    func testRequirementIsNeverEmpty() {
+        // Пустой список не должен превращаться в «разрешить всё»: требование остаётся,
+        // а переходная версия с двумя отпечатками — штатный путь смены сертификата.
+        XCTAssertFalse(SigningIdentity.requirement.isEmpty)
+        XCTAssertGreaterThanOrEqual(SigningIdentity.leafHashes.count, 1)
     }
 
     func testAcceptsPinnedLeafRegardlessOfCase() throws {

@@ -221,7 +221,7 @@ struct ChatScreen: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .onChange(of: chat.entries.count) { scroll(proxy, chat) }
+                    .onChange(of: chat.revision) { scroll(proxy, chat) }
                     .onChange(of: chat.isSending) { scroll(proxy, chat) }
                 }
                 Rectangle().fill(Term.dark).frame(height: 1)

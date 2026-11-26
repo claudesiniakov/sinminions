@@ -18,11 +18,13 @@ root = pathlib.Path(__file__).resolve().parent.parent
 tsv = root / "l10n/strings.tsv"
 
 keys = []
+rows = []
 for line in tsv.read_text(encoding="utf-8").splitlines():
     if not line or line.startswith("#"):
         continue
     parts = line.split("\t")
     assert len(parts) == 4, line
+    rows.append(parts)
     keys.append(parts[0])
 def decode(raw: str) -> str:
     """В TSV переводы строк записаны как \\n — приводим к тому же виду, что и литерал в коде."""
@@ -42,6 +44,8 @@ def decode(raw: str) -> str:
     return "".join(out)
 
 known = {decode(k) for k in keys}
+# Пустой перевод — такая же ошибка, как отсутствующий: в интерфейсе окажется пустая подпись.
+empty = [p[0] for p in rows if any(not cell.strip() for cell in p[1:])]
 
 literal = re.compile(r'\btrf?\("((?:[^"\\]|\\.)*)"')
 used: set[str] = set()
@@ -57,6 +61,11 @@ for path in sorted((root / "Sources").rglob("*.swift")):
         used.add(value)
 
 missing = sorted(used - known)
+if empty:
+    print(f"Пустой перевод у {len(empty)} строк(и):")
+    for text in empty:
+        print("  •", text)
+    sys.exit(1)
 if missing:
     print(f"Нет перевода для {len(missing)} строк(и) из кода:")
     for text in missing:

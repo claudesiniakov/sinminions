@@ -102,7 +102,11 @@ final class ChatSession {
     /// оставались пропорциональны числу реплик. Храним последние двести сорок.
     static let entriesLimit = 240
 
+    /// Растёт с каждой записью, даже когда журнал упёрся в лимит: по нему идёт автоскролл.
+    private(set) var revision = 0
+
     private func append(_ entry: ChatEntry) {
+        revision += 1
         entries.append(entry)
         if entries.count > Self.entriesLimit {
             entries.removeFirst(entries.count - Self.entriesLimit)

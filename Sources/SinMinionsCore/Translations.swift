@@ -715,5 +715,8 @@ GitHub ограничил частоту запросов — попробуйт
 Не закрывать чат при потере фокуса	Keep the chat open when focus moves	Chat nicht schließen, wenn der Fokus wechselt	No cerrar el chat al perder el foco
 Разблокировать окна	Unlock the windows	Fenster entsperren	Desbloquear las ventanas
 Чат останется открытым, когда вы переключитесь в другое приложение	The chat stays open when you switch to another app	Der Chat bleibt offen, wenn Sie zu einer anderen App wechseln	El chat sigue abierto al cambiar a otra aplicación
+не выбрано	not selected	nicht ausgewählt	no seleccionado
+Предыдущее подключение	Previous connection	Vorherige Verbindung	Conexión anterior
+Следующее подключение	Next connection	Nächste Verbindung	Conexión siguiente
 """#
 }

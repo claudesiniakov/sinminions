@@ -250,15 +250,15 @@ final class Prefs {
 
     /// Настройка активного персонажа: ключ получает его префикс.
     private func store(_ value: Any, _ key: String) {
-        guard !demoStorage else { return }
-        defaults.set(value, forKey: character.keyPrefix + key)
+        // В демонстрации настройки не сохраняем, но изменение всё равно применяем:
+        // иначе сцены пижамы и смены языка снимались бы в прежнем состоянии.
+        if !demoStorage { defaults.set(value, forKey: character.keyPrefix + key) }
         if !applying { onChange() }
     }
 
     /// Общая настройка, не зависящая от персонажа.
     private func storeGlobal(_ value: Any, _ key: String) {
-        guard !demoStorage else { return }
-        defaults.set(value, forKey: key)
+        if !demoStorage { defaults.set(value, forKey: key) }
         if !applying { onChange() }
     }
 

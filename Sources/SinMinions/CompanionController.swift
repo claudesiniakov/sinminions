@@ -364,6 +364,8 @@ final class CompanionController: NSObject {
     }
 
     func savePosition() {
+        // В демонстрации профиль пользователя не трогаем.
+        guard !demo else { return }
         // Пока открыт терминал, призрак временно в центре — запоминаем его обычное место.
         let origin = consoleHome ?? panel.frame.origin
         UserDefaults.standard.set(Double(origin.x), forKey: Keys.x)
@@ -743,9 +745,6 @@ final class CompanionController: NSObject {
 
     private var windowPosition: CGFloat = 0.75
     private var nextWindowCheck: Double = 0
-    /// Скорость прогулки по низу экрана, точек в секунду.
-    private static let walkSpeed: Double = 80
-
     /// WindowServer перечисляет окна спереди назад в координатах с началом вверху основного экрана.
     private func windowWalkTarget(at fraction: CGFloat) -> CGPoint? {
         guard prefs.character == .v, prefs.vikchaRoute == .windowEdge,
@@ -1055,9 +1054,10 @@ final class CompanionController: NSObject {
             })
             return
         }
-        // По низу экрана она идёт пешком: та же линейная траектория, но медленно и с шагом.
-        let walking = prefs.character == .v && prefs.vikchaRoute == .screenBottom
-        let speed = walking ? Self.walkSpeed : Double.random(in: prefs.flightSpeedRange)
+        // По низу экрана она идёт пешком — но только когда это прогулка по маршруту:
+        // погоня за курсором и выход из терминала остаются полётом в любую точку.
+        let walking = prefs.character == .v && prefs.vikchaRoute == .screenBottom && explicit == nil && !chase
+        let speed = walking ? Agility.walkSpeed(level: prefs.agility) : Double.random(in: prefs.flightSpeedRange)
         let distance = Double(hypot(to.x - from.x, to.y - from.y))
         flight = Flight(from: from, to: to, start: now, duration: max(distance / speed, walking ? 0.6 : 0.5), wander: true, chase: chase)
         startFlightTimer()

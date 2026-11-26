@@ -139,10 +139,12 @@ enum SpecialStat: Int, CaseIterable, Identifiable {
     var id: Int { rawValue }
 
     private static let specialLetters = ["S", "P", "E", "C", "I", "A", "L"]
-    private static let specialTitles = [
-        tr("СИЛА"), tr("ВОСПРИЯТИЕ"), tr("ВЫНОСЛИВОСТЬ"), tr("ХАРИЗМА"),
-        tr("ИНТЕЛЛЕКТ"), tr("ЛОВКОСТЬ"), tr("УДАЧА"),
-    ]
+    /// Считается при каждом обращении: язык можно сменить на ходу, а `static let`
+    /// зафиксировал бы подписи на языке запуска.
+    private static var specialTitles: [String] {
+        [tr("СИЛА"), tr("ВОСПРИЯТИЕ"), tr("ВЫНОСЛИВОСТЬ"), tr("ХАРИЗМА"),
+         tr("ИНТЕЛЛЕКТ"), tr("ЛОВКОСТЬ"), tr("УДАЧА")]
+    }
 
     /// Какие кнопки видит персонаж. У призрака и стража — S.P.E.C.I.A.L. из Fallout,
     /// у V — своё слово «ПИАР»: каждая буква называет то, что эта кнопка и меняет

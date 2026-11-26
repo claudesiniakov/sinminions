@@ -21,6 +21,16 @@ public enum Agility {
     public static func title(level: Int) -> String {
         [tr("МЕДЛЕННО"), tr("ОБЫЧНО"), tr("БЫСТРО"), tr("МОЛНИЕНОСНО")][clamp(level)]
     }
+
+    /// Шаг прогулки по низу экрана (pt/с). Медленнее полёта, но тоже растёт с уровнем.
+    public static func walkSpeed(level: Int) -> Double {
+        switch clamp(level) {
+        case 0: return 55
+        case 1: return 80
+        case 2: return 120
+        default: return 170
+        }
+    }
 }
 
 /// Выносливость (E): 0 — призрак спит, 1 — засыпает при бездействии, 2 — не засыпает, 3 — «кофе»: не засыпает

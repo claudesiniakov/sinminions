@@ -65,7 +65,7 @@ jobs:
       # поэтому разрешение «Универсальный доступ» не сбрасывается при обновлении.
       # В pull_request секретов нет и подпись ad-hoc — ключ рядом с кодом из форка не появляется.
       - name: Signing certificate
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         env:
           SIGNING_P12: ${{ secrets.SIGNING_P12 }}
           SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
@@ -78,7 +78,7 @@ jobs:
           KEYCHAIN_PASSWORD="$(uuidgen)"
           echo "$SIGNING_P12" | base64 --decode > "$RUNNER_TEMP/signing.p12"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
-          security set-keychain-settings -lut 60 "$KEYCHAIN"
+          security set-keychain-settings -lut 300 "$KEYCHAIN"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
           security import "$RUNNER_TEMP/signing.p12" -k "$KEYCHAIN" -P "$SIGNING_PASSWORD" -T /usr/bin/codesign
           rm "$RUNNER_TEMP/signing.p12"
@@ -94,6 +94,7 @@ jobs:
 
       - name: Smoke test (приложение не падает при запуске, компаньон на экране)
         run: |
+          trap 'echo "::group::smoke.log"; cat smoke.log 2>/dev/null || true; echo "::endgroup::"' EXIT
           # SINMINIONS_DEMO=1: компаньон говорит реплику, затем открывает настройки — оба состояния попадают на снимки.
           SINMINIONS_DEMO=1 SINMINIONS_SHOT_DIR="$PWD/build" build/SinMinions.app/Contents/MacOS/SinMinions > smoke.log 2>&1 &
           PID=$!
@@ -124,7 +125,7 @@ jobs:
           # событиями, а затем «ab» — как из окна. Раньше это только писалось в лог.
           grep -q "DEMO input after system typing: \[привет\]" smoke.log \
             || { cat smoke.log; echo "::error::Ввод с клавиатуры не дошёл до чата"; exit 1; }
-          grep -Eq "DEMO input after window typing: \[[^]]+\]" smoke.log \
+          grep -Eq "DEMO input after window typing: \[[^]]*ab\]" smoke.log \
             || { cat smoke.log; echo "::error::Ввод из окна не дошёл до чата"; exit 1; }
           if kill -0 $PID 2>/dev/null; then
             echo "Процесс жив после демонстрации порталов"
@@ -147,6 +148,7 @@ jobs:
           fi
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
         with:
           name: SinMinions-app
           path: |

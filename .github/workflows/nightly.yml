@@ -39,6 +39,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh issue create --title "Ночная проверка TLS упала (${{ github.run_id }})" \
-            --body "Живая проверка серверов нейросетей не прошла: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            || true
+          # Одна открытая задача на все ночные сбои: иначе затяжная поломка даёт пачку задач.
+          TITLE="Ночная проверка TLS падает"
+          BODY="Живая проверка серверов нейросетей не прошла: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          EXISTING="$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number' || true)"
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY" || true
+          else
+            gh issue create --title "$TITLE" --body "$BODY" || true
+          fi

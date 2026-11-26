@@ -127,7 +127,7 @@ final class Updater {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             // Лимит запросов на адрес (60 в час без ключа): берём последний релиз со страницы.
             if code == 403 || code == 429 {
-                let release = try await latestFromPage()
+                let release = try await latestFromPage(rateLimited: true)
                 lastCheck = Date()
                 UserDefaults.standard.set(lastCheck, forKey: Keys.lastCheck)
                 let newer = currentVersion.map { release.version > $0 } ?? true
@@ -148,7 +148,8 @@ final class Updater {
             let release: ReleaseInfo
             do {
                 release = try ReleaseFeed.parse(data)
-            } catch {
+            } catch ReleaseFeedError.invalidResponse {
+                // Ответ 200, но не JSON: например, заглушка прокси. Идём запасным путём.
                 release = try await latestFromPage()
             }
             let newer = currentVersion.map { release.version > $0 } ?? true
@@ -168,14 +169,16 @@ final class Updater {
     /// Последний релиз без API: страница `/releases/latest` перенаправляется на тег,
     /// а адреса архива и контрольной суммы у GitHub предсказуемы. Заметок о выпуске
     /// на этом пути нет — их отдаёт только API.
-    private func latestFromPage() async throws -> ReleaseInfo {
+    private func latestFromPage(rateLimited: Bool = false) async throws -> ReleaseInfo {
         var request = URLRequest(url: ReleaseFeed.latestPageURL)
         request.httpMethod = "HEAD"
         request.setValue("SinMinions-Updater", forHTTPHeaderField: "User-Agent")
         request.timeoutInterval = 20
         let (_, response) = try await UpdateNetwork.session.data(for: request)
-        guard let url = response.url, let tag = ReleaseFeed.tag(fromLocation: url) else {
-            throw ReleaseFeedError.rateLimited
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard status == 200, let url = response.url, let tag = ReleaseFeed.tag(fromLocation: url) else {
+            // Причина важна: «нет релиза» и «не пустили» — разные сообщения.
+            throw rateLimited ? ReleaseFeedError.rateLimited : ReleaseFeedError.invalidResponse
         }
         guard let release = ReleaseFeed.fallback(tag: tag) else {
             throw ReleaseFeedError.badVersion(tag)

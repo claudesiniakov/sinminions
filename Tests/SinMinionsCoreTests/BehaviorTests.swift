@@ -1611,6 +1611,21 @@ final class UpdatesTests: XCTestCase {
         XCTAssertThrowsError(try ReleaseFeed.parse(Data(foreign.utf8)))
     }
 
+    func testWalkSpeedGrowsWithAgility() {
+        let speeds = (0..<Agility.levels).map { Agility.walkSpeed(level: $0) }
+        XCTAssertEqual(speeds, speeds.sorted())
+        XCTAssertGreaterThan(speeds[0], 0)
+        // Зажим уровней как у остальных характеристик.
+        XCTAssertEqual(Agility.walkSpeed(level: -3), speeds[0])
+        XCTAssertEqual(Agility.walkSpeed(level: 99), speeds[speeds.count - 1])
+    }
+
+    func testStripANSIPreservesCRLFLines() {
+        // CRLF: возврат каретки не должен съедать уже написанную строку.
+        XCTAssertEqual(ShellText.stripANSI("foo\r\nbar"), "foo\nbar")
+        XCTAssertEqual(ShellText.stripANSI("line1\r\nline2\r\n"), "line1\nline2\n")
+    }
+
     func testChecksumParsing() {
         let hex = String(repeating: "ab", count: 32)
         XCTAssertEqual(UpdateVerifier.parseChecksum("\(hex)  SinMinions.zip\n"), hex)

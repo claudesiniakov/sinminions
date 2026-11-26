@@ -106,8 +106,10 @@ public enum ShellText {
             }
             switch scalar {
             case "\n":
-                out.insert("\n", at: min(cursor, out.count))
-                cursor += 1
+                // Перевод строки дописывается в конец, а не в позицию курсора:
+                // иначе «foo\r\nbar» терял «foo» (так приходит CRLF от curl -i).
+                out.append("\n")
+                cursor = out.count
                 lineStart = cursor
             case "\r":
                 cursor = lineStart
