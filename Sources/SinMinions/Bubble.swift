@@ -2,20 +2,42 @@ import AppKit
 import SinMinionsCore
 
 /// Пузырь с репликой в стиле терминала из claudesiniakov/summary: тёмная плашка без скруглений,
-/// зелёный моноширинный текст 11 pt со свечением, ширина до 170.
+/// моноширинный текст со свечением, ширина до 170.
+///
+/// Раскладка и отрисовка идут одним движком (TextKit): размер панели считается по той же
+/// `NSTextContainer`, которой потом рисуются глифы, поэтому последняя строка не может
+/// оказаться под нижней границей. Раньше замер (`boundingRect`) и отрисовка расходились,
+/// и на длинных репликах текст уезжал вниз и обрезался.
 @MainActor
 final class BubbleView: NSView {
     static let maxWidth: CGFloat = 170
     static let padH: CGFloat = 12
     static let padV: CGFloat = 7
     static let tail: CGFloat = 7
+    static let fontSize: CGFloat = 11
+    static let minFontSize: CGFloat = 9
 
     private typealias Palette = CompanionView.Palette
 
-    var text = ""
+    /// Готовая раскладка реплики: возможно укороченный текст, кегль и посчитанные размеры.
+    struct Fit {
+        let text: String
+        let fontSize: CGFloat
+        let textWidth: CGFloat
+        let textHeight: CGFloat
+
+        var panelSize: CGSize {
+            CGSize(
+                width: textWidth + BubbleView.padH * 2 + 2,
+                height: textHeight + BubbleView.padV * 2 + BubbleView.tail + 2
+            )
+        }
+    }
+
     var character: CompanionCharacter = .f
     var below = false
     var tailX: CGFloat = 0
+    private(set) var fit = Fit(text: "", fontSize: fontSize, textWidth: 1, textHeight: 1)
 
     private static func colors(for character: CompanionCharacter) -> (
         text: NSColor, glow: NSColor, panel: NSColor, border: NSColor
@@ -31,7 +53,9 @@ final class BubbleView: NSView {
         }
     }
 
-    private static func attributed(_ text: String, character: CompanionCharacter = .f) -> NSAttributedString {
+    private static func attributed(
+        _ text: String, character: CompanionCharacter, fontSize: CGFloat
+    ) -> NSAttributedString {
         let style = NSMutableParagraphStyle()
         style.alignment = .center
         style.lineBreakMode = .byWordWrapping
@@ -42,7 +66,7 @@ final class BubbleView: NSView {
         glow.shadowBlurRadius = 6
         glow.shadowOffset = .zero
         return NSAttributedString(string: text, attributes: [
-            .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .regular),
+            .font: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular),
             .foregroundColor: colors.text,
             .kern: 0.5,
             .shadow: glow,
@@ -50,50 +74,69 @@ final class BubbleView: NSView {
         ])
     }
 
-    private static func textSize(_ text: String) -> CGSize {
-        let box = attributed(text).boundingRect(
-            with: CGSize(width: maxWidth - padH * 2, height: .greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading]
-        )
-        // Запас по высоте: при межстрочном множителе замер многострочного текста бывает короче отрисовки.
-        let extra = ceil(box.height / 15) > 2 ? 4 : 0
-        return CGSize(width: ceil(box.width), height: ceil(box.height) + CGFloat(extra))
-    }
-
-    /// Высота текста по правилам отрисовки: тот же TextKit, что и в `draw`.
-    /// `boundingRect` для многострочного текста с `lineHeightMultiple` занижает высоту,
-    /// и последняя строка уезжала под нижнюю границу пузыря.
-    static func layoutHeight(_ text: String, width: CGFloat) -> CGFloat {
-        let storage = NSTextStorage(attributedString: attributed(text))
+    /// Раскладка ровно на той ширине, на которой текст будет нарисован.
+    private static func layout(
+        _ text: String, width: CGFloat, character: CompanionCharacter, fontSize: CGFloat
+    ) -> (storage: NSTextStorage, manager: NSLayoutManager, height: CGFloat) {
+        let storage = NSTextStorage(attributedString: attributed(text, character: character, fontSize: fontSize))
         let manager = NSLayoutManager()
         let container = NSTextContainer(size: CGSize(width: width, height: .greatestFiniteMagnitude))
         container.lineFragmentPadding = 0
         manager.addTextContainer(container)
         storage.addLayoutManager(manager)
         manager.ensureLayout(for: container)
-        return ceil(manager.usedRect(for: container).height)
+        return (storage, manager, ceil(manager.usedRect(for: container).height))
     }
 
-    /// Ширина текста, на которой он будет нарисован при данном размере окна.
-    static func textWidth(forPanelWidth width: CGFloat) -> CGFloat {
-        max(width - 2 - padH * 2, 1)
-    }
-
-    /// Размер окна пузыря вместе с хвостиком. Высота считается раскладкой на той же ширине,
-    /// на которой текст рисуется, плюс небольшой запас — тогда последняя строка не режется.
-    static func size(for text: String) -> CGSize {
+    /// Ширина самой длинной строки при данном кегле: от неё зависит ширина плашки.
+    private static func inkWidth(_ text: String, character: CompanionCharacter, fontSize: CGFloat) -> CGFloat {
         let widest = maxWidth - padH * 2
-        var textWidth = min(max(textSize(text).width, 44), widest)
-        var height = layoutHeight(text, width: textWidth)
-        // На узкой ширине текст может занять больше строк, чем на максимальной: берём лучший вариант.
-        if textWidth < widest {
-            let atWidest = layoutHeight(text, width: widest)
-            if atWidest <= height {
-                textWidth = widest
-                height = atWidest
+        let box = attributed(text, character: character, fontSize: fontSize).boundingRect(
+            with: CGSize(width: widest, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading]
+        )
+        return min(ceil(box.width), widest)
+    }
+
+    /// Подбор размера: сначала обычный кегль, при нехватке места — мельче, затем текст укорачивается.
+    static func fit(_ text: String, character: CompanionCharacter, maxHeight: CGFloat) -> Fit {
+        let widest = maxWidth - padH * 2
+        var fontSize = Self.fontSize
+        var body = text
+        // Узкая плашка — для короткой реплики. Если на узкой ширине текст занимает больше строк,
+        // берём максимальную: так длинные реплики не становятся выше без нужды.
+        var width = max(inkWidth(text, character: character, fontSize: fontSize), 44)
+        func height() -> CGFloat {
+            layout(body, width: width, character: character, fontSize: fontSize).height
+        }
+        func chrome() -> CGFloat { padV * 2 + tail + 2 }
+        var h = height()
+        if width < widest {
+            let atWidest = layout(body, width: widest, character: character, fontSize: fontSize).height
+            // Шире берём только если это уменьшает высоту: короткой реплике узкая плашка лучше.
+            if atWidest < h {
+                width = widest
+                h = atWidest
             }
         }
-        return CGSize(width: textWidth + padH * 2 + 2, height: height + padV * 2 + tail + 2 + 6)
+        while h + chrome() > maxHeight, fontSize > Self.minFontSize {
+            fontSize -= 1
+            h = height()
+        }
+        if h + chrome() > maxHeight {
+            var words = body.split(separator: " ")
+            while words.count > 1, h + chrome() > maxHeight {
+                words.removeLast()
+                body = words.joined(separator: " ") + "…"
+                h = height()
+            }
+        }
+        return Fit(text: body, fontSize: fontSize, textWidth: width, textHeight: h)
+    }
+
+    func apply(_ fit: Fit) {
+        self.fit = fit
+        needsDisplay = true
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -130,10 +173,20 @@ final class BubbleView: NSView {
         colors.border.setStroke()
         edges.stroke()
 
-        let width = Self.textWidth(forPanelWidth: bounds.width)
-        let height = Self.layoutHeight(text, width: width)
-        let textRect = CGRect(x: box.minX + Self.padH, y: box.midY - height / 2, width: width, height: height)
-        Self.attributed(text, character: character).draw(with: textRect, options: [.usesLineFragmentOrigin, .usesFontLeading])
+        guard !fit.text.isEmpty else { return }
+        let laid = Self.layout(fit.text, width: fit.textWidth, character: character, fontSize: fit.fontSize)
+        // TextKit рисует сверху вниз в перевёрнутой системе координат: переворачиваем сами,
+        // тогда верх текста ровно там, где мы его посчитали.
+        let top = box.midY + laid.height / 2
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        ctx.saveGState()
+        ctx.textMatrix = .identity
+        ctx.translateBy(x: box.minX + Self.padH, y: top)
+        ctx.scaleBy(x: 1, y: -1)
+        laid.manager.drawGlyphs(
+            forGlyphRange: NSRange(location: 0, length: laid.storage.length), at: .zero
+        )
+        ctx.restoreGState()
     }
 }
 
@@ -171,13 +224,14 @@ final class BubblePanel {
     /// Показывает реплику рядом с персонажем; `moth` и `area` — в координатах экрана.
     func show(_ text: String, over moth: CGRect, in area: CGRect) {
         generation += 1
-        let size = BubbleView.size(for: text)
-        let placement = Layout.bubble(size: size, over: moth, in: area)
-        view.text = text
+        // Запас по высоте экрана: длинная реплика сначала уменьшается в кегле, потом укорачивается.
+        let fit = BubbleView.fit(text, character: character, maxHeight: max(area.height - 48, 120))
+        let placement = Layout.bubble(size: fit.panelSize, over: moth, in: area)
+        view.character = character
+        view.apply(fit)
         view.below = placement.below
         view.tailX = placement.tailX
-        panel.setFrame(CGRect(origin: placement.origin, size: size), display: true)
-        view.needsDisplay = true
+        panel.setFrame(CGRect(origin: placement.origin, size: fit.panelSize), display: true)
         panel.orderFrontRegardless()
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.4
