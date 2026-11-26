@@ -148,7 +148,7 @@ final class CompanionController: NSObject {
             name: NSWorkspace.didActivateApplicationNotification, object: nil
         )
         workspace.addObserver(
-            self, selector: #selector(frontmostAppChanged),
+            self, selector: #selector(spaceChanged),
             name: NSWorkspace.activeSpaceDidChangeNotification, object: nil
         )
 
@@ -1203,6 +1203,18 @@ final class CompanionController: NSObject {
     /// Это уведомление система может прислать не из главного потока (как и смену режима питания).
     @objc private nonisolated func frontmostAppChanged() {
         Task { @MainActor in self.updateFullScreenHide() }
+    }
+
+    /// Свайп на другое пространство. Персонаж виден везде, а окна терминала остаются на прежнем
+    /// пространстве — и двойной щелчок считал, что чат открыт, и закрывал его вместо открытия.
+    /// Поэтому при смене пространства чат закрывается: следующий двойной щелчок открывает его заново.
+    @objc private nonisolated func spaceChanged() {
+        Task { @MainActor in
+            if self.engine.mode == .console {
+                self.apply(self.engine.handle(.closeConsole, now: self.now))
+            }
+            self.updateFullScreenHide()
+        }
     }
 
     /// Скрывается ли компаньон, потому что активное приложение занимает экран целиком.
