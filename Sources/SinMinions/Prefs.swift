@@ -112,6 +112,8 @@ final class Prefs {
     var hideInFullScreen: Bool { didSet { storeGlobal(hideInFullScreen, "hideInFullScreen") } }
     /// Чат не закрывается, когда фокус уходит в другое приложение.
     var chatStaysOpen: Bool { didSet { storeGlobal(chatStaysOpen, "chatStaysOpen") } }
+    /// Сколько висит реплика: быстро, средне (как было) или долго.
+    var bubbleDuration: BubbleDuration { didSet { storeGlobal(bubbleDuration.rawValue, "bubbleDuration") } }
 
     /// Вызывается после любого изменения.
     @ObservationIgnored var onChange: () -> Void = {}
@@ -151,6 +153,8 @@ final class Prefs {
         sleepMinutes = c.sleepMinutes
         hideInFullScreen = d.object(forKey: "hideInFullScreen") as? Bool ?? true
         chatStaysOpen = d.object(forKey: "chatStaysOpen") as? Bool ?? false
+        bubbleDuration = BubbleDuration.clamp(d.object(forKey: "bubbleDuration") as? Int
+            ?? BubbleDuration.standard.rawValue)
         let savedLanguage = AppLanguage(rawValue: d.string(forKey: "language") ?? "") ?? .system
         language = savedLanguage
         L10n.current = savedLanguage.resolved()
@@ -278,6 +282,7 @@ final class Prefs {
         config.singEnabled = singEnabled && character == .ab
         config.singDuration = Anthem.duration
         config.celebrateEnabled = celebrateEnabled
+        config.talkDuration = bubbleDuration.seconds
         config.talkEnabled = talkEnabled
         config.talkInterval = talkFrequency.talkInterval
         config.sleepAfter = sleepMinutes > 0 && !coffee ? Double(sleepMinutes) * 60 : nil

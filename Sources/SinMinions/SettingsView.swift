@@ -132,6 +132,9 @@ private struct GeneralSettings: View {
                     Text(tr("Часто (8–14 с)")).tag(Frequency.often)
                 }
                 .disabled(!prefs.talkEnabled)
+                Picker(tr("Реплика на экране"), selection: $prefs.bubbleDuration) {
+                    ForEach(BubbleDuration.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
                 Picker(tr("Засыпать при бездействии"), selection: $prefs.sleepMinutes) {
                     Text(tr("через 1 мин")).tag(1)
                     Text(tr("через 5 мин")).tag(5)

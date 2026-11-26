@@ -1626,6 +1626,17 @@ final class UpdatesTests: XCTestCase {
         XCTAssertEqual(ShellText.stripANSI("line1\r\nline2\r\n"), "line1\nline2\n")
     }
 
+    func testBubbleDurationLevels() {
+        // Средний показ — прежнее поведение (4 секунды), края зажимаются.
+        XCTAssertEqual(BubbleDuration.standard, .medium)
+        XCTAssertEqual(BubbleDuration.medium.seconds, BehaviorConfig().talkDuration)
+        XCTAssertLessThan(BubbleDuration.fast.seconds, BubbleDuration.medium.seconds)
+        XCTAssertLessThan(BubbleDuration.medium.seconds, BubbleDuration.long.seconds)
+        XCTAssertEqual(BubbleDuration.clamp(-5), .fast)
+        XCTAssertEqual(BubbleDuration.clamp(99), .long)
+        XCTAssertFalse(BubbleDuration.long.title.isEmpty)
+    }
+
     func testChecksumParsing() {
         let hex = String(repeating: "ab", count: 32)
         XCTAssertEqual(UpdateVerifier.parseChecksum("\(hex)  SinMinions.zip\n"), hex)

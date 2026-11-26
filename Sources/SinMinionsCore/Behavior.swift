@@ -13,7 +13,9 @@ public struct BehaviorConfig: Equatable, Sendable {
     /// Пауза между репликами, секунды.
     public var talkInterval: ClosedRange<Double> = 120...300
     /// Сколько реплика остаётся на экране.
-    public var talkDuration: Double = 4
+    /// Сколько секунд реплика висит над персонажем. Значение по умолчанию — средний показ,
+    /// то есть то, как приложение вело себя до появления настройки.
+    public var talkDuration: Double = BubbleDuration.standard.seconds
     /// Через сколько секунд без ввода компаньон засыпает; nil — никогда.
     public var sleepAfter: Double? = 300
     /// После перетаскивания компаньон остаётся на месте не меньше этого времени.
@@ -488,5 +490,29 @@ public struct BehaviorEngine {
         nextSearchAt = max(nextSearchAt, until)
         nextPlayAt = max(nextPlayAt, until)
         nextSingAt = max(nextSingAt, until)
+    }
+}
+
+/// Сколько реплика висит над персонажем: короткий, средний (как было) и долгий показ.
+public enum BubbleDuration: Int, CaseIterable, Sendable {
+    case fast, medium, long
+
+    /// Средний показ — прежнее поведение приложения.
+    public static let standard = BubbleDuration.medium
+
+    public static func clamp(_ raw: Int) -> BubbleDuration {
+        BubbleDuration(rawValue: min(max(raw, 0), long.rawValue)) ?? standard
+    }
+
+    public var seconds: Double {
+        switch self {
+        case .fast: return 2.5
+        case .medium: return 4
+        case .long: return 7
+        }
+    }
+
+    public var title: String {
+        [tr("БЫСТРО"), tr("СРЕДНЕ"), tr("ДОЛГО")][rawValue]
     }
 }
