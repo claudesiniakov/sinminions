@@ -225,6 +225,7 @@ struct MonitorView: View {
         case let .value(value): text = value
         case let .failed(reason): text = reason; warning = true
         case .noKey: text = tr("нет ключа"); warning = true
+        case .denied: text = tr("нет доступа"); warning = true
         case .unsupported: text = "—"
         }
         return VStack(alignment: .leading, spacing: 0) {

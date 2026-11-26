@@ -12,6 +12,8 @@ final class LimitsStore {
         case value(String)
         case failed(String)
         case noKey
+        /// Запись есть, но Связка ключей не дала её прочитать (пользователь отказал).
+        case denied
         /// У провайдера нет способа узнать остаток по обычному ключу.
         case unsupported
     }
@@ -74,8 +76,18 @@ final class LimitsStore {
             set(connection, signature, .unsupported)
             return
         }
-        guard Keychain.exists(connection.keyAccount), let key = Keychain.read(connection.keyAccount) else {
+        let stored = Keychain.readChecked(connection.keyAccount)
+        if stored.status == errSecItemNotFound {
             set(connection, signature, .noKey)
+            return
+        }
+        if stored.status != errSecSuccess || stored.value == nil {
+            // Ответ «нет доступа» нельзя показывать как «нет ключа»: ключ есть, его не пустили.
+            set(connection, signature, .denied)
+            return
+        }
+        guard let key = stored.value else {
+            set(connection, signature, .denied)
             return
         }
         do {

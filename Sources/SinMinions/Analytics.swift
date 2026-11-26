@@ -238,6 +238,7 @@ struct AnalyticsView: View {
                 case let .value(value): row(tr("ОСТАТОК (API)"), value.uppercased())
                 case let .failed(reason): row(tr("ОСТАТОК (API)"), reason.uppercased()).foregroundStyle(Term.amber)
                 case .noKey: row(tr("ОСТАТОК (API)"), tr("НЕТ КЛЮЧА")).foregroundStyle(Term.amber)
+                case .denied: row(tr("ОСТАТОК (API)"), tr("НЕТ ДОСТУПА")).foregroundStyle(Term.amber)
                 case .unsupported: row(tr("ОСТАТОК (API)"), "—")
                 }
             } else {

@@ -310,6 +310,8 @@ private struct ConnectionEditor: View {
     @State private var useInChat: Bool
     @State private var error: String?
     @State private var check: CheckState = .idle
+    /// Что ответила Связка ключей на попытку прочитать сохранённый ключ.
+    @State private var accessNote: String?
 
     init(prefs: Prefs, llm: LLMService, existing: LLMConnection?, close: @escaping () -> Void) {
         self.prefs = prefs
@@ -356,6 +358,19 @@ private struct ConnectionEditor: View {
                         if name == old.title { name = new.title }
                     }
                     SecureField(keyLabel, text: $keyDraft)
+                    if let account = existing?.keyAccount, Keychain.exists(account) {
+                        // Ключ уже сохранён: объясняем, почему macOS может спросить пароль,
+                        // и даём кнопку, которая вызывает этот запрос осознанно.
+                        HStack(spacing: 8) {
+                            Text(tr("Ключ хранится в Связке ключей. macOS может спросить разрешение — выберите «Разрешать всегда»."))
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                            Button(tr("Разрешить доступ")) { requestKeyAccess(account) }
+                        }
+                        if let accessNote {
+                            Text(accessNote).font(.footnote).foregroundStyle(.secondary)
+                        }
+                    }
                     if provider.usesScope {
                         Picker(tr("Область доступа"), selection: $scope) {
                             Text(tr("Физлица (GIGACHAT_API_PERS)")).tag("GIGACHAT_API_PERS")
@@ -436,6 +451,20 @@ private struct ConnectionEditor: View {
             id: existing?.id ?? UUID(), name: name, provider: provider, scope: scope, model: model,
             keyAccount: existing?.keyAccount, showLimits: showLimits, useInChat: useInChat
         )
+    }
+
+    /// Осознанный запрос доступа к сохранённому ключу: macOS показывает диалог один раз,
+    /// «Разрешать всегда» привязывает разрешение к подписи этой сборки.
+    private func requestKeyAccess(_ account: String) {
+        let result = Keychain.readChecked(account)
+        switch result.status {
+        case errSecSuccess:
+            accessNote = tr("Доступ к ключу есть")
+        case errSecUserCanceled, errSecAuthFailed:
+            accessNote = tr("Доступ не выдан — ключ не прочитан")
+        default:
+            accessNote = tr("Связка ключей не ответила")
+        }
     }
 
     private func runCheck() {

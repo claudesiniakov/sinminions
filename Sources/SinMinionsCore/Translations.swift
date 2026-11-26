@@ -796,5 +796,13 @@ S.P.E.C.I.A.L. у Мота и стража, ПИАР у V	S.P.E.C.I.A.L. for Mot
 ЗАКРЫТЬ	CLOSE	SCHLIESSEN	CERRAR
 Монитор	Monitor	Monitor	Monitor
 Чат	Chat	Chat	Chat
+Ключ хранится в Связке ключей. macOS может спросить разрешение — выберите «Разрешать всегда».	The key is stored in the Keychain. macOS may ask for permission — choose “Always Allow”.	Der Schlüssel liegt im Schlüsselbund. macOS fragt eventuell nach — wählen Sie „Immer erlauben“.	La clave se guarda en el Llavero. macOS puede pedir permiso: elija «Permitir siempre».
+Разрешить доступ	Allow access	Zugriff erlauben	Permitir acceso
+Доступ к ключу есть	Key access granted	Zugriff auf den Schlüssel erlaubt	Acceso a la clave concedido
+Доступ не выдан — ключ не прочитан	Access not granted — the key was not read	Zugriff nicht erteilt — Schlüssel nicht gelesen	Acceso no concedido: la clave no se leyó
+Связка ключей не ответила	The Keychain did not respond	Der Schlüsselbund hat nicht geantwortet	El Llavero no respondió
+нет доступа	no access	kein Zugriff	sin acceso
+НЕТ ДОСТУПА	NO ACCESS	KEIN ZUGRIFF	SIN ACCESO
+Нет доступа к ключу в Связке ключей	No access to the key in the Keychain	Kein Zugriff auf den Schlüssel im Schlüsselbund	Sin acceso a la clave en el Llavero
 """#
 }
