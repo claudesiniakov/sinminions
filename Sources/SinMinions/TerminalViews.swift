@@ -225,18 +225,33 @@ struct ChatScreen: View {
                     .onChange(of: chat.isSending) { scroll(proxy, chat) }
                 }
                 Rectangle().fill(Term.dark).frame(height: 1)
+                // Подсказки команд: у каждой задан свой цвет (иначе в светлой теме системный
+                // чёрный терялся на тёмной панели), одна строка и не больше четырёх —
+                // иначе список сжимал журнал и обрезался сам.
                 let hints = SlashParser.hints(for: chat.input)
-                ForEach(hints.prefix(6), id: \.name) { hint in
-                    Button {
-                        chat.input = hint.name
-                        focused = true
-                    } label: {
-                        HStack {
-                            Text(hint.name)
-                            Text(hint.summary).foregroundStyle(Term.dim)
+                if !hints.isEmpty {
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(hints.prefix(4), id: \.name) { hint in
+                            Button {
+                                chat.input = hint.name
+                                focused = true
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Text(hint.name)
+                                        .foregroundStyle(Term.green)
+                                        .lineLimit(1)
+                                    Text(hint.summary)
+                                        .foregroundStyle(Term.dim)
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
+                                    Spacer(minLength: 0)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .help(hint.summary)
                         }
                     }
-                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 HStack(spacing: 6) {
                     Text(">")
