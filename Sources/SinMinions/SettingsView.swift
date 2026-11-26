@@ -151,6 +151,9 @@ private struct GeneralSettings: View {
                     }
                 }
                 Toggle(tr("Скрывать в полноэкранных приложениях"), isOn: $prefs.hideInFullScreen)
+                Picker(tr("Размер шрифта чата"), selection: $prefs.chatFont) {
+                    ForEach(ChatFont.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
                 Toggle(tr("Не закрывать чат при потере фокуса"), isOn: $prefs.chatStaysOpen)
                     .help(tr("Чат останется открытым, когда вы переключитесь в другое приложение"))
                 Toggle(tr("Помнить режим «кофе» после перезапуска"), isOn: $prefs.coffeeKeep)

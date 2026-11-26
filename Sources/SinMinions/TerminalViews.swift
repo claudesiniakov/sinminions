@@ -223,6 +223,7 @@ struct ChatScreen: View {
                             }
                             Color.clear.frame(height: 1).id("end")
                         }
+                        .font(.system(size: model.chatFont.pointSize, design: .monospaced))
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .onChange(of: chat.revision) { scroll(proxy, chat) }
@@ -271,6 +272,7 @@ struct ChatScreen: View {
                             return .handled
                         }
                 }
+                .font(.system(size: model.chatFont.pointSize, design: .monospaced))
                 .foregroundStyle(Term.green)
                 Text(tr("ENTER ОТПРАВИТЬ · /HELP · ESC ЗАКРЫТЬ"))
                     .foregroundStyle(Term.dim)

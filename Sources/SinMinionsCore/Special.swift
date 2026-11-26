@@ -110,3 +110,27 @@ public enum GhostStyle: Int, CaseIterable, Sendable {
         }
     }
 }
+
+/// Размер шрифта журнала чата. Мелкий — прежний вид (11 pt), дальше крупнее.
+public enum ChatFont: Int, CaseIterable, Sendable {
+    case small, normal, large
+
+    /// Прежний вид приложения: терминал был набран 11-м кеглем.
+    public static let standard = ChatFont.small
+
+    public static func clamp(_ raw: Int) -> ChatFont {
+        ChatFont(rawValue: min(max(raw, 0), large.rawValue)) ?? standard
+    }
+
+    public var pointSize: Double {
+        switch self {
+        case .small: return 11
+        case .normal: return 13
+        case .large: return 15
+        }
+    }
+
+    public var title: String {
+        [tr("МЕЛКИЙ"), tr("ОБЫЧНЫЙ"), tr("КРУПНЫЙ")][rawValue]
+    }
+}

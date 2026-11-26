@@ -114,6 +114,8 @@ final class Prefs {
     var chatStaysOpen: Bool { didSet { storeGlobal(chatStaysOpen, "chatStaysOpen") } }
     /// Сколько висит реплика: быстро, средне (как было) или долго.
     var bubbleDuration: BubbleDuration { didSet { storeGlobal(bubbleDuration.rawValue, "bubbleDuration") } }
+    /// Размер шрифта журнала чата.
+    var chatFont: ChatFont { didSet { storeGlobal(chatFont.rawValue, "chatFont") } }
 
     /// Вызывается после любого изменения.
     @ObservationIgnored var onChange: () -> Void = {}
@@ -155,6 +157,7 @@ final class Prefs {
         chatStaysOpen = d.object(forKey: "chatStaysOpen") as? Bool ?? false
         bubbleDuration = BubbleDuration.clamp(d.object(forKey: "bubbleDuration") as? Int
             ?? BubbleDuration.standard.rawValue)
+        chatFont = ChatFont.clamp(d.object(forKey: "chatFont") as? Int ?? ChatFont.standard.rawValue)
         let savedLanguage = AppLanguage(rawValue: d.string(forKey: "language") ?? "") ?? .system
         language = savedLanguage
         L10n.current = savedLanguage.resolved()

@@ -1637,6 +1637,16 @@ final class UpdatesTests: XCTestCase {
         XCTAssertFalse(BubbleDuration.long.title.isEmpty)
     }
 
+    func testChatFontLevels() {
+        // Мелкий — прежний вид (11 pt), дальше крупнее и с зажимом.
+        XCTAssertEqual(ChatFont.standard, .small)
+        XCTAssertEqual(ChatFont.small.pointSize, 11)
+        XCTAssertLessThan(ChatFont.small.pointSize, ChatFont.normal.pointSize)
+        XCTAssertLessThan(ChatFont.normal.pointSize, ChatFont.large.pointSize)
+        XCTAssertEqual(ChatFont.clamp(-4), .small)
+        XCTAssertEqual(ChatFont.clamp(42), .large)
+    }
+
     func testChecksumParsing() {
         let hex = String(repeating: "ab", count: 32)
         XCTAssertEqual(UpdateVerifier.parseChecksum("\(hex)  SinMinions.zip\n"), hex)

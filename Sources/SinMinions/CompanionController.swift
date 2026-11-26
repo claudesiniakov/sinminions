@@ -271,6 +271,7 @@ final class CompanionController: NSObject {
     private func refreshLLM() {
         let list = prefs.connections
         console.model.chatStaysOpen = prefs.chatStaysOpen
+        console.model.chatFont = prefs.chatFont
         console.model.llmName = list.active?.name
         console.model.llmModelName = list.active?.model
         console.model.llmConnections = list.items.filter(\.showLimits)
