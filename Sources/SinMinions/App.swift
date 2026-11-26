@@ -317,7 +317,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let self else { return }
                 if case let .available(release) = self.updater.state, self.announcedVersion != release.version {
                     self.announcedVersion = release.version
-                    self.controller?.announceUpdate(version: release.version.description)
+                    self.controller?.announceUpdate(version: release.version.description, notes: release.notes)
                 }
                 self.observeUpdater()
             }

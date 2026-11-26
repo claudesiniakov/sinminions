@@ -237,8 +237,27 @@ final class CompanionController: NSObject {
     }
 
     /// Вышла новая версия: говорим об этом в пузыре, установка — из меню.
-    func announceUpdate(version: String) {
-        showHint(trf("Вышла версия %@ — обновить можно из меню", version), seconds: 10)
+    /// Если в заметках к релизу есть первая фраза — показываем и её, чтобы было видно,
+    /// что именно изменилось, не открывая меню.
+    func announceUpdate(version: String, notes: String = "") {
+        if let first = firstSentence(of: notes) {
+            showHint(trf("Вышла версия %@. Что нового: %@. Обновить можно из меню", version, first), seconds: 12)
+        } else {
+            showHint(trf("Вышла версия %@ — обновить можно из меню", version), seconds: 10)
+        }
+    }
+
+    /// Первая фраза заметок: до точки, восклицательного или вопросительного знака,
+    /// не длиннее 120 знаков — пузырь не должен превращаться в стену текста.
+    private func firstSentence(of notes: String) -> String? {
+        let flat = notes
+            .replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !flat.isEmpty else { return nil }
+        let end = flat.firstIndex(where: { $0 == "." || $0 == "!" || $0 == "?" }) ?? flat.endIndex
+        let sentence = String(flat[flat.startIndex..<end]).trimmingCharacters(in: .whitespaces)
+        guard !sentence.isEmpty else { return nil }
+        return sentence.count > 120 ? String(sentence.prefix(120)) + "…" : sentence
     }
 
     /// Реплика по системному поводу; обычные поводы молчат, если реплики выключены или компаньон спит.

@@ -804,5 +804,6 @@ S.P.E.C.I.A.L. у Мота и стража, ПИАР у V	S.P.E.C.I.A.L. for Mot
 нет доступа	no access	kein Zugriff	sin acceso
 НЕТ ДОСТУПА	NO ACCESS	KEIN ZUGRIFF	SIN ACCESO
 Нет доступа к ключу в Связке ключей	No access to the key in the Keychain	Kein Zugriff auf den Schlüssel im Schlüsselbund	Sin acceso a la clave en el Llavero
+Вышла версия %@. Что нового: %@. Обновить можно из меню	Version %@ is out. What's new: %@. Update from the menu	Version %@ ist da. Neu: %@. Update über das Menü	Ya salió la versión %@. Novedades: %@. Actualiza desde el menú
 """#
 }
