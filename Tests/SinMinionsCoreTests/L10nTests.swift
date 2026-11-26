@@ -31,6 +31,23 @@ final class L10nTests: XCTestCase {
         XCTAssertEqual(Translations.en.count, Translations.es.count)
     }
 
+    /// Все реплики V должны быть переведены: иначе в en/de/es она молча переходит на русский.
+    /// Гейт check-l10n видит только литералы `tr(...)`, а реплики берутся из наборов,
+    /// поэтому нужна отдельная проверка.
+    func testEveryVPhraseIsTranslated() {
+        var missing: [String] = []
+        for kind in PhraseKind.allCases {
+            for hour in [3, 9, 15, 20] {
+                for phrase in PhraseBook.pool(kind, hour: hour, character: .v) {
+                    if Translations.en[phrase] == nil || Translations.de[phrase] == nil || Translations.es[phrase] == nil {
+                        missing.append("\(kind): \(phrase)")
+                    }
+                }
+            }
+        }
+        XCTAssertTrue(missing.isEmpty, "нет перевода у \(missing.count) реплик:\n" + missing.prefix(10).joined(separator: "\n"))
+    }
+
     func testPhrasesAndAnthemTranslated() {
         L10n.current = .en
         var book = PhraseBook(character: .ab)
