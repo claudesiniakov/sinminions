@@ -303,6 +303,21 @@ final class ConsoleController: NSObject, NSWindowDelegate {
         }
     }
 
+    /// Окна чата открыты и действительно видны.
+    var isShowing: Bool { isOpen && terminal.isVisible && terminal.alphaValue > 0.05 }
+
+    /// Показать уже открытые окна на текущем пространстве, не сбрасывая состояние чата:
+    /// так чат «переезжает» вместе с пользователем, а не оставляет его с пустым режимом.
+    func reveal(terminalRect: CGRect, monitorRect: CGRect) {
+        guard isOpen else { return }
+        setVisual(terminalRect, of: terminal)
+        setVisual(monitorRect, of: monitor)
+        terminal.alphaValue = 1
+        monitor.alphaValue = 1
+        monitor.orderFrontRegardless()
+        terminal.makeKeyAndOrderFront(nil)
+    }
+
     func open(terminalRect: CGRect, monitorRect: CGRect) {
         isOpen = true
         model.setShellMode(false)

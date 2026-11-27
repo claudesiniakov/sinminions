@@ -557,11 +557,8 @@ final class CompanionController: NSObject {
 
     // MARK: - Средний режим
 
-    private func openConsole() {
-        applyCharacter()
-        refreshLLM()
-        refreshSpecial()
-        refreshLimits()
+    /// Раскладка окон чата по текущему экрану и месту персонажа.
+    private func consoleLayout() -> (terminal: CGRect, monitor: CGRect, ghost: CGRect, moth: CGPoint) {
         let mothSize = view.mothFrame.size
         let area = area
         let place = Layout.console(
@@ -577,6 +574,29 @@ final class CompanionController: NSObject {
             terminalRect = saved.terminal
             monitorRect = saved.monitor
         }
+        return (terminalRect, monitorRect, ghost, place.moth)
+    }
+
+    /// Пересчитать раскладку и показать открытый чат на текущем пространстве.
+    private func relayoutConsole() {
+        guard console.isOpen else { return }
+        let layout = consoleLayout()
+        console.ghostRect = layout.ghost
+        console.defaultRects = (layout.terminal, layout.monitor)
+        console.reveal(terminalRect: layout.terminal, monitorRect: layout.monitor)
+    }
+
+    private func openConsole() {
+        applyCharacter()
+        refreshLLM()
+        refreshSpecial()
+        refreshLimits()
+        let layout = consoleLayout()
+        let ghost = layout.ghost
+        let terminalRect = layout.terminal
+        let monitorRect = layout.monitor
+        let place = (moth: layout.moth, terminal: layout.terminal, monitor: layout.monitor)
+        let mothSize = view.mothFrame.size
         console.areaProvider = { [weak self] in self?.area ?? .zero }
         console.ghostRect = ghost
         console.defaultRects = (place.terminal, place.monitor)
@@ -662,6 +682,12 @@ final class CompanionController: NSObject {
         }
         view.onDoubleClick = { [weak self] in
             guard let self else { return }
+            // Режим «чат открыт», но окон не видно (сменилось пространство, экран, полноэкранный
+            // режим) — показываем их, а не закрываем невидимое.
+            if self.engine.mode == .console, self.console.isOpen, !self.console.isShowing {
+                self.relayoutConsole()
+                return
+            }
             self.apply(self.engine.handle(.doubleClick, now: self.now))
         }
         view.onShoo = { [weak self] in
@@ -1267,8 +1293,11 @@ final class CompanionController: NSObject {
     /// Поэтому при смене пространства чат закрывается: следующий двойной щелчок открывает его заново.
     @objc private nonisolated func spaceChanged() {
         Task { @MainActor in
-            if self.engine.mode == .console {
-                self.apply(self.engine.handle(.closeConsole, now: self.now))
+            if self.engine.mode == .console, self.console.isOpen {
+                // Раньше чат здесь закрывался, и состояние расходилось с тем, что видно:
+                // окон нет, а режим «открыт», поэтому двойной щелчок только закрывал.
+                // Теперь чат переезжает: окна пересчитываются и показываются на новом месте.
+                self.relayoutConsole()
             }
             self.updateFullScreenHide()
         }
